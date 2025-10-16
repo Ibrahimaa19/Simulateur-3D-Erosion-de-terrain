@@ -4,7 +4,7 @@ Projet de Programmation Numérique dans le cadre du M1 CHPS [UVSQ - Paris Saclay
 ## Equipe du projet
 - Ibrahima DIALLO
 - Aboubacar-Bonfing SY
-- Pape Moussa NIANG
+- Papa Moussa NIANG
 - Amar LECHANI
 
 **Encadrant:** Mathys JAM
