@@ -22,3 +22,25 @@ void Terrain::load_vectices(){
     }
 }
 
+void Terrain::load_incides(){
+    indices.clear();
+    for (int z = 0; z < height - 1; z++) {
+        for (int x = 0; x < width - 1; x++) {
+            
+            int topLeft = z * width + x;
+            int topRight = topLeft + 1;
+            int bottomLeft = (z + 1) * width + x;
+            int bottomRight = bottomLeft + 1;
+            
+            
+            indices.push_back(topLeft);
+            indices.push_back(bottomLeft);
+            indices.push_back(topRight);
+            
+            indices.push_back(topRight);
+            indices.push_back(bottomLeft);
+            indices.push_back(bottomRight);
+        }
+    }
+}
+

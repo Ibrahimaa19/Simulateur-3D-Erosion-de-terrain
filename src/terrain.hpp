@@ -39,6 +39,14 @@ struct Terrain{
      * C'est à dire, si x est compris en [0; borderSize] ou [width-borderSize;width] ou si, z est compris entre [0; borderSize] ou [height-borderSize;height]
      */
     void load_vectices();
-    
+
+    /**
+     * @brief Créer un vecteur d'indices représentant les triangles à afficher.
+     * 
+     * Génère les indices des chaques triangles a afficher et les stocke dans le vecteur indices. Chaque carré du plan 2D, sera représenter avec deux triangles.
+     * 
+     * Par exemple, le premier carré de notre heightmap sera celui en haut à gauche, si on suppose que notre terrain est une matrice T de M*N. 
+     * Alors le premier carré sera T(0,0) T(0,1) T(1,0) T(1,1), donc deux triangles seront générer avec comme indice de sommets : [T(0,0);T(1,0);T(0,1)] et [T(1,0);T(0,0);T(1,1)] 
+     */
     void load_incides();
 };
