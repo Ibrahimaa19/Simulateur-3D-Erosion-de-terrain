@@ -1,3 +1,5 @@
+#define STB_IMAGE_IMPLEMENTATION
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -8,12 +10,15 @@
 #include "Shader.hpp"
 #include "Camera.hpp"
 
+#include "terrain.hpp"
+
+
 Camera camera;
 const float cameraSpeed = 0.1f;
 
 // Screen size globals
-int SCR_WIDTH = 800;
-int SCR_HEIGHT = 600;
+int SCR_WIDTH = 1224;
+int SCR_HEIGHT = 868;
 
 // Mouse tracking globals
 float lastX = SCR_WIDTH / 2.0f;
@@ -137,7 +142,7 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Cube Shader", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Height Map", nullptr, nullptr);
     if (!window) {
         glfwTerminate();
         return -1;
@@ -153,40 +158,13 @@ int main() {
     glewInit();
     glEnable(GL_DEPTH_TEST);
 
-    // --- Cube vertices
-    Vertex vertices[] = {
-        Vertex(-0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f),
-        Vertex( 0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f),
-        Vertex( 0.5f,  0.5f, -0.5f, 0.0f, 0.0f, 1.0f),
-        Vertex(-0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 0.0f),
-        Vertex(-0.5f, -0.5f,  0.5f, 1.0f, 0.0f, 1.0f),
-        Vertex( 0.5f, -0.5f,  0.5f, 0.0f, 1.0f, 1.0f),
-        Vertex( 0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 1.0f),
-        Vertex(-0.5f,  0.5f,  0.5f, 0.0f, 0.0f, 0.0f)
-    };
-
-    unsigned int indices[] = {
-        0,1,2, 2,3,0, 4,5,6, 6,7,4,
-        4,5,1, 1,0,4, 6,7,3, 3,2,6,
-        4,7,3, 3,0,4, 5,6,2, 2,1,5
-    };
-
     GLuint VBO, VAO, IBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &IBO);
 
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
-    glEnableVertexAttribArray(1);
+    Terrain mainTerrain = Terrain("../src/heightmap/iceland_heightmap.png");
+    
+	mainTerrain.load_incides();
+	mainTerrain.load_vectices();
+    mainTerrain.setup_terrain(VBO, VAO, IBO);
 
     // --- Shader
     Shader shader("../Shaders/shader.vs", "../Shaders/shader.fs");
@@ -215,8 +193,10 @@ int main() {
         glm::mat4 finalMatrix = projection * view * model;
         shader.SetMat4("gFinalMatrix", finalMatrix);
 
+
         glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mainTerrain.indices.size(), GL_UNSIGNED_INT, 0);
+        
 
         glfwSwapBuffers(window);
         glfwPollEvents();

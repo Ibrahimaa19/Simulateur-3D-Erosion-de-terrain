@@ -1,14 +1,15 @@
 #version 330 core
 
-layout(location = 0) in vec3 Position; // vertex position
-layout(location = 1) in vec3 aColor;   // vertex color
+layout(location = 0) in vec3 aPos; // vertex position
 
-out vec3 Color; // color passed to fragment shader
+out float height;
 
 uniform mat4 gFinalMatrix; // MVP matrix
 
 void main()
 {
-    gl_Position = gFinalMatrix * vec4(Position, 1.0);
-    Color = aColor;
+    vec4 v = vec4(aPos.x, aPos.y/10., aPos.z, 1.0); 
+    height = aPos.y/10.;
+
+    gl_Position = gFinalMatrix * v;
 }
