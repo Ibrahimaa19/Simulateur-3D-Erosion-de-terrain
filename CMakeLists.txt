@@ -1,20 +1,31 @@
-cmake_minimum_required (VERSION 3.0)
-project (Erosion)
+cmake_minimum_required(VERSION 3.10)
 
+project(erosion)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Trouver les packages nécessaires
 find_package(OpenGL REQUIRED)
+find_package(GLEW REQUIRED)
+find_package(glfw3 REQUIRED)
+find_package(glm REQUIRED)
 
-add_subdirectory (lib)
+# Rassembler toutes les sources de src/
+file(GLOB SOURCE_FILES src/*.cpp)
 
-include_directories(
-	lib/glfw-3.1.2/include/
-	lib/glm-0.9.7.1/
-	lib/glew-1.13.0/include/
+# Créer l'exécutable
+add_executable(${PROJECT_NAME} ${SOURCE_FILES})
+
+target_include_directories(${PROJECT_NAME}
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src
 )
 
-add_executable(erosion 
-    src/main.cpp 
-    shaders/SimpleFragmentShader.fragmentshader
-    shaders/SimpleVertexShader.vertexshader)
-
-target_include_directories(erosion PUBLIC ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(erosion ${OPENGL_LIBRARY} glfw GLEW_1130)
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE
+        OpenGL::GL
+        GLEW::GLEW
+        glfw
+        glm::glm
+)
