@@ -1,36 +1,43 @@
 cmake_minimum_required(VERSION 3.10)
-
 project(erosion)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Trouver les packages nécessaires
+# Find required packages
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
 
-# Rassembler toutes les sources de src/
+# Collect all source files from src/
 file(GLOB SOURCE_FILES src/*.cpp)
 
-# Créer l'exécutable
+# Create the executable
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
+# Include header directories
 target_include_directories(${PROJECT_NAME}
     PRIVATE
         ${PROJECT_SOURCE_DIR}/src
+        ${GLEW_INCLUDE_DIRS}
+        ${GLFW_INCLUDE_DIRS}
+        ${GLM_INCLUDE_DIRS}
 )
 
+# Define GLEW_STATIC if needed
+add_definitions(-DGLEW_STATIC)
+
+# Link the libraries
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         OpenGL::GL
         GLEW::GLEW
         glfw
-        glm::glm
 )
+
 # --------------------------------------------------------------------
-#                            GOOGLE TEST
+# GOOGLE TEST
 # --------------------------------------------------------------------
 include(FetchContent)
 
@@ -40,7 +47,5 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(googletest)
-
 enable_testing()
-
 add_subdirectory(tests)

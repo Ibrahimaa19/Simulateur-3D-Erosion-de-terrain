@@ -1,5 +1,4 @@
-#ifndef TEST_SHADER_HPP
-#define TEST_SHADER_HPP
+#pragma once
 
 #include <gtest/gtest.h>
 #include <GL/glew.h>
@@ -7,10 +6,10 @@
 
 /**
  * @class ShaderTest
- * @brief Fixture pour tester la classe Shader avec contexte OpenGL.
+ * @brief Fixture for testing the Shader class with an OpenGL context.
  *
- * Initialise un contexte OpenGL minimal pour pouvoir créer et compiler
- * des shaders dans les tests.
+ * Initializes a minimal OpenGL context to create and compile
+ * shaders in tests.
  */
 class ShaderTest : public ::testing::Test
 {
@@ -19,27 +18,27 @@ protected:
 
     void SetUp() override
     {
-        // Initialiser GLFW
+        // Initialize GLFW
         if (!glfwInit()) {
-            FAIL() << "Impossible d'initialiser GLFW";
+            FAIL() << "Failed to initialize GLFW";
         }
 
-        // Créer une fenêtre invisible
+        // Create an invisible window
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
         mWindow = glfwCreateWindow(100, 100, "Test OpenGL", nullptr, nullptr);
         if (!mWindow) {
             glfwTerminate();
-            FAIL() << "Impossible de créer une fenêtre GLFW pour les tests";
+            FAIL() << "Failed to create a GLFW window for tests";
         }
 
         glfwMakeContextCurrent(mWindow);
 
-        // Initialiser GLEW
+        // Initialize GLEW
         glewExperimental = GL_TRUE;
         GLenum err = glewInit();
         if (err != GLEW_OK) {
             std::cerr << "Failed to initialize GLEW: "
-                    << glewGetErrorString(err) << std::endl;
+                      << glewGetErrorString(err) << std::endl;
         }
     }
 
@@ -52,5 +51,3 @@ protected:
         }
     }
 };
-
-#endif // TEST_SHADER_HPP

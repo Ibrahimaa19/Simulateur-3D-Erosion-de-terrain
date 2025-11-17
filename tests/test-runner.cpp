@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 /**
- * @brief Fonction principale du framework GoogleTest.
+ * @brief Main function for the GoogleTest framework.
  */
 int main(int argc, char **argv)
 {
