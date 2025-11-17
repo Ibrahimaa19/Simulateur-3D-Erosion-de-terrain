@@ -1,4 +1,7 @@
 #include <vector>
+#include <iostream>
+#include <GL/glew.h>
+
 #include "stb_image.h"
 
 struct Terrain{
@@ -17,15 +20,26 @@ struct Terrain{
      */
     Terrain (const char* image_path){
         int t_channels;
+
         unsigned char* image = stbi_load(image_path, &this->width, &this->height, &t_channels, 1);
-        
+
+        if (image){
+            std::cout << "Loaded heightmap of size " << height << " x " << width << std::endl;
+        }else{
+            std::cout << "Failed to load texture" << std::endl;
+        }
+
         this->data.resize(height*width);
 
         this->borderSize = 10;
 
+        
+
         for (int i = 0; i < width * height; i++) {
             this->data[i] = image[i] / 255.0f;
         }
+
+        
 
         stbi_image_free(image);
     }
@@ -49,4 +63,6 @@ struct Terrain{
      * Alors le premier carré sera T(0,0) T(0,1) T(1,0) T(1,1), donc deux triangles seront générer avec comme indice de sommets : [T(0,0);T(1,0);T(0,1)] et [T(1,0);T(0,0);T(1,1)] 
      */
     void load_incides();
+
+    void setup_terrain(GLuint &VAO, GLuint &VBO, GLuint &EBO);
 };
