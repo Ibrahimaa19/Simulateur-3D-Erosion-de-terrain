@@ -185,7 +185,6 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         view = camera.GetViewMatrix();
-
         glm::mat4 finalMatrix = projection * view * model;
         shader.SetMat4("gFinalMatrix", finalMatrix);
 
