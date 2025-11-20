@@ -1,5 +1,4 @@
 #include "HydraulicErosion.h"
-#include <cstdlib>
 
 HydraulicErosion::HydraulicErosion(int iterations,
                                    float rain,
@@ -14,14 +13,12 @@ HydraulicErosion::HydraulicErosion(int iterations,
 {
 }
 
-void HydraulicErosion::apply(HeightField& terrain)
+void HydraulicErosion::apply(Terrain& terrain)
 {
-    int n = terrain.size;
-
     for (int it = 0; it < iterations; it++)
     {
-        int i = rand() % n;
-        int j = rand() % n;
+        int i = rand() % terrain.height;
+        int j = rand() % terrain.width;
 
         float water = rain;
         float sediment = 0.0f;
@@ -65,9 +62,9 @@ void HydraulicErosion::apply(HeightField& terrain)
             float slope = h - lowestH;
 
             float erodeAmount = erosionRate * slope * water;
-
-            sediment += erodeAmount;
+ 
             terrain.SetHeight(i, j, -erodeAmount);
+            sediment += erodeAmount; // la matière transportée devient du sédiment
 
             i = lowestI;
             j = lowestJ;
