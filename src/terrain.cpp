@@ -7,17 +7,17 @@ void Terrain::load_vectices(){
         for (int x = 0; x < width; x++) {
             bool isBorder = (x < borderSize || x >= width - borderSize || z < borderSize || z >= height - borderSize); // Si on est dans le bordure, alors isBorder devient true
             int index = z * width + x;
-            float y = data[index] * 10.0f; // Ajoute un facteur 10, pour metter en évidence différences de hauteur.
+            float y = data[index];
             
             
-            vertices.push_back((float)x/200.);  
+            vertices.push_back((float)x/100.f);  
             if(isBorder){
                 vertices.push_back(0.0f); // en bordure on aplatit
             }else{
                 vertices.push_back(y);
             }
                         
-            vertices.push_back((float)z/200.);        
+            vertices.push_back((float)z/100.f);        
         }
     }
 }
@@ -74,3 +74,14 @@ void Terrain::setup_terrain(GLuint &VAO, GLuint &VBO, GLuint &EBO){
     
 }
 
+int Terrain::getHeight(int i, int j) const{
+
+}
+
+void Terrain::setHeight(int i, int j, float value){
+    
+}
+
+bool Terrain::inside(int i, int j) const{
+    
+}

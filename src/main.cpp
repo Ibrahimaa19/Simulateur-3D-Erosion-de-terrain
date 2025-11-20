@@ -179,15 +179,11 @@ int main() {
     view = camera.GetViewMatrix();
     projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 
-    float angle = 0.0f;
     while (!glfwWindowShouldClose(window)) {
 
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // rotate cube
-        angle += 0.5f;
-        model = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0,1,0));
         view = camera.GetViewMatrix();
 
         glm::mat4 finalMatrix = projection * view * model;

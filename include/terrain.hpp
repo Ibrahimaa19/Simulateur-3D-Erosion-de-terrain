@@ -9,6 +9,7 @@ struct Terrain{
 	int height;
 	int width;
 	int borderSize;
+    int cellSpacing;
 	std::vector<float> vertices;
 	std::vector<unsigned int> indices;
 
@@ -32,7 +33,7 @@ struct Terrain{
         this->data.resize(height*width);
 
         this->borderSize = 10;
-
+        this->cellSpacing = 1;
         
 
         for (int i = 0; i < width * height; i++) {
@@ -64,5 +65,21 @@ struct Terrain{
      */
     void load_incides();
 
+    /**
+     * @brief Met en place les buffers pour le terrain
+     * 
+     * Remplis les buffers passer en argument avec les valeurs correspondant au terrain courant.
+     * 
+     * @param VAO le vertex array object, mode de lecture du VBO
+     * @param VBO le vertex buffer object, buffer contenant tout les sommets
+     * @param EBO le element buffer object, les triangles a afficher
+     */
     void setup_terrain(GLuint &VAO, GLuint &VBO, GLuint &EBO);
+
+    
+    int getHeight(int i, int j) const;
+
+    void setHeight(int i, int j, float value);
+
+    bool inside(int i, int j) const;
 };
