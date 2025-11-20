@@ -44,6 +44,23 @@ struct Terrain{
         stbi_image_free(image);
     }
 
+    // Accès à une hauteur
+    float GetHeight(int i, int j) const
+    {
+        return data[i * width + j];
+    }
+
+    // mise à jour d'une hauteur
+    void SetHeight(int i, int j, float value)
+    {
+        data[i * width + j] += value;
+    }
+
+    // vérifier si on n'est pas hors terrain
+    bool inside(int i, int j) const {
+        return (i >= 0 && i < height && j >= 0 && j < width);
+    }
+
     /**
      * @brief Met à jours le vecteur vertices, en fonction des valeurs dans data
      * 

@@ -1,5 +1,4 @@
-#pragma once
-#include "HeightField.h"
+#include "../include/terrain.hpp"
 
 /**
  * @class ThermalErosion
@@ -22,7 +21,7 @@ public:
      * @brief Applique une itération d'érosion thermique sur le terrain
      * @param terrain Terrain sur lequel appliquer l'érosion
      */
-    void step(HeightField& terrain);
+    void step(Terrain& terrain);
 
 private:
     float talusAngle;
