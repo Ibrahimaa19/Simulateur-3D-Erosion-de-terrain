@@ -1,4 +1,4 @@
-#include "HeightField.h"
+#include "../include/terrain.hpp"
 
 /**
  * @class HydraulicErosion
@@ -28,7 +28,7 @@ public:
      * @brief Applique l'érosion hydraulique sur le terrain
      * @param terrain Terrain sur lequel appliquer l'érosion
      */
-    void apply(HeightField& terrain);
+    void apply(Terrain& terrain);
 
 private:
     int iterations;   
