@@ -185,11 +185,7 @@ int main() {
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // rotate cube
-        angle += 0.5f;
-        model = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0,1,0));
         view = camera.GetViewMatrix();
-
         glm::mat4 finalMatrix = projection * view * model;
         shader.SetMat4("gFinalMatrix", finalMatrix);
 
