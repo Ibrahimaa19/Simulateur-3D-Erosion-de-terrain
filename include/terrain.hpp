@@ -1,3 +1,6 @@
+#ifndef TERRAIN_H
+#define TERRAIN_H
+
 #include <vector>
 #include <iostream>
 #include <GL/glew.h>
@@ -87,3 +90,5 @@ struct Terrain{
     bool inside(int i, int j) const;
 
 };
+
+#endif

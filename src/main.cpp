@@ -11,6 +11,7 @@
 #include "Camera.hpp"
 
 #include "terrain.hpp"
+#include "ThermalErosion.h"
 
 
 Camera camera;
@@ -162,9 +163,17 @@ int main() {
 
     Terrain mainTerrain = Terrain("../src/heightmap/iceland_heightmap.png");
     
-	mainTerrain.load_incides();
+
+    ThermalErosion thermal = ThermalErosion();
+    for (size_t i =0;i<20;i++){
+        thermal.step(mainTerrain);
+    }
+
+    mainTerrain.load_incides();
 	mainTerrain.load_vectices();
     mainTerrain.setup_terrain(VBO, VAO, IBO);
+    
+
 
     // --- Shader
     Shader shader("../Shaders/shader.vs", "../Shaders/shader.fs");
