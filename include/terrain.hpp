@@ -64,6 +64,15 @@ struct Terrain{
      */
     void load_incides();
 
+    /**
+     * @brief Met en place les buffers pour le terrain
+     * 
+     * Remplis les buffers passer en argument avec les valeurs correspondant au terrain courant.
+     * 
+     * @param VAO le vertex array object, mode de lecture du VBO
+     * @param VBO le vertex buffer object, buffer contenant tout les sommets
+     * @param EBO le element buffer object, les triangles a afficher
+     */
     void setup_terrain(GLuint &VAO, GLuint &VBO, GLuint &EBO);
 
 
