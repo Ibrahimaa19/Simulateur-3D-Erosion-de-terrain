@@ -1,14 +1,13 @@
-#include <iostream>
+#include <vector>
 #include "ThermalErosion.h"
 
 ThermalErosion::ThermalErosion(float talusAngle, float c)
     : talusAngle(talusAngle), c(c) {}
 
 
-void ThermalErosion::step(HeightField& terrain)
+void ThermalErosion::step(Terrain& terrain)
 {
-    int n = terrain.size;
-    float cellSize = terrain.cellSpacing;
+    float cellSize = 1.0f;
 
     // Les 8 voisins
     int di[8] = { -1,-1,-1, 0, 1, 1, 1, 0 };
@@ -20,9 +19,11 @@ void ThermalErosion::step(HeightField& terrain)
         1.4142f, 1.0f
     };
 
-    for (int i = 0; i < n; i++)
+    std::vector<float> delta(terrain.height * terrain.width, 0.0f);
+
+    for (int i = 0; i < terrain.height; i++)
     {
-        for (int j = 0; j < n; j++)
+        for (int j = 0; j < terrain.width; j++)
         {
             float currentHeight = terrain.GetHeight(i, j);
 
@@ -56,10 +57,16 @@ void ThermalErosion::step(HeightField& terrain)
 
                 if (slopeAngle > talusAngle)
                 {
-                    terrain.SetHeight(i, j, -c * maxSlope);
-                    terrain.SetHeight(lowestI, lowestJ, c * maxSlope);
+                    float amount = c * maxSlope;
+                    
+                    delta[i * terrain.width + j] -= amount;
+                    delta[lowestI * terrain.width + lowestJ] += amount;
                 }
             }
         }
     }
+
+    // appliquer les changements
+    for (int i = 0; i < terrain.width * terrain.height; i++)
+        terrain.data[i] += delta[i];
 }
