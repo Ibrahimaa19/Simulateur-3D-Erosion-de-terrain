@@ -74,3 +74,14 @@ void Terrain::setup_terrain(GLuint &VAO, GLuint &VBO, GLuint &EBO){
     
 }
 
+int Terrain::getHeight(int i, int j) const{
+    return data[i * width + j];
+}
+
+void Terrain::setHeight(int i, int j, float value){
+    data[i * width + j] += value;
+}
+
+bool Terrain::inside(int i, int j) const {
+    return (i >= 0 && i < height && j >= 0 && j < width);
+}

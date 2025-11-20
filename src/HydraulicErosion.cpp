@@ -25,7 +25,7 @@ void HydraulicErosion::apply(Terrain& terrain)
 
         for (int step = 0; step < 15; step++)
         {
-            float h = terrain.GetHeight(i, j);
+            float h = terrain.getHeight(i, j);
 
             int lowestI = i;
             int lowestJ = j;
@@ -42,7 +42,7 @@ void HydraulicErosion::apply(Terrain& terrain)
 
                     if (!terrain.inside(ni, nj)) continue;
 
-                    float hn = terrain.GetHeight(ni, nj);
+                    float hn = terrain.getHeight(ni, nj);
 
                     if (hn < lowestH)
                     {
@@ -55,7 +55,7 @@ void HydraulicErosion::apply(Terrain& terrain)
 
             if (lowestI == i && lowestJ == j)
             {
-                terrain.SetHeight(i, j, sediment * depositRate);
+                terrain.setHeight(i, j, sediment * depositRate);
                 break;
             }
 
@@ -63,7 +63,7 @@ void HydraulicErosion::apply(Terrain& terrain)
 
             float erodeAmount = erosionRate * slope * water;
  
-            terrain.SetHeight(i, j, -erodeAmount);
+            terrain.setHeight(i, j, -erodeAmount);
             sediment += erodeAmount; // la matière transportée devient du sédiment
 
             i = lowestI;

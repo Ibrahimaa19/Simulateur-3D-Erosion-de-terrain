@@ -25,7 +25,7 @@ void ThermalErosion::step(Terrain& terrain)
     {
         for (int j = 0; j < terrain.width; j++)
         {
-            float currentHeight = terrain.GetHeight(i, j);
+            float currentHeight = terrain.getHeight(i, j);
 
             int lowestI = -1; 
             int lowestJ = -1;
@@ -40,7 +40,7 @@ void ThermalErosion::step(Terrain& terrain)
                 if (!terrain.inside(ni, nj))
                     continue;
 
-                float diff = currentHeight - terrain.GetHeight(ni, nj);
+                float diff = currentHeight - terrain.getHeight(ni, nj);
 
                 if (diff > maxSlope && diff > 0.0f)
                 {
