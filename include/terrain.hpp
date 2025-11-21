@@ -1,8 +1,11 @@
 #ifndef TERRAIN_H
 #define TERRAIN_H
 
+#include <string.h>
 #include <vector>
 #include <iostream>
+#include <mutex>
+#include <thread>
 #include <GL/glew.h>
 
 #include "stb_image.h"
@@ -79,6 +82,10 @@ struct Terrain{
      */
     void setup_terrain(GLuint &VAO, GLuint &VBO, GLuint &EBO);
 
+    /**
+     * @brief Dessine les triangles avec les données du terrain
+    */
+    virtual void renderer();
 
     // Accès à une hauteur
     int getHeight(int i, int j) const;
@@ -88,6 +95,65 @@ struct Terrain{
 
     // vérifier si on n'est pas hors terrain
     bool inside(int i, int j) const;
+
+};
+
+/**
+ * @brief Enumeration des différents types d'érosion
+ *
+ * @param Thermal pour l'érosion thermique
+ * @param Hydraulic pour l'érosion hydraulique
+ * 
+ */
+enum ErosionType{
+    Thermal,
+    Hydraulic
+};
+
+struct TerrainDynamique : public Terrain{
+	std::vector<float> back_data; // les données sur lequels le thread écrira
+	std::mutex verrou;
+	bool need_swap = false; // Si true on mettra a jour le VBO
+	GLint VBO;
+    ErosionType type_erosion;
+    size_t iteration_counter = 0; // Compteur du nombre d'iteration effectué
+
+    /**
+     * @brief Contructeur de la structure de données fille DynamiqueTerrain avec l'image passer en paramètre
+     *
+     * @param image_path Un chemin vers une image à lire
+     * @param vbo Le buffer associé à ce terrain
+     * @return Une structure Terrain correspondant avec l'image passer en paramètre
+     */
+    TerrainDynamique(const char* image_path,GLuint vbo, ErosionType erosion) : Terrain(image_path){
+		this->VBO = vbo;
+		this->back_data = data;
+        this->type_erosion = erosion;
+	}
+
+    /**
+     * @brief Lance le thread qui calculera l'érosion pour le terrain en fonction de son type d'érosion
+     * @param max_iteration Le nombre maximum d'itération effectuer par le thread
+     * @param seconds Les secondes a attendre avant de lancer la prochaine iteration
+    */
+    void startThread(size_t max_iteration,size_t seconds);
+
+    /**
+     * @brief La fonction qui sera lancer par le thread pour simuler l'erosion
+     * @param max_iteration Le nombre maximum d'itération effectuer par le thread
+     * @param seconds Les secondes a attendre avant de lancer la prochaine iteration
+    */
+    void updateTerrainThermal(size_t max_iteration,size_t seconds);
+
+    /**
+     * @brief Met à jour le vecteur vertices et le VBO du terrain avec les données de data
+    */
+    void updateVBO();
+
+    /**
+     * @brief Dessine les triangles avec les données mise à jour du terrain
+    */
+    void renderer();
 
 };
 
