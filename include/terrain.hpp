@@ -14,6 +14,8 @@ struct Terrain{
 	std::vector<float> data; // matrice des valeurs de chaque pixel
 	int height;
 	int width;
+    float yfactor;
+    float xzfactor; // pour redimensionner l'axe x et z
 	int borderSize;
     int cellSpacing;
 	std::vector<float> vertices;
@@ -25,7 +27,7 @@ struct Terrain{
      * @param image_path Un chemin vers une image à lire
      * @return Une structure Terrain correspondant avec l'image passer en paramètre
      */
-    Terrain (const char* image_path){
+    Terrain (const char* image_path,float yfactor,float xzfactor){
         int t_channels;
 
         unsigned char* image = stbi_load(image_path, &this->width, &this->height, &t_channels, 1);
@@ -40,6 +42,8 @@ struct Terrain{
 
         this->borderSize = 10;
         this->cellSpacing = 1;
+        this->yfactor = yfactor;
+        this->xzfactor = xzfactor;
         
 
         for (int i = 0; i < width * height; i++) {
@@ -125,7 +129,7 @@ struct TerrainDynamique : public Terrain{
      * @param vbo Le buffer associé à ce terrain
      * @return Une structure Terrain correspondant avec l'image passer en paramètre
      */
-    TerrainDynamique(const char* image_path,GLuint vbo, ErosionType erosion) : Terrain(image_path){
+    TerrainDynamique(const char* image_path,float _yfactor,float _xzfactor,GLuint vbo, ErosionType erosion) : Terrain(image_path,_yfactor,_xzfactor){
 		this->VBO = vbo;
 		this->back_data = data;
         this->type_erosion = erosion;

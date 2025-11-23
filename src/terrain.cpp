@@ -7,17 +7,17 @@ void Terrain::load_vectices(){
         for (int x = 0; x < width; x++) {
             bool isBorder = (x < borderSize || x >= width - borderSize || z < borderSize || z >= height - borderSize); // Si on est dans le bordure, alors isBorder devient true
             int index = z * width + x;
-            float y = data[index];
+            float y = data[index]*yfactor;
             
             
-            vertices.push_back((float)x/100.f);  
+            vertices.push_back((float)x/xzfactor);  
             if(isBorder){
                 vertices.push_back(0.0f); // en bordure on aplatit
             }else{
                 vertices.push_back(y);
             }
                         
-            vertices.push_back((float)z/100.f);        
+            vertices.push_back((float)z/xzfactor);        
         }
     }
 }
