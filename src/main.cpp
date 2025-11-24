@@ -13,6 +13,7 @@
 #include "terrain.hpp"
 #include "ThermalErosion.h"
 
+#include "Gui.hpp" 
 
 Camera camera;
 const float cameraSpeed = 0.1f;
@@ -26,6 +27,8 @@ float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 float mouseSensitivity = 0.1f;
+
+bool showMenu = true; 
 
 // Transform matrices globals
 glm::mat4 model = glm::mat4(1.0f);
@@ -52,6 +55,7 @@ void ShowMenu()
     std::cout << "  D : Move right\n";
     std::cout << "  Q : Move up\n";
     std::cout << "  E : Move down\n";
+    std::cout << "  M : Toggle Mouse/Menu (Compatible AZERTY/QWERTY)\n"; 
     std::cout << "  ESC : Quit\n";
     std::cout << "  H : Show this menu\n\n";
     std::cout << "Mouse :\n";
@@ -77,6 +81,23 @@ void FramebufferSizeCallback(GLFWwindow* window, int width, int height) {
 // Keyboard input
 void HandleKeyBoardInput(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
+    if (action == GLFW_PRESS) 
+    {
+    
+        if (key == GLFW_KEY_M || key == GLFW_KEY_SEMICOLON) {
+            
+            showMenu = !showMenu; 
+            
+            if (showMenu) {
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            } else {
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                firstMouse = true; 
+            return; 
+            }
+        }
+    }
+
     if (action == GLFW_PRESS || action == GLFW_REPEAT)
     {
         switch (key)
@@ -111,6 +132,8 @@ void HandleKeyBoardInput(GLFWwindow* window, int key, int scancode, int action, 
 
 void HandleMouseInput(GLFWwindow *window, double xpos, double ypos)
 {
+    if (showMenu) return;
+
     if(firstMouse)
     {
         lastX = (float)xpos;
@@ -133,6 +156,9 @@ void HandleMouseInput(GLFWwindow *window, double xpos, double ypos)
 
 void HandleScrollCallback(GLFWwindow *window, double xoffset, double yoffset)
 {
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return; 
+
     camera.Move(camera.GetForward(), (float)yoffset);
 }
 
@@ -152,7 +178,14 @@ int main() {
     glfwSetFramebufferSizeCallback(window, FramebufferSizeCallback);
     glfwSetKeyCallback(window, HandleKeyBoardInput);
     glfwSetCursorPosCallback(window, HandleMouseInput);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    
+    // --- CONFIGURATION INITIALE
+    if (showMenu) {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    } else {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    }
+
     glfwSetScrollCallback(window, HandleScrollCallback);
 
     // --- Initialize GLEW
@@ -181,6 +214,11 @@ int main() {
     view = camera.GetViewMatrix();
     projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 
+    // ---Initialisation de l'interface
+    Gui myGui;
+    myGui.Init(window);
+
+    float angle = 0.0f;
     while (!glfwWindowShouldClose(window)) {
 
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -195,10 +233,21 @@ int main() {
         mainTerrain.renderer();
 
         
+        
+        myGui.cameraPos = glm::vec3(glm::inverse(view)[3]);
+
+        if (showMenu) {
+            
+            myGui.Render(&mainTerrain);
+        }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+
+    // --- Nettoyage
+    myGui.Shutdown();
+    
 
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
