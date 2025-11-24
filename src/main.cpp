@@ -194,17 +194,10 @@ int main() {
 
     GLuint VBO, VAO, IBO;
 
-    Terrain mainTerrain = Terrain("../src/heightmap/iceland_heightmap.png");
+    TerrainDynamique mainTerrain = TerrainDynamique("../src/heightmap/iceland_heightmap.png",1.f,100.f,VBO,ErosionType::Thermal);
     
-
-    ThermalErosion thermal = ThermalErosion();
-    for (size_t i =0;i<20;i++){
-        thermal.step(mainTerrain);
-    }
-
-    mainTerrain.load_incides();
-	mainTerrain.load_vectices();
-    mainTerrain.setup_terrain(VBO, VAO, IBO);
+    mainTerrain.setup_terrain(VAO, VBO, IBO);
+    //mainTerrain.startThread(50,1);
     
 
 
@@ -237,7 +230,8 @@ int main() {
 
 
         glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, mainTerrain.indices.size(), GL_UNSIGNED_INT, 0);
+        mainTerrain.renderer();
+
         
         
         myGui.cameraPos = glm::vec3(glm::inverse(view)[3]);

@@ -1,8 +1,11 @@
 #ifndef TERRAIN_H
 #define TERRAIN_H
 
+#include <string.h>
 #include <vector>
 #include <iostream>
+#include <mutex>
+#include <thread>
 #include <GL/glew.h>
 
 #include "stb_image.h"
@@ -11,7 +14,10 @@ struct Terrain{
 	std::vector<float> data; // matrice des valeurs de chaque pixel
 	int height;
 	int width;
+    float yfactor;
+    float xzfactor; // pour redimensionner l'axe x et z
 	int borderSize;
+    int cellSpacing;
 	std::vector<float> vertices;
 	std::vector<unsigned int> indices;
 
@@ -21,7 +27,7 @@ struct Terrain{
      * @param image_path Un chemin vers une image à lire
      * @return Une structure Terrain correspondant avec l'image passer en paramètre
      */
-    Terrain (const char* image_path){
+    Terrain (const char* image_path,float yfactor,float xzfactor){
         int t_channels;
 
         unsigned char* image = stbi_load(image_path, &this->width, &this->height, &t_channels, 1);
@@ -35,7 +41,9 @@ struct Terrain{
         this->data.resize(height*width);
 
         this->borderSize = 10;
-
+        this->cellSpacing = 1;
+        this->yfactor = yfactor;
+        this->xzfactor = xzfactor;
         
 
         for (int i = 0; i < width * height; i++) {
@@ -78,6 +86,10 @@ struct Terrain{
      */
     void setup_terrain(GLuint &VAO, GLuint &VBO, GLuint &EBO);
 
+    /**
+     * @brief Dessine les triangles avec les données du terrain
+    */
+    virtual void renderer();
 
     // Accès à une hauteur
     int getHeight(int i, int j) const;
@@ -87,6 +99,65 @@ struct Terrain{
 
     // vérifier si on n'est pas hors terrain
     bool inside(int i, int j) const;
+
+};
+
+/**
+ * @brief Enumeration des différents types d'érosion
+ *
+ * @param Thermal pour l'érosion thermique
+ * @param Hydraulic pour l'érosion hydraulique
+ * 
+ */
+enum ErosionType{
+    Thermal,
+    Hydraulic
+};
+
+struct TerrainDynamique : public Terrain{
+	std::vector<float> back_data; // les données sur lequels le thread écrira
+	std::mutex verrou;
+	bool need_swap = false; // Si true on mettra a jour le VBO
+	GLint VBO;
+    ErosionType type_erosion;
+    size_t iteration_counter = 0; // Compteur du nombre d'iteration effectué
+
+    /**
+     * @brief Contructeur de la structure de données fille DynamiqueTerrain avec l'image passer en paramètre
+     *
+     * @param image_path Un chemin vers une image à lire
+     * @param vbo Le buffer associé à ce terrain
+     * @return Une structure Terrain correspondant avec l'image passer en paramètre
+     */
+    TerrainDynamique(const char* image_path,float _yfactor,float _xzfactor,GLuint vbo, ErosionType erosion) : Terrain(image_path,_yfactor,_xzfactor){
+		this->VBO = vbo;
+		this->back_data = data;
+        this->type_erosion = erosion;
+	}
+
+    /**
+     * @brief Lance le thread qui calculera l'érosion pour le terrain en fonction de son type d'érosion
+     * @param max_iteration Le nombre maximum d'itération effectuer par le thread
+     * @param seconds Les secondes a attendre avant de lancer la prochaine iteration
+    */
+    void startThread(size_t max_iteration,size_t seconds);
+
+    /**
+     * @brief La fonction qui sera lancer par le thread pour simuler l'erosion
+     * @param max_iteration Le nombre maximum d'itération effectuer par le thread
+     * @param seconds Les secondes a attendre avant de lancer la prochaine iteration
+    */
+    void updateTerrainThermal(size_t max_iteration,size_t seconds);
+
+    /**
+     * @brief Met à jour le vecteur vertices et le VBO du terrain avec les données de data
+    */
+    void updateVBO();
+
+    /**
+     * @brief Dessine les triangles avec les données mise à jour du terrain
+    */
+    void renderer();
 
 };
 
