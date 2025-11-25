@@ -12,12 +12,18 @@
 
 #include "terrain.hpp"
 #include "ThermalErosion.h"
+#include "HydraulicErosion.h"
 
 
 Camera camera;
 const float cameraSpeed = 0.1f;
-static bool erosionEnabled = false;
-static bool erosionStarted = false;
+
+static bool thermalEnabled = false;
+static bool thermalStarted = false;
+
+static bool hydraulicEnabled = false;
+static bool hydraulicStarted = false;
+
 
 // Screen size globals
 int SCR_WIDTH = 1224;
@@ -108,10 +114,17 @@ void HandleKeyBoardInput(GLFWwindow* window, int key, int scancode, int action, 
             ShowMenu();
             break;
         case GLFW_KEY_F:
-            erosionEnabled = !erosionEnabled;
-            if (erosionEnabled && !erosionStarted) {
-                std::cout << "start erosion\n";
-                erosionStarted = true;
+            thermalEnabled = !thermalEnabled;
+            if (thermalEnabled && !thermalStarted) {
+                std::cout << "start thermal erosion\n";
+                thermalStarted = true;
+            }
+            break;
+        case GLFW_KEY_G:
+            hydraulicEnabled = !hydraulicEnabled;
+            if (hydraulicEnabled && !hydraulicStarted) {
+                std::cout << "start hydraulic erosion\n";
+                hydraulicStarted = true;
             }
             break;
         }
@@ -172,9 +185,6 @@ int main() {
 
     Terrain mainTerrain = Terrain("../src/heightmap/iceland_heightmap.png");
     
-
-    ThermalErosion thermal = ThermalErosion();
-
     mainTerrain.load_incides();
     mainTerrain.load_vectices();
     mainTerrain.setup_terrain(VBO, VAO, IBO);
@@ -192,6 +202,10 @@ int main() {
     view = camera.GetViewMatrix();
     projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 
+
+    ThermalErosion thermal = ThermalErosion();
+    HydraulicErosion hydraulic = HydraulicErosion();
+
     int stepCounter = 0;
 
     while (!glfwWindowShouldClose(window)) {
@@ -204,9 +218,19 @@ int main() {
         shader.SetMat4("gFinalMatrix", finalMatrix);
 
         // Gestion de l'érosion
-        if (erosionEnabled) {
+        if (thermalEnabled) {
             // Appliquer une seule étape d'érosion par frame
             thermal.step(mainTerrain);
+            stepCounter++;
+            
+            if (stepCounter % 10 == 0) {
+                std::cout << "Erosion step " << stepCounter << std::endl;
+            }
+        }
+        
+        if (hydraulicEnabled) {
+            // Appliquer une seule étape d'érosion par frame
+            hydraulic.apply(mainTerrain);
             stepCounter++;
             
             if (stepCounter % 10 == 0) {

@@ -13,9 +13,9 @@ public:
     /**
      * @brief Constructeur de la classe ThermalErosion
      * @param talusAngle Angle critique des pentes (tangent), au-dessus duquel la matière est déplacée
-     * @param transferRate Fraction de matériau transférée par itération
+     * @param transferRate Coefficient de diffusion
      */
-    ThermalErosion(float talusAngle = 12.0f, float tranferRate = 2.0f);
+    ThermalErosion(float talusAngle = 12.0f, float tranferRate = 0.9f);
 
     /**
      * @brief Applique une itération d'érosion thermique sur le terrain

@@ -63,7 +63,7 @@ void HydraulicErosion::apply(Terrain& terrain)
 
             float erodeAmount = erosionRate * slope * water;
  
-            terrain.setHeight(i, j, -erodeAmount);
+            terrain.setHeight(i, j, h - erodeAmount);
             sediment += erodeAmount; // la matière transportée devient du sédiment
 
             i = lowestI;

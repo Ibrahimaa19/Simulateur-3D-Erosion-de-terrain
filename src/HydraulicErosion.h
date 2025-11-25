@@ -28,7 +28,7 @@ public:
      * @brief Applique l'érosion hydraulique sur le terrain
      * @param terrain Terrain sur lequel appliquer l'érosion
      */
-    void apply(Terrain& terrain);
+    void apply(HeightField& terrain);
 
 private:
     int iterations;   

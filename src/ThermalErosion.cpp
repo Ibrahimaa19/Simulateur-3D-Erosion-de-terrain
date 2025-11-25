@@ -11,19 +11,19 @@ void ThermalErosion::step(Terrain& terrain)
     const int W = terrain.width;
     const int H = terrain.height;
     const float talus = tan(talusAngle);
-    const float amount = transferRate;
 
     for (int i = 1; i < H - 1; i++) {
         for (int j = 1; j < W - 1; j++) {
-            float h = terrain.getHeight(i, j);
+
+            float currentHeight = terrain.getHeight(i, j);
             
             // Voisins directs
-            float diffUp = h - terrain.getHeight(i-1, j);
-            float diffDown = h - terrain.getHeight(i+1, j);
-            float diffLeft = h - terrain.getHeight(i, j-1);
-            float diffRight = h - terrain.getHeight(i, j+1);
+            float diffUp = currentHeight - terrain.getHeight(i-1, j);
+            float diffDown = currentHeight - terrain.getHeight(i+1, j);
+            float diffLeft = currentHeight - terrain.getHeight(i, j-1);
+            float diffRight = currentHeight - terrain.getHeight(i, j+1);
             
-            float diffs[4] = {diffUp, diffDown, diffLeft, diffRight};
+            float dist[4] = {diffUp, diffDown, diffLeft, diffRight};
             int neighbors[4][2] = {{-1,0}, {1,0}, {0,-1}, {0,1}};
             
             float totalDiff = 0.0f;
@@ -31,27 +31,24 @@ void ThermalErosion::step(Terrain& terrain)
             
             // Calculer les différences valides
             for (int k = 0; k < 4; k++) {
-                if (diffs[k] > talus) {
-                    totalDiff += diffs[k];
+                if (dist[k] > talus) {
+                    totalDiff += dist[k];
                     validNeighbors++;
                 }
             }
             
             // Appliquer l'érosion si nécessaire
             if (totalDiff > 0 && validNeighbors > 0) {
-                float materialToMove = amount * (totalDiff / validNeighbors);
+                float materialToMove = transferRate * (totalDiff / validNeighbors);
                 
-                // Éviter de descendre en dessous de 0
-                if (materialToMove > h) {
-                    materialToMove = h * 0.5f;
-                }
-                
-                terrain.setHeight(i, j, h - materialToMove);
+                materialToMove = std::min(materialToMove, currentHeight*transferRate);
+
+                terrain.setHeight(i, j, currentHeight - materialToMove);
                 
                 // Répartir le gain de matière aux voisins
                 for (int k = 0; k < 4; k++) {
-                    if (diffs[k] > talus) {
-                        float proportion = diffs[k] / totalDiff;
+                    if (dist[k] > talus) {
+                        float proportion = dist[k] / totalDiff;
                         float moveAmount = materialToMove * proportion;
                         
                         int ni = i + neighbors[k][0];
