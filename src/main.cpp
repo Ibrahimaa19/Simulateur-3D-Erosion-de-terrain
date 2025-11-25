@@ -13,10 +13,11 @@
 #include "terrain.hpp"
 #include "ThermalErosion.h"
 
-#include "Gui.hpp" 
 
 Camera camera;
 const float cameraSpeed = 0.1f;
+static bool erosionEnabled = false;
+static bool erosionStarted = false;
 
 // Screen size globals
 int SCR_WIDTH = 1224;
@@ -27,8 +28,6 @@ float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 float mouseSensitivity = 0.1f;
-
-bool showMenu = true; 
 
 // Transform matrices globals
 glm::mat4 model = glm::mat4(1.0f);
@@ -55,7 +54,6 @@ void ShowMenu()
     std::cout << "  D : Move right\n";
     std::cout << "  Q : Move up\n";
     std::cout << "  E : Move down\n";
-    std::cout << "  M : Toggle Mouse/Menu (Compatible AZERTY/QWERTY)\n"; 
     std::cout << "  ESC : Quit\n";
     std::cout << "  H : Show this menu\n\n";
     std::cout << "Mouse :\n";
@@ -81,23 +79,6 @@ void FramebufferSizeCallback(GLFWwindow* window, int width, int height) {
 // Keyboard input
 void HandleKeyBoardInput(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    if (action == GLFW_PRESS) 
-    {
-    
-        if (key == GLFW_KEY_M || key == GLFW_KEY_SEMICOLON) {
-            
-            showMenu = !showMenu; 
-            
-            if (showMenu) {
-                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            } else {
-                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-                firstMouse = true; 
-            return; 
-            }
-        }
-    }
-
     if (action == GLFW_PRESS || action == GLFW_REPEAT)
     {
         switch (key)
@@ -126,14 +107,19 @@ void HandleKeyBoardInput(GLFWwindow* window, int key, int scancode, int action, 
         case GLFW_KEY_H:
             ShowMenu();
             break;
+        case GLFW_KEY_F:
+            erosionEnabled = !erosionEnabled;
+            if (erosionEnabled && !erosionStarted) {
+                std::cout << "start erosion\n";
+                erosionStarted = true;
+            }
+            break;
         }
     }
 }
 
 void HandleMouseInput(GLFWwindow *window, double xpos, double ypos)
 {
-    if (showMenu) return;
-
     if(firstMouse)
     {
         lastX = (float)xpos;
@@ -156,9 +142,6 @@ void HandleMouseInput(GLFWwindow *window, double xpos, double ypos)
 
 void HandleScrollCallback(GLFWwindow *window, double xoffset, double yoffset)
 {
-    ImGuiIO& io = ImGui::GetIO();
-    if (io.WantCaptureMouse) return; 
-
     camera.Move(camera.GetForward(), (float)yoffset);
 }
 
@@ -178,14 +161,7 @@ int main() {
     glfwSetFramebufferSizeCallback(window, FramebufferSizeCallback);
     glfwSetKeyCallback(window, HandleKeyBoardInput);
     glfwSetCursorPosCallback(window, HandleMouseInput);
-    
-    // --- CONFIGURATION INITIALE
-    if (showMenu) {
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-    } else {
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    }
-
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetScrollCallback(window, HandleScrollCallback);
 
     // --- Initialize GLEW
@@ -194,12 +170,14 @@ int main() {
 
     GLuint VBO, VAO, IBO;
 
-    Terrain mainTerrain = Terrain("../src/heightmap/iceland_heightmap.png",1.f,100.f);
-    
-    mainTerrain.setup_terrain(VAO, VBO, IBO);
-    //mainTerrain.startThread(50,1);
+    Terrain mainTerrain = Terrain("../src/heightmap/iceland_heightmap.png");
     
 
+    ThermalErosion thermal = ThermalErosion();
+
+    mainTerrain.load_incides();
+    mainTerrain.load_vectices();
+    mainTerrain.setup_terrain(VBO, VAO, IBO);
 
     // --- Shader
     Shader shader("../Shaders/shader.vs", "../Shaders/shader.fs");
@@ -214,11 +192,8 @@ int main() {
     view = camera.GetViewMatrix();
     projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 
-    // ---Initialisation de l'interface
-    Gui myGui;
-    myGui.Init(window);
+    int stepCounter = 0;
 
-    float angle = 0.0f;
     while (!glfwWindowShouldClose(window)) {
 
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -228,26 +203,30 @@ int main() {
         glm::mat4 finalMatrix = projection * view * model;
         shader.SetMat4("gFinalMatrix", finalMatrix);
 
+        // Gestion de l'érosion
+        if (erosionEnabled) {
+            // Appliquer une seule étape d'érosion par frame
+            thermal.step(mainTerrain);
+            stepCounter++;
+            
+            if (stepCounter % 10 == 0) {
+                std::cout << "Erosion step " << stepCounter << std::endl;
+            }
+        }
+
+        mainTerrain.load_vectices();
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferSubData(GL_ARRAY_BUFFER, 0,
+            mainTerrain.vertices.size() * sizeof(float),
+            mainTerrain.vertices.data());
+
 
         glBindVertexArray(VAO);
-        mainTerrain.renderer();
-
-        
-        
-        myGui.cameraPos = glm::vec3(glm::inverse(view)[3]);
-
-        if (showMenu) {
-            
-            myGui.Render(&mainTerrain);
-        }
+        glDrawElements(GL_TRIANGLES, mainTerrain.indices.size(), GL_UNSIGNED_INT, 0);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
-
-    // --- Nettoyage
-    myGui.Shutdown();
-    
 
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
