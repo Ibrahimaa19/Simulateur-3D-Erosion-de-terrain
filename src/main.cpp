@@ -194,7 +194,7 @@ int main() {
 
     GLuint VBO, VAO, IBO;
 
-    TerrainDynamique mainTerrain = TerrainDynamique("../src/heightmap/iceland_heightmap.png",1.f,100.f,VBO,ErosionType::Thermal);
+    Terrain mainTerrain = Terrain("../src/heightmap/iceland_heightmap.png",1.f,100.f);
     
     mainTerrain.setup_terrain(VAO, VBO, IBO);
     //mainTerrain.startThread(50,1);
