@@ -167,7 +167,7 @@ int main() {
     mainTerrain.setup_terrain(VAO, VBO, IBO);
 
     // --- Shader
-    Shader shader("../Shaders/shader.vs", "../Shaders/shader.fs");
+    Shader shader("../shaders/shader.vs", "../shaders/shader.fs");
     shader.Use();
 
     // --- Camera setup
