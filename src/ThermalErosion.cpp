@@ -1,5 +1,5 @@
 #include <vector>
-#include "ThermalErosion.h"
+#include "ThermalErosion.hpp"
 
 ThermalErosion::ThermalErosion(float talusAngle, float c)
     : talusAngle(talusAngle), c(c) {}
@@ -19,13 +19,13 @@ void ThermalErosion::step(Terrain& terrain)
         1.4142f, 1.0f
     };
 
-    std::vector<float> delta(terrain.height * terrain.width, 0.0f);
+    std::vector<float> delta(terrain.get_terrain_height() * terrain.get_terrain_width(), 0.0f);
 
-    for (int i = 0; i < terrain.height; i++)
+    for (int i = 0; i < terrain.get_terrain_height(); i++)
     {
-        for (int j = 0; j < terrain.width; j++)
+        for (int j = 0; j < terrain.get_terrain_width(); j++)
         {
-            float currentHeight = terrain.getHeight(i, j);
+            float currentHeight = terrain.get_height(i, j);
 
             int lowestI = -1; 
             int lowestJ = -1;
@@ -40,7 +40,7 @@ void ThermalErosion::step(Terrain& terrain)
                 if (!terrain.inside(ni, nj))
                     continue;
 
-                float diff = currentHeight - terrain.getHeight(ni, nj);
+                float diff = currentHeight - terrain.get_height(ni, nj);
 
                 if (diff > maxSlope && diff > 0.0f)
                 {
@@ -59,14 +59,17 @@ void ThermalErosion::step(Terrain& terrain)
                 {
                     float amount = c * maxSlope;
                     
-                    delta[i * terrain.width + j] -= amount;
-                    delta[lowestI * terrain.width + lowestJ] += amount;
+                    delta[i * terrain.get_terrain_width() + j] -= amount;
+                    delta[lowestI * terrain.get_terrain_width() + lowestJ] += amount;
                 }
             }
         }
     }
 
     // appliquer les changements
-    for (int i = 0; i < terrain.width * terrain.height; i++)
-        terrain.data[i] += delta[i];
+    for (int i = 0; i < terrain.get_terrain_width() * terrain.get_terrain_width(); i++){
+        //terrain.data[i] += delta[i];
+        terrain.set_data(i,delta[i]);
+    }
+        
 }

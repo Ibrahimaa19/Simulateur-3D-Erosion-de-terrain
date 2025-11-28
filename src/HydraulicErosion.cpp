@@ -1,4 +1,4 @@
-#include "HydraulicErosion.h"
+#include "HydraulicErosion.hpp"
 
 HydraulicErosion::HydraulicErosion(int iterations,
                                    float rain,
@@ -17,15 +17,15 @@ void HydraulicErosion::apply(Terrain& terrain)
 {
     for (int it = 0; it < iterations; it++)
     {
-        int i = rand() % terrain.height;
-        int j = rand() % terrain.width;
+        int i = rand() % terrain.get_terrain_height();
+        int j = rand() % terrain.get_terrain_width();
 
         float water = rain;
         float sediment = 0.0f;
 
         for (int step = 0; step < 15; step++)
         {
-            float h = terrain.getHeight(i, j);
+            float h = terrain.get_height(i, j);
 
             int lowestI = i;
             int lowestJ = j;
@@ -42,7 +42,7 @@ void HydraulicErosion::apply(Terrain& terrain)
 
                     if (!terrain.inside(ni, nj)) continue;
 
-                    float hn = terrain.getHeight(ni, nj);
+                    float hn = terrain.get_height(ni, nj);
 
                     if (hn < lowestH)
                     {
@@ -55,7 +55,7 @@ void HydraulicErosion::apply(Terrain& terrain)
 
             if (lowestI == i && lowestJ == j)
             {
-                terrain.setHeight(i, j, sediment * depositRate);
+                terrain.set_height(i, j, sediment * depositRate);
                 break;
             }
 
@@ -63,7 +63,7 @@ void HydraulicErosion::apply(Terrain& terrain)
 
             float erodeAmount = erosionRate * slope * water;
  
-            terrain.setHeight(i, j, -erodeAmount);
+            terrain.set_height(i, j, -erodeAmount);
             sediment += erodeAmount; // la matière transportée devient du sédiment
 
             i = lowestI;

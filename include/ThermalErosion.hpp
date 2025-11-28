@@ -1,4 +1,4 @@
-#include "../include/terrain.hpp"
+#include "Terrain.hpp"
 
 /**
  * @class ThermalErosion

@@ -29,12 +29,27 @@ set(IMGUI_SOURCES
     ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
 )
 
-# Collect all source files from src/
-file(GLOB SOURCE_FILES src/*.cpp)
+include_directories(${PROJECT_SOURCE_DIR}/include)
 
+set(SOURCE_FILES
+    ${PROJECT_SOURCE_DIR}/src/main.cpp
+    ${PROJECT_SOURCE_DIR}/src/Camera.cpp
+    ${PROJECT_SOURCE_DIR}/src/Shader.cpp
+    ${PROJECT_SOURCE_DIR}/src/Terrain.cpp
+    ${PROJECT_SOURCE_DIR}/src/ThermalErosion.cpp
+)
 # Create the executable
 # ### MODIFICATION : On ajoute ${IMGUI_SOURCES} à la liste
 add_executable(${PROJECT_NAME} ${SOURCE_FILES} ${IMGUI_SOURCES})
+
+# Link the libraries
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE
+        OpenGL::GL
+        GLEW::GLEW
+        glfw
+        
+)
 
 # Include header directories
 target_include_directories(${PROJECT_NAME}
@@ -51,13 +66,8 @@ target_include_directories(${PROJECT_NAME}
 # Define GLEW_STATIC if needed
 add_definitions(-DGLEW_STATIC)
 
-# Link the libraries
-target_link_libraries(${PROJECT_NAME}
-    PRIVATE
-        OpenGL::GL
-        GLEW::GLEW
-        glfw
-)
+
+
 
 # --------------------------------------------------------------------
 # GOOGLE TEST

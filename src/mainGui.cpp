@@ -1,17 +1,20 @@
+/*
 #define STB_IMAGE_IMPLEMENTATION
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <iostream>
 
-// --------------------
+#include <iostream>
 #include "Shader.hpp"
 #include "Camera.hpp"
-#include "Terrain.hpp"
-#include "ThermalErosion.hpp"
 
+#include "Terrain.hpp"
+#include "ThermalErosion.h"
+
+#include "Gui.hpp" 
 
 Camera camera;
 const float cameraSpeed = 0.1f;
@@ -25,6 +28,8 @@ float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 float mouseSensitivity = 0.1f;
+
+bool showMenu = true; 
 
 // Transform matrices globals
 glm::mat4 model = glm::mat4(1.0f);
@@ -51,6 +56,7 @@ void ShowMenu()
     std::cout << "  D : Move right\n";
     std::cout << "  Q : Move up\n";
     std::cout << "  E : Move down\n";
+    std::cout << "  M : Toggle Mouse/Menu (Compatible AZERTY/QWERTY)\n"; 
     std::cout << "  ESC : Quit\n";
     std::cout << "  H : Show this menu\n\n";
     std::cout << "Mouse :\n";
@@ -76,6 +82,23 @@ void FramebufferSizeCallback(GLFWwindow* window, int width, int height) {
 // Keyboard input
 void HandleKeyBoardInput(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
+    if (action == GLFW_PRESS) 
+    {
+    
+        if (key == GLFW_KEY_M || key == GLFW_KEY_SEMICOLON) {
+            
+            showMenu = !showMenu; 
+            
+            if (showMenu) {
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            } else {
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                firstMouse = true; 
+            return; 
+            }
+        }
+    }
+
     if (action == GLFW_PRESS || action == GLFW_REPEAT)
     {
         switch (key)
@@ -110,6 +133,8 @@ void HandleKeyBoardInput(GLFWwindow* window, int key, int scancode, int action, 
 
 void HandleMouseInput(GLFWwindow *window, double xpos, double ypos)
 {
+    if (showMenu) return;
+
     if(firstMouse)
     {
         lastX = (float)xpos;
@@ -132,6 +157,9 @@ void HandleMouseInput(GLFWwindow *window, double xpos, double ypos)
 
 void HandleScrollCallback(GLFWwindow *window, double xoffset, double yoffset)
 {
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return; 
+
     camera.Move(camera.GetForward(), (float)yoffset);
 }
 
@@ -151,7 +179,14 @@ int main() {
     glfwSetFramebufferSizeCallback(window, FramebufferSizeCallback);
     glfwSetKeyCallback(window, HandleKeyBoardInput);
     glfwSetCursorPosCallback(window, HandleMouseInput);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    
+    // --- CONFIGURATION INITIALE
+    if (showMenu) {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    } else {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    }
+
     glfwSetScrollCallback(window, HandleScrollCallback);
 
     // --- Initialize GLEW
@@ -160,11 +195,12 @@ int main() {
 
     GLuint VBO, VAO, IBO;
 
-    //Terrain mainTerrain = Terrain("../src/heightmap/heightmap.png",1.f,500.f);
-    Terrain mainTerrain = Terrain();
-    mainTerrain.load_terrain("../src/heightmap/iceland_heightmap.png",1.f,100.f);
+    Terrain mainTerrain = Terrain("../src/heightmap/iceland_heightmap.png",1.f,100.f);
     
     mainTerrain.setup_terrain(VAO, VBO, IBO);
+    //mainTerrain.startThread(50,1);
+    
+
 
     // --- Shader
     Shader shader("../Shaders/shader.vs", "../Shaders/shader.fs");
@@ -179,6 +215,11 @@ int main() {
     view = camera.GetViewMatrix();
     projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 
+    // ---Initialisation de l'interface
+    Gui myGui;
+    myGui.Init(window);
+
+    float angle = 0.0f;
     while (!glfwWindowShouldClose(window)) {
 
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -193,10 +234,21 @@ int main() {
         mainTerrain.renderer();
 
         
+        
+        myGui.cameraPos = glm::vec3(glm::inverse(view)[3]);
+
+        if (showMenu) {
+            
+            myGui.Render(&mainTerrain);
+        }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+
+    // --- Nettoyage
+    myGui.Shutdown();
+    
 
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
@@ -205,3 +257,5 @@ int main() {
     glfwTerminate();
     return 0;
 }
+
+*/

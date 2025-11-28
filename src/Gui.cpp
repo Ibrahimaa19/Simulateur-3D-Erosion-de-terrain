@@ -1,5 +1,5 @@
 #include "Gui.hpp"
-#include "terrain.hpp" 
+#include "Terrain.hpp" 
 
 #include <GL/glew.h> 
 
@@ -149,8 +149,8 @@ void Gui::Render(Terrain* terrain) {
             
             if (terrain != nullptr) {
             
-                ImGui::Text("Nombre de Triangles : %zu", terrain->indices.size() / 3);
-                ImGui::Text("Nombre de Sommets   : %zu", terrain->vertices.size());
+                ImGui::Text("Nombre de Triangles : %zu", terrain->get_indices_size() / 3);
+                ImGui::Text("Nombre de Sommets   : %zu", terrain->get_vertices_size());
             } else {
                 ImGui::TextColored(ImVec4(1,0,0,1), "Terrain non connecte !");
             }
