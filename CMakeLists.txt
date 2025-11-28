@@ -32,11 +32,13 @@ set(IMGUI_SOURCES
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
 set(SOURCE_FILES
-    ${PROJECT_SOURCE_DIR}/src/main.cpp
+    ${PROJECT_SOURCE_DIR}/src/main.cpp # Commenter et decommenter pour échanger de main
+    #${PROJECT_SOURCE_DIR}/src/mainGui.cpp
     ${PROJECT_SOURCE_DIR}/src/Camera.cpp
     ${PROJECT_SOURCE_DIR}/src/Shader.cpp
     ${PROJECT_SOURCE_DIR}/src/Terrain.cpp
     ${PROJECT_SOURCE_DIR}/src/ThermalErosion.cpp
+    ${PROJECT_SOURCE_DIR}/src/Gui.cpp
 )
 # Create the executable
 # ### MODIFICATION : On ajoute ${IMGUI_SOURCES} à la liste

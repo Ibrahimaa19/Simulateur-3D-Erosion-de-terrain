@@ -1,4 +1,3 @@
-/*
 #define STB_IMAGE_IMPLEMENTATION
 
 #include <GL/glew.h>
@@ -12,7 +11,7 @@
 #include "Camera.hpp"
 
 #include "Terrain.hpp"
-#include "ThermalErosion.h"
+#include "ThermalErosion.hpp"
 
 #include "Gui.hpp" 
 
@@ -195,10 +194,11 @@ int main() {
 
     GLuint VBO, VAO, IBO;
 
-    Terrain mainTerrain = Terrain("../src/heightmap/iceland_heightmap.png",1.f,100.f);
+    //Terrain mainTerrain = Terrain("../src/heightmap/heightmap.png",1.f,500.f);
+    Terrain mainTerrain = Terrain();
+    mainTerrain.load_terrain("../src/heightmap/iceland_heightmap.png",1.f,100.f);
     
     mainTerrain.setup_terrain(VAO, VBO, IBO);
-    //mainTerrain.startThread(50,1);
     
 
 
@@ -257,5 +257,3 @@ int main() {
     glfwTerminate();
     return 0;
 }
-
-*/
