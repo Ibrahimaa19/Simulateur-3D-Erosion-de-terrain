@@ -7,12 +7,16 @@ TerrainApp::TerrainApp()
     : mWindow(nullptr), mScreenWidth(1224), mScreenHeight(868),
       mLastX(mScreenWidth/2.0f), mLastY(mScreenHeight/2.0f),
       mFirstMouse(true), mMouseSensitivity(0.1f),
-      mCameraSpeed(0.1f)
+      mCameraSpeed(0.1f),
+      mShowMenu(true) 
 {
 }
 
 TerrainApp::~TerrainApp()
 {
+    // --- [TACHE 5] Nettoyage Interface ---
+    //mGui.Shutdown();
+    // -------------------------------------
     delete mShader;
     glfwTerminate();
 }
@@ -23,6 +27,9 @@ bool TerrainApp::Init()
     InitCallbacks();
     InitScene();
     InitCamera();
+
+    mGui.Init(mWindow);
+
     return true;
 }
 
@@ -53,7 +60,11 @@ void TerrainApp::InitCallbacks()
     glfwSetKeyCallback(mWindow, KeyCallback);
     glfwSetScrollCallback(mWindow, ScrollCallback);
 
-    glfwSetInputMode(mWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    if (mShowMenu) {
+        glfwSetInputMode(mWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    } else {
+        glfwSetInputMode(mWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    }
 }
 
 void TerrainApp::InitCamera()
@@ -82,7 +93,19 @@ void TerrainApp::Run()
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        RenderScene();
+        if (mGui.showWelcomeScreen) {
+            glfwSetInputMode(mWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            mGui.Render(nullptr);
+        }
+        else {
+            RenderScene();
+
+            mGui.cameraPos = glm::vec3(glm::inverse(mView)[3]);
+
+            if (mShowMenu) {
+                mGui.Render(&mTerrain);
+            }
+        }
 
         glfwSwapBuffers(mWindow);
         glfwPollEvents();
@@ -103,6 +126,19 @@ void TerrainApp::KeyCallback(GLFWwindow* window, int key, int scancode, int acti
 {
     TerrainApp* app = (TerrainApp*)glfwGetWindowUserPointer(window);
     if (!app) return;
+
+    if (action == GLFW_PRESS) {
+        if (key == GLFW_KEY_M || key == GLFW_KEY_SEMICOLON) {
+            app->mShowMenu = !app->mShowMenu;
+            if (app->mShowMenu) {
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            } else {
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                app->mFirstMouse = true;
+            }
+            return; 
+        }
+    }
 
     if (action == GLFW_PRESS || action == GLFW_REPEAT)
     {
@@ -136,6 +172,8 @@ void TerrainApp::MouseCallback(GLFWwindow* window, double xpos, double ypos)
     TerrainApp* app = (TerrainApp*)glfwGetWindowUserPointer(window);
     if (!app) return;
 
+    if (app->mShowMenu || app->mGui.showWelcomeScreen) return;
+
     if (app->mFirstMouse) {
         app->mLastX = (float)xpos;
         app->mLastY = (float)ypos;
@@ -160,6 +198,9 @@ void TerrainApp::ScrollCallback(GLFWwindow* window, double xoffset, double yoffs
     TerrainApp* app = (TerrainApp*)glfwGetWindowUserPointer(window);
     if (!app) return;
 
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return;
+
     app->mCamera.Move(app->mCamera.GetForward(), (float)yoffset);
 }
 
@@ -176,4 +217,4 @@ void TerrainApp::FramebufferCallback(GLFWwindow* window, int width, int height)
 
     app->mLastX = width / 2.0f;
     app->mLastY = height / 2.0f;
-}
+};

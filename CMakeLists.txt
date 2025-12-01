@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.14) 
 project(erosion)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -11,28 +11,55 @@ find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
 
 # --------------------------------------------------------------------
-# ### AJOUT IMGUI 
+# ### GESTION IMGUI VIA FETCHCONTENT (Automatique)
 # --------------------------------------------------------------------
-# On définit le chemin vers le dossier que tu as créé
-set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/external/imgui)
+# Plus besoin de dossier external/imgui, CMake télécharge tout seul.
+include(FetchContent)
 
-# On liste manuellement les fichiers sources d'ImGui nécessaires
-# Note : On inclut "impl_glfw" car le projet utilise GLFW
-# Note : On inclut "impl_opengl3" car le projet utilise OpenGL moderne
-set(IMGUI_SOURCES
-    ${IMGUI_DIR}/imgui.cpp
-    ${IMGUI_DIR}/imgui_demo.cpp
-    ${IMGUI_DIR}/imgui_draw.cpp
-    ${IMGUI_DIR}/imgui_tables.cpp
-    ${IMGUI_DIR}/imgui_widgets.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+message(STATUS "Téléchargement et configuration de ImGui...")
+
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG        v1.90.4
+)
+FetchContent_MakeAvailable(imgui)
+
+# Création de la librairie ImGui statique
+add_library(imgui_lib STATIC
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/imgui_demo.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
 )
 
+# Configuration des includes pour ImGui
+target_include_directories(imgui_lib PUBLIC 
+    ${imgui_SOURCE_DIR} 
+    ${imgui_SOURCE_DIR}/backends
+)
+
+# Liens ImGui -> GLFW/OpenGL
+target_link_libraries(imgui_lib PUBLIC 
+    glfw 
+    GLEW::GLEW 
+    OpenGL::GL
+)
+
+# --------------------------------------------------------------------
+# SOURCES DU PROJET (Structure de tes collègues)
+# --------------------------------------------------------------------
+
+# On inclut le dossier include globalement
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
+# Liste des fichiers sources fournie par tes collègues
+# Note : Gui.cpp est bien dedans, et mainGui.cpp est bien commenté (désactivé)
 set(SOURCE_FILES
-    ${PROJECT_SOURCE_DIR}/src/main.cpp # Commenter et decommenter pour échanger de main
+    ${PROJECT_SOURCE_DIR}/src/main.cpp 
     #${PROJECT_SOURCE_DIR}/src/mainGui.cpp
     ${PROJECT_SOURCE_DIR}/src/Camera.cpp
     ${PROJECT_SOURCE_DIR}/src/Shader.cpp
@@ -41,17 +68,18 @@ set(SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/src/Gui.cpp
     ${PROJECT_SOURCE_DIR}/src/TerrainApp.cpp
 )
+
 # Create the executable
-# ### MODIFICATION : On ajoute ${IMGUI_SOURCES} à la liste
-add_executable(${PROJECT_NAME} ${SOURCE_FILES} ${IMGUI_SOURCES})
+# Note : On a retiré ${IMGUI_SOURCES} car c'est géré par la lib imgui_lib
+add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
 # Link the libraries
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
+        imgui_lib      # <-- Notre lib ImGui automatique
         OpenGL::GL
         GLEW::GLEW
         glfw
-        
 )
 
 # Include header directories
@@ -62,15 +90,11 @@ target_include_directories(${PROJECT_NAME}
         ${GLEW_INCLUDE_DIRS}
         ${GLFW_INCLUDE_DIRS}
         ${GLM_INCLUDE_DIRS}
-        ${IMGUI_DIR}
-        ${IMGUI_DIR}/backends
+        # Plus besoin des chemins ImGui manuels ici
 )
 
 # Define GLEW_STATIC if needed
 add_definitions(-DGLEW_STATIC)
-
-
-
 
 # --------------------------------------------------------------------
 # GOOGLE TEST

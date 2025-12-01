@@ -11,6 +11,8 @@
 #include "Shader.hpp"
 #include "Terrain.hpp"
 
+#include "Gui.hpp"
+
 /**
  * @class TerrainApp
  * @brief Manages window creation, input callbacks, camera, rendering loop, and terrain rendering.
@@ -90,6 +92,9 @@ private:
     GLuint mIBO;                      ///< Index Buffer Object
 
     float mCameraSpeed;               ///< Speed used for keyboard movement
+
+    Gui mGui;                         ///< Instance de l'interface graphique
+    bool mShowMenu;                   ///< État du menu (Vrai = Menu, Faux = Jeu)
 
 private:
     /** Keyboard callback wrapper */

@@ -2,8 +2,9 @@
 #define GUI_HPP
 
 #include "imgui.h"
-#include <glm/glm.hpp> 
+#include <glm/glm.hpp> // Nécessaire pour glm::vec3
 
+// Forward declarations
 struct GLFWwindow;
 class Terrain; 
 
@@ -13,23 +14,22 @@ public:
     ~Gui();
 
     void Init(GLFWwindow* window);
-
     void Render(Terrain* terrain = nullptr);
-
     void Shutdown();
 
     // =========================================================
     // VARIABLES DE CONTRÔLE
     // =========================================================
 
+    // --- Ecran d'accueil ---
+    bool showWelcomeScreen = true; // Commence à VRAI
+
     // --- 1. Simulation & Temps ---
     bool isPaused = false;      
     float timeSpeed = 1.0f;     
 
     // --- 2. Paramètres Visuels ---
-    bool showWireframe = false; 
     float verticalScale = 1.0f; 
-    float sunPosition[3] = {10.0f, 50.0f, 10.0f}; 
     float terrainColor[3] = {0.3f, 0.5f, 0.3f};   
 
     // --- 3. Paramètres Erosion Thermique ---
@@ -37,7 +37,7 @@ public:
     float talusAngle = 30.0f;   
     float thermalK = 0.5f;      
 
-    // --- 4. Paramètres Erosion Hydraulique---
+    // --- 4. Paramètres Erosion Hydraulique ---
     int hydroIterations = 50000;
     float rainAmount = 1.0f;
     float evaporationRate = 0.5f;
