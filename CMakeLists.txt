@@ -11,9 +11,8 @@ find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
 
 # --------------------------------------------------------------------
-# ### GESTION IMGUI VIA FETCHCONTENT (Automatique)
+# ### GESTION IMGUI VIA FETCHCONTENT
 # --------------------------------------------------------------------
-# Plus besoin de dossier external/imgui, CMake télécharge tout seul.
 include(FetchContent)
 
 message(STATUS "Téléchargement et configuration de ImGui...")
@@ -50,7 +49,7 @@ target_link_libraries(imgui_lib PUBLIC
 )
 
 # --------------------------------------------------------------------
-# SOURCES DU PROJET (Structure de tes collègues)
+# SOURCES DU PROJET 
 # --------------------------------------------------------------------
 
 # On inclut le dossier include globalement

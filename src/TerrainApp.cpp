@@ -14,9 +14,6 @@ TerrainApp::TerrainApp()
 
 TerrainApp::~TerrainApp()
 {
-    // --- [TACHE 5] Nettoyage Interface ---
-    //mGui.Shutdown();
-    // -------------------------------------
     delete mShader;
     glfwTerminate();
 }

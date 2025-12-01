@@ -38,7 +38,6 @@ void Gui::Render(Terrain* terrain) {
     if (showWelcomeScreen) {
         ImGuiIO& io = ImGui::GetIO();
         
-        // Configuration fenêtre plein écran
         ImGui::SetNextWindowPos(ImVec2(0, 0));
         ImGui::SetNextWindowSize(io.DisplaySize);
         ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
@@ -48,7 +47,6 @@ void Gui::Render(Terrain* terrain) {
         float windowWidth = ImGui::GetWindowSize().x;
         float windowHeight = ImGui::GetWindowSize().y;
         
-        // --- Titre ---
         ImGui::SetCursorPosY(windowHeight * 0.3f); 
         ImGui::SetWindowFontScale(3.0f); 
         const char* title = "SIMULATEUR D'EROSION 3D";
@@ -56,21 +54,18 @@ void Gui::Render(Terrain* terrain) {
         ImGui::SetCursorPosX((windowWidth - textWidth) * 0.5f);
         ImGui::TextColored(ImVec4(0.2f, 0.6f, 1.0f, 1.0f), "%s", title);
         
-        // --- Sous-titre ---
         ImGui::SetWindowFontScale(1.5f); 
-        const char* subtitle = "Projet L3 Informatique - Universite de Versailles";
+        const char* subtitle = "Projet M1 CHPC - Universite de Versailles";
         textWidth = ImGui::CalcTextSize(subtitle).x;
         ImGui::SetCursorPosX((windowWidth - textWidth) * 0.5f);
         ImGui::Text("%s", subtitle);
 
-        // --- Bouton Lancer ---
         ImGui::SetCursorPosY(windowHeight * 0.6f); 
         const char* btnText = "LANCER LA SIMULATION";
         float btnWidth = 300.0f;
         float btnHeight = 60.0f;
         ImGui::SetCursorPosX((windowWidth - btnWidth) * 0.5f);
         
-        // Style bouton vert
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.7f, 0.2f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.8f, 0.3f, 1.0f));
         
@@ -92,7 +87,6 @@ void Gui::Render(Terrain* terrain) {
 
         if (ImGui::BeginTabBar("MyTabBar"))
         {
-            // ONGLET SIMULATION
             if (ImGui::BeginTabItem("Simulation"))
             {
                 ImGui::Spacing();
@@ -127,7 +121,6 @@ void Gui::Render(Terrain* terrain) {
                 ImGui::EndTabItem();
             }
 
-            // ONGLET VISUEL
             if (ImGui::BeginTabItem("Visuel"))
             {
                 ImGui::Spacing();
@@ -139,7 +132,6 @@ void Gui::Render(Terrain* terrain) {
                 ImGui::EndTabItem();
             }
 
-            // ONGLET INFOS (Contrôles Caméra uniquement)
             if (ImGui::BeginTabItem("Infos"))
             {
                 ImGui::Spacing();
