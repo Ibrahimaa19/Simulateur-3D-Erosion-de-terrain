@@ -40,6 +40,8 @@ set(SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/src/ThermalErosion.cpp
     ${PROJECT_SOURCE_DIR}/src/Gui.cpp
     ${PROJECT_SOURCE_DIR}/src/TerrainApp.cpp
+    ${PROJECT_SOURCE_DIR}/src/FaultFormationTerrain.cpp
+    ${PROJECT_SOURCE_DIR}/src/MidpointDisplacement.cpp
 )
 # Create the executable
 # ### MODIFICATION : On ajoute ${IMGUI_SOURCES} à la liste

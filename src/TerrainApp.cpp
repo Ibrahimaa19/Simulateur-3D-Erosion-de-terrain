@@ -3,12 +3,13 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 
-TerrainApp::TerrainApp()
+TerrainApp::TerrainApp(unsigned int seed)
     : mWindow(nullptr), mScreenWidth(1224), mScreenHeight(868),
       mLastX(mScreenWidth/2.0f), mLastY(mScreenHeight/2.0f),
       mFirstMouse(true), mMouseSensitivity(0.1f),
-      mCameraSpeed(0.1f)
+      mCameraSpeed(5.0f)
 {
+    std::srand(seed);
 }
 
 TerrainApp::~TerrainApp()
@@ -58,21 +59,21 @@ void TerrainApp::InitCallbacks()
 
 void TerrainApp::InitCamera()
 {
-    mCamera.MoveTo(glm::vec3{0.0f, 5.0f, 0.0f});
+    mCamera.MoveTo(glm::vec3{-54.0f, 220.0f, -42.0f});
     mCamera.TurnTo(glm::vec3{mTerrain.get_terrain_width() / 2, 0.0f, mTerrain.get_terrain_height()/ 2});
 }
 
 void TerrainApp::InitScene()
 {
-    mShader = new Shader("../shaders/shader.vs", "../shaders/shader.fs");
+    mShader = new Shader("../shaders/terrain.vs", "../shaders/terrain.fs");
     mShader->Use();
 
-    mTerrain.load_terrain("../src/heightmap/iceland_heightmap.png", 1.f, 100.f);
+    mTerrain.CreateMidpointDisplacement(std::pow(2, 10) + 1, 0, 100);
     mTerrain.setup_terrain(mVAO, mVBO, mIBO);
 
     mModel = glm::mat4(1.0f);
     mView = mCamera.GetViewMatrix();
-    mProjection = glm::perspective(glm::radians(45.0f), (float)mScreenWidth / (float)mScreenHeight, 0.1f, 100.0f);
+    mProjection = glm::perspective(glm::radians(45.0f), (float)mScreenWidth / (float)mScreenHeight, 0.1f, 5000.0f);
 }
 
 void TerrainApp::Run()
@@ -110,8 +111,10 @@ void TerrainApp::RenderScene()
     // Choix du LOD
     int lod = SelectLOD(mCamera.GetPosition());
 
+    mShader->SetFloat("gMaxHeight", mTerrain.get_max_height());
+    mShader->SetFloat("gMixHeight", mTerrain.get_min_height());
+  
     glBindVertexArray(mVAO[lod]);
-
     mTerrain.renderer();
 }
 
@@ -188,7 +191,7 @@ void TerrainApp::FramebufferCallback(GLFWwindow* window, int width, int height)
     app->mScreenHeight = height;
 
     glViewport(0, 0, width, height);
-    app->mProjection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 100.0f);
+    app->mProjection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 5000.0f);
 
     app->mLastX = width / 2.0f;
     app->mLastY = height / 2.0f;
