@@ -10,7 +10,8 @@
 #include "Camera.hpp"
 #include "Shader.hpp"
 #include "Terrain.hpp"
-
+#include "FaultFormationTerrain.hpp"
+#include "MidpointDisplacement.hpp"
 /**
  * @class TerrainApp
  * @brief Manages window creation, input callbacks, camera, rendering loop, and terrain rendering.
@@ -21,9 +22,10 @@ class TerrainApp
 {
 public:
     /**
-     * @brief Default constructor.
+     * @brief Constructs a TerrainApp instance
+     * @param seed Seed used to initialize the random number generator
      */
-    TerrainApp();
+    TerrainApp(unsigned int seed = 1);
 
     /**
      * @brief Destructor.
@@ -83,7 +85,7 @@ private:
     glm::mat4 mProjection;            ///< Projection matrix
 
     Shader* mShader;                  ///< Pointer to the shader program
-    Terrain mTerrain;                 ///< Terrain object
+    MidpointDisplacement mTerrain;                 ///< Terrain object
 
     GLuint mVAO;                      ///< Vertex Array Object
     GLuint mVBO;                      ///< Vertex Buffer Object
