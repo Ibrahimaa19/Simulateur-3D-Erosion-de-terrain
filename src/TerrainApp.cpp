@@ -7,7 +7,7 @@ TerrainApp::TerrainApp(unsigned int seed)
     : mWindow(nullptr), mScreenWidth(1224), mScreenHeight(868),
       mLastX(mScreenWidth/2.0f), mLastY(mScreenHeight/2.0f),
       mFirstMouse(true), mMouseSensitivity(0.1f),
-      mCameraSpeed(5.0f)
+      mCameraSpeed(.2f)
 {
     std::srand(seed);
 }
@@ -65,15 +65,15 @@ void TerrainApp::InitCamera()
 
 void TerrainApp::InitScene()
 {
-    mShader = new Shader("../shaders/terrain.vs", "../shaders/terrain.fs");
+    mShader = new Shader("../shaders/shader.vs", "../shaders/shader.fs");
     mShader->Use();
 
-    mTerrain.CreateMidpointDisplacement(std::pow(2, 10) + 1, 0, 100);
+    mTerrain.load_terrain("../src/heightmap/iceland_heightmap.png", 1.f, 100.f);
     mTerrain.setup_terrain(mVAO, mVBO, mIBO);
 
     mModel = glm::mat4(1.0f);
     mView = mCamera.GetViewMatrix();
-    mProjection = glm::perspective(glm::radians(45.0f), (float)mScreenWidth / (float)mScreenHeight, 0.1f, 5000.0f);
+    mProjection = glm::perspective(glm::radians(45.0f), (float)mScreenWidth / (float)mScreenHeight, 0.1f, 100.0f);
 }
 
 void TerrainApp::Run()
