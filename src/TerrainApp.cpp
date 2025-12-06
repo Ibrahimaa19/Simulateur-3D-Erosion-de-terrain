@@ -94,8 +94,8 @@ int TerrainApp::SelectLOD(const glm::vec3&& cameraPos)
 {
     glm::vec3 milieu_terrain = glm::vec3(mTerrain.get_terrain_width()/2, 0, mTerrain.get_terrain_height()/2);
 
-    int x = glm::clamp((int)cameraPos.x, 0, mTerrain.get_terrain_width() - 1);
-    int z = glm::clamp((int)cameraPos.z, 0, mTerrain.get_terrain_height() - 1);
+    int x = glm::clamp((int)cameraPos.x, 0, mTerrain.get_terrain_width());
+    int z = glm::clamp((int)cameraPos.z, 0, mTerrain.get_terrain_height());
     float y = mTerrain.get_data()[z * mTerrain.get_terrain_width() + x];
     //float dist = glm::distance(cameraPos, glm::vec3(milieu_terrain.x/mTerrain.get_xz(), 0, milieu_terrain.z/mTerrain.get_xz()));
 

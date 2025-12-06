@@ -26,7 +26,7 @@ protected:
 
     // Paramètres LOD
     int lodSteps[4] = {1, 2, 4, 8}; 
-    float lodDistances[4] = {3.0f, 5.f, 7.5f, 9.f};
+    float lodDistances[4] = {2.0f, 4.f, 6.5f, 8.f};
 
     /**
      * @brief Met à jours le vecteur vertices, en fonction des valeurs dans data
