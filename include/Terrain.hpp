@@ -21,12 +21,8 @@ protected:
     float min_height;
 	int borderSize;
     int cellSpacing;
-	std::vector<float> vertices[4];
-	std::vector<unsigned int> indices[4];
-
-    // Paramètres LOD
-    int lodSteps[4] = {1, 2, 4, 8}; 
-    float lodDistances[4] = {6.0f, 8.f, 12.f, 22.f};
+	std::vector<float> vertices;
+	std::vector<unsigned int> indices;
 
     /**
      * @brief Met à jours le vecteur vertices, en fonction des valeurs dans data
@@ -67,7 +63,7 @@ public:
      * @param VBO le vertex buffer object, buffer contenant tout les sommets
      * @param EBO le element buffer object, les triangles a afficher
      */
-    void setup_terrain(GLuint *VAO, GLuint *VBO, GLuint *EBO);
+    void setup_terrain(GLuint &VAO, GLuint &VBO, GLuint &EBO);
 
     /**
      * @brief Dessine les triangles avec les données du terrain
@@ -147,15 +143,6 @@ public:
     */
     bool inside(int i, int j) const;
 
-    /**
-     * @brief Retourne la valeur de distance correspondant a l'indice passer en paramètre
-     */
-    float get_lod_distance(int i) const;
-
-    /**
-     * @brief Retourne la valeur de xzfactor du terrain
-     */
-    float get_xz() const;
 };
 
 #endif

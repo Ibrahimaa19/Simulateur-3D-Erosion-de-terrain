@@ -90,31 +90,15 @@ void TerrainApp::Run()
     }
 }
 
-int TerrainApp::SelectLOD(const glm::vec3&& cameraPos)
-{
-    glm::vec3 milieu_terrain = glm::vec3(mTerrain.get_terrain_width()/2, 0, mTerrain.get_terrain_height()/2);
-    float dist = glm::distance(cameraPos, glm::vec3(milieu_terrain.x/mTerrain.get_xz(), 0, milieu_terrain.z/mTerrain.get_xz()));
-    std::cout << dist << std::endl;
-    for (int lod = 0; lod < 4; lod++) {
-        if (dist < mTerrain.get_lod_distance(lod)) return lod;
-    }
-    return 3; // LOD le plus bas
-}
-
 void TerrainApp::RenderScene()
 {
     mView = mCamera.GetViewMatrix();
     glm::mat4 finalMatrix = mProjection * mView * mModel;
     
     mShader->SetMat4("gFinalMatrix", finalMatrix);
-
-    // Choix du LOD
-    int lod = SelectLOD(mCamera.GetPosition());
-
     mShader->SetFloat("gMaxHeight", mTerrain.get_max_height());
     mShader->SetFloat("gMixHeight", mTerrain.get_min_height());
-  
-    glBindVertexArray(mVAO[lod]);
+    glBindVertexArray(mVAO);
     mTerrain.renderer();
 }
 

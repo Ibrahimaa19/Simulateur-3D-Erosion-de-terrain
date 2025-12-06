@@ -87,9 +87,9 @@ private:
     Shader* mShader;                  ///< Pointer to the shader program
     MidpointDisplacement mTerrain;                 ///< Terrain object
 
-    GLuint mVAO[4];                      ///< Vertex Array Object
-    GLuint mVBO[4];                      ///< Vertex Buffer Object
-    GLuint mIBO[4];                      ///< Index Buffer Object
+    GLuint mVAO;                      ///< Vertex Array Object
+    GLuint mVBO;                      ///< Vertex Buffer Object
+    GLuint mIBO;                      ///< Index Buffer Object
 
     float mCameraSpeed;               ///< Speed used for keyboard movement
 
@@ -105,7 +105,4 @@ private:
 
     /** Framebuffer resize callback wrapper */
     static void FramebufferCallback(GLFWwindow* window, int width, int height);
-
-    /** Return the LOD levels to use for renderer*/
-    int SelectLOD(const glm::vec3&& cameraPos);
 };
