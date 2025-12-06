@@ -59,7 +59,7 @@ void TerrainApp::InitCallbacks()
 
 void TerrainApp::InitCamera()
 {
-    mCamera.MoveTo(glm::vec3{0.f, 5.0f, 0.f});
+    mCamera.MoveTo(glm::vec3{0.f, 12.0f, 0.f});
     mCamera.TurnTo(glm::vec3{mTerrain.get_terrain_width() / 2, 0.0f, mTerrain.get_terrain_height()/ 2});
 }
 
@@ -93,8 +93,16 @@ void TerrainApp::Run()
 int TerrainApp::SelectLOD(const glm::vec3&& cameraPos)
 {
     glm::vec3 milieu_terrain = glm::vec3(mTerrain.get_terrain_width()/2, 0, mTerrain.get_terrain_height()/2);
-    float dist = glm::distance(cameraPos, glm::vec3(milieu_terrain.x/mTerrain.get_xz(), 0, milieu_terrain.z/mTerrain.get_xz()));
+
+    int x = glm::clamp((int)cameraPos.x, 0, mTerrain.get_terrain_width() - 1);
+    int z = glm::clamp((int)cameraPos.z, 0, mTerrain.get_terrain_height() - 1);
+    float y = mTerrain.get_data()[z * mTerrain.get_terrain_width() + x];
+    //float dist = glm::distance(cameraPos, glm::vec3(milieu_terrain.x/mTerrain.get_xz(), 0, milieu_terrain.z/mTerrain.get_xz()));
+
+    glm::vec3 terrain_proche = glm::vec3(x,y,z);
+    float dist = glm::distance(cameraPos, terrain_proche);
     //std::cout << dist << std::endl;
+
     for (int lod = 0; lod < 4; lod++) {
         if (dist < mTerrain.get_lod_distance(lod)) return lod;
     }
