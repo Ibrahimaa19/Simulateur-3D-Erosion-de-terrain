@@ -3,12 +3,13 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 
-TerrainApp::TerrainApp()
+TerrainApp::TerrainApp(unsigned int seed)
     : mWindow(nullptr), mScreenWidth(1224), mScreenHeight(868),
       mLastX(mScreenWidth/2.0f), mLastY(mScreenHeight/2.0f),
       mFirstMouse(true), mMouseSensitivity(0.1f),
       mCameraSpeed(0.1f)
 {
+    std::srand(seed);
 }
 
 TerrainApp::~TerrainApp()
@@ -58,7 +59,7 @@ void TerrainApp::InitCallbacks()
 
 void TerrainApp::InitCamera()
 {
-    mCamera.MoveTo(glm::vec3{0.0f, 5.0f, 0.0f});
+    mCamera.MoveTo(glm::vec3{0.f, 5.0f, 0.f});
     mCamera.TurnTo(glm::vec3{mTerrain.get_terrain_width() / 2, 0.0f, mTerrain.get_terrain_height()/ 2});
 }
 
@@ -93,7 +94,7 @@ int TerrainApp::SelectLOD(const glm::vec3&& cameraPos)
 {
     glm::vec3 milieu_terrain = glm::vec3(mTerrain.get_terrain_width()/2, 0, mTerrain.get_terrain_height()/2);
     float dist = glm::distance(cameraPos, glm::vec3(milieu_terrain.x/mTerrain.get_xz(), 0, milieu_terrain.z/mTerrain.get_xz()));
-    std::cout << dist << std::endl;
+    //std::cout << dist << std::endl;
     for (int lod = 0; lod < 4; lod++) {
         if (dist < mTerrain.get_lod_distance(lod)) return lod;
     }
@@ -110,8 +111,10 @@ void TerrainApp::RenderScene()
     // Choix du LOD
     int lod = SelectLOD(mCamera.GetPosition());
 
+    mShader->SetFloat("gMaxHeight", mTerrain.get_max_height());
+    mShader->SetFloat("gMixHeight", mTerrain.get_min_height());
+  
     glBindVertexArray(mVAO[lod]);
-
     mTerrain.renderer();
 }
 
@@ -188,7 +191,7 @@ void TerrainApp::FramebufferCallback(GLFWwindow* window, int width, int height)
     app->mScreenHeight = height;
 
     glViewport(0, 0, width, height);
-    app->mProjection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 100.0f);
+    app->mProjection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 5000.0f);
 
     app->mLastX = width / 2.0f;
     app->mLastY = height / 2.0f;
