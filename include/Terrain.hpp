@@ -79,7 +79,7 @@ public:
      * @param i l'indice de la ligne
      * @param j l'indice de la colonne
     */
-    int get_height(int i, int j) const{
+    float get_height(int i, int j) const{
         return data[i * width + j];
     };
 

@@ -139,7 +139,7 @@ bool Terrain::inside(int i, int j) const {
 }
 
 void Terrain::set_data(int i, float value){
-    this->data[i] = value;
+    this->data[i] += value;
 }
 
 std::vector<float> Terrain::get_data(){
