@@ -1,5 +1,5 @@
 #include "test-shader.hpp"
-#include "../src/Shader.hpp"
+#include "Shader.hpp"
 #include <fstream>
 #include <cstdio>
 

@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../src/Camera.hpp"
+#include "Camera.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/epsilon.hpp>
 

@@ -1,6 +1,6 @@
 #pragma once
 #include <gtest/gtest.h>
-#include "../src/Camera.hpp"
+#include "Camera.hpp"
 
 /**
  * @class CameraTest

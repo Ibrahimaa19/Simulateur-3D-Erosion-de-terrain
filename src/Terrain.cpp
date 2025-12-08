@@ -1,5 +1,35 @@
-#include "terrain.hpp"
+#include "Terrain.hpp"
+#include "ThermalErosion.hpp"
 
+
+void Terrain::load_terrain (const char* image_path,float yfactor,float xzfactor){
+    int t_channels;
+
+    unsigned char* image = stbi_load(image_path, &this->width, &this->height, &t_channels, 1);
+
+    if (image){
+        std::cout << "Loaded heightmap of size " << height << " x " << width << std::endl;
+    }else{
+        std::cout << "Failed to load texture" << std::endl;
+    }
+
+    this->data.resize(height*width);
+
+    this->borderSize = 10;
+    this->cellSpacing = 1;
+    this->yfactor = yfactor;
+    this->xzfactor = xzfactor;
+    
+
+    for (int i = 0; i < width * height; i++) {
+        this->data[i] = image[i] / 255.0f;
+    }
+
+    this->max_height = *std::max_element(data.begin(),data.end());
+    this->min_height = *std::min_element(data.begin(),data.end());
+
+    stbi_image_free(image);
+}
 
 void Terrain::load_vectices(){
     vertices.clear();
@@ -7,17 +37,17 @@ void Terrain::load_vectices(){
         for (int x = 0; x < width; x++) {
             bool isBorder = (x < borderSize || x >= width - borderSize || z < borderSize || z >= height - borderSize); // Si on est dans le bordure, alors isBorder devient true
             int index = z * width + x;
-            float y = data[index] * 10.0f; // Ajoute un facteur 10, pour metter en évidence différences de hauteur.
+            float y = data[index]*yfactor;
             
             
-            vertices.push_back((float)x/200.);  
+            vertices.push_back((float)x/xzfactor);  
             if(isBorder){
                 vertices.push_back(0.0f); // en bordure on aplatit
             }else{
                 vertices.push_back(y);
             }
                         
-            vertices.push_back((float)z/200.);        
+            vertices.push_back((float)z/xzfactor);        
         }
     }
 }
@@ -46,6 +76,9 @@ void Terrain::load_incides(){
 }
 
 void Terrain::setup_terrain(GLuint &VAO, GLuint &VBO, GLuint &EBO){
+    this->load_incides();
+	this->load_vectices();
+
     // Créer un VAO
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
@@ -74,14 +107,30 @@ void Terrain::setup_terrain(GLuint &VAO, GLuint &VBO, GLuint &EBO){
     
 }
 
-float Terrain::getHeight(int i, int j) const{
-    return data[i * width + j];
+void Terrain::update_vertices() {
+    load_vectices();
 }
 
-void Terrain::setHeight(int i, int j, float value){
-    data[i * width + j] = value;
+void Terrain::renderer(){
+    glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
 }
 
 bool Terrain::inside(int i, int j) const {
     return (i >= 0 && i < height && j >= 0 && j < width);
 }
+
+void Terrain::set_data(int i, float value){
+    this->data[i] = value;
+}
+
+std::vector<float> Terrain::get_data(){
+    return this->data;
+}
+
+int Terrain::get_indices_size() const{
+    return this->indices.size();
+};
+
+int Terrain::get_vertices_size() const{
+    return this->vertices.size();
+};

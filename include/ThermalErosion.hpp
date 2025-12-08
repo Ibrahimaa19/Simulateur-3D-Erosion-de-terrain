@@ -1,4 +1,4 @@
-#include "../include/terrain.hpp"
+#include "Terrain.hpp"
 
 /**
  * @class ThermalErosion
@@ -15,7 +15,7 @@ public:
      * @param talusAngle Angle critique des pentes (tangent), au-dessus duquel la matière est déplacée
      * @param transferRate Coefficient de diffusion
      */
-    ThermalErosion(float talusAngle = 12.0f, float tranferRate = 0.9f);
+    ThermalErosion(float talusAngle = 5.0f, float tranferRate = 0.9f);
 
     /**
      * @brief Applique une itération d'érosion thermique sur le terrain
