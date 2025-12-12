@@ -1,5 +1,4 @@
 #include "ThermalErosion.hpp"
-#include <cmath>
 #include <iostream>
 
 void ThermalErosion::step()

@@ -1,3 +1,6 @@
+#pragma once
+
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -20,9 +23,10 @@ class TerrainApp
 {
 public:
     /**
-     * @brief Default constructor.
+     * @brief Constructs a TerrainApp instance
+     * @param seed Seed used to initialize the random number generator
      */
-    TerrainApp();
+    TerrainApp(unsigned int seed = 1);
 
     /**
      * @brief Destructor.
