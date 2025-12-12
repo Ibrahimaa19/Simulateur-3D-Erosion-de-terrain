@@ -1,5 +1,6 @@
-#include <vector>
-#include "ThermalErosion.h"
+#include "ThermalErosion.hpp"
+#include <cmath>
+#include <iostream>
 
 ThermalErosion::ThermalErosion(float talusAngle, float c)
     : talusAngle(talusAngle), c(c) {}
