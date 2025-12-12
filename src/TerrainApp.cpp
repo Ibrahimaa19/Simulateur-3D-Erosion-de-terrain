@@ -68,7 +68,7 @@ void TerrainApp::InitScene()
     mShader = new Shader("../shaders/terrain.vs", "../shaders/terrain.fs");
     mShader->Use();
 
-    mTerrain.CreateMidpointDisplacement(std::pow(2, 10) + 1, 0, 100);
+    mTerrain.CreatePerlinNoise(1000, 1000, 0, 100);
     mTerrain.setup_terrain(mVAO, mVBO, mIBO);
 
     mModel = glm::mat4(1.0f);

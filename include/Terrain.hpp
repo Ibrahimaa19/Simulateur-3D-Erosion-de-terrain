@@ -76,7 +76,7 @@ public:
      * @param j l'indice de la colonne
     */
     int get_height(int i, int j) const{
-        return data[i * width + j];
+        return data[j * width + i];
     };
 
     /**
@@ -86,7 +86,7 @@ public:
      * @param value la valeur a insérer à la position(i,j)
     */
     void set_height(int i, int j, float value){
-        data[i * width + j] = value;
+        data[j * width + i] = value;
     };
 
     /**
