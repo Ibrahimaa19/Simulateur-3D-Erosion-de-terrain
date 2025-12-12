@@ -1,6 +1,5 @@
 #include "ThermalErosion.hpp"
 #include <cmath>
-#include <algorithm>
 #include <iostream>
 
 void ThermalErosion::step()
