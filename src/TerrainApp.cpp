@@ -81,7 +81,13 @@ void TerrainApp::InitScene()
 
 void TerrainApp::Run()
 {
-    ThermalErosion thermalErosion = ThermalErosion();
+    // --- Initialisation de l'érosion thermique
+    ThermalErosion thermalErosion;
+    thermalErosion.loadTerrainInfo(&mTerrain);
+
+    // Paramètres initiaux (modifiables plus tard via l’UI)
+    thermalErosion.setTalusAngle(0.6f);
+    thermalErosion.setTransferRate(0.05f);
 
     int stepCounter = 0;
 
@@ -92,22 +98,21 @@ void TerrainApp::Run()
 
         RenderScene();
 
-        bool terrainUpdated = false;
-
-        // Gestion de l'érosion thermique
-        if (thermalEnabled) {
-            thermalErosion.step(mTerrain);
+        // --- Erosion thermique
+        if (thermalEnabled)
+        {
+            thermalErosion.step();
             stepCounter++;
-    
-            // Mise à jour du terrain
-            mTerrain.update_vertices(); // Recalcule les vertices
-            
+
+            // Mise à jour CPU des vertices
+            mTerrain.update_vertices();
+
             // Mise à jour GPU
             glBindBuffer(GL_ARRAY_BUFFER, mVBO);
             glBufferSubData(GL_ARRAY_BUFFER, 0,
                 mTerrain.get_vertices().size() * sizeof(float),
                 mTerrain.get_vertices().data());
-            
+
             if (stepCounter % 10 == 0) {
                 std::cout << "Thermal erosion step " << stepCounter << std::endl;
             }
@@ -117,6 +122,7 @@ void TerrainApp::Run()
         glfwPollEvents();
     }
 }
+
 
 void TerrainApp::RenderScene()
 {
