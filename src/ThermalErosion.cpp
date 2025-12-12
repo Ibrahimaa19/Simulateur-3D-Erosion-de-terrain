@@ -24,13 +24,13 @@ void ThermalErosion::step()
     for (int i = 1; i < H - 1; i++) {
         for (int j = 1; j < W - 1; j++) {
 
-            float currentHeight = data[i * W + j];
+            float currentHeight = newData[i * W + j];
 
             // Hauteurs des voisins
-            float diffUp    = currentHeight - data[(i - 1) * W + j];
-            float diffDown  = currentHeight - data[(i + 1) * W + j];
-            float diffLeft  = currentHeight - data[i * W + (j - 1)];
-            float diffRight = currentHeight - data[i * W + (j + 1)];
+            float diffUp    = currentHeight - newData[(i - 1) * W + j];
+            float diffDown  = currentHeight - newData[(i + 1) * W + j];
+            float diffLeft  = currentHeight - newData[i * W + (j - 1)];
+            float diffRight = currentHeight - newData[i * W + (j + 1)];
 
             //std::cout << diffUp <<" "<<  diffDown <<" "<< diffLeft <<" "<< diffRight <<" "<< std::endl;
 
@@ -55,8 +55,7 @@ void ThermalErosion::step()
             // Érosion
             if (totalDiff > 0 && validNeighbors > 0) {
 
-                float materialToMove =
-                    transferRate * (totalDiff / validNeighbors);
+                float materialToMove = transferRate * (totalDiff / validNeighbors);
 
                 // Sécurité : ne retire pas plus qu’une fraction de la hauteur actuelle
                 materialToMove = std::min(materialToMove, currentHeight * transferRate);
