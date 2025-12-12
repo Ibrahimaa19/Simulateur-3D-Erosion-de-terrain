@@ -12,6 +12,7 @@
 #include "Terrain.hpp"
 #include "FaultFormationTerrain.hpp"
 #include "MidpointDisplacement.hpp"
+#include "PerlinNoiseTerrain.hpp"
 /**
  * @class TerrainApp
  * @brief Manages window creation, input callbacks, camera, rendering loop, and terrain rendering.
@@ -85,7 +86,7 @@ private:
     glm::mat4 mProjection;            ///< Projection matrix
 
     Shader* mShader;                  ///< Pointer to the shader program
-    MidpointDisplacement mTerrain;                 ///< Terrain object
+    PerlinNoiseTerrain mTerrain;      ///< Terrain object
 
     GLuint mVAO;                      ///< Vertex Array Object
     GLuint mVBO;                      ///< Vertex Buffer Object
