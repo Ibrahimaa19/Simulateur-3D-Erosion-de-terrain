@@ -2,72 +2,86 @@
 #include <cmath>
 #include <iostream>
 
-ThermalErosion::ThermalErosion(float talusAngle, float c)
-    : talusAngle(talusAngle), c(c) {}
-
-
-void ThermalErosion::step(Terrain& terrain)
+void ThermalErosion::step()
 {
-    float cellSize = 1.0f;
+    const int W = m_width;
+    const int H = m_height;
 
-    // Les 8 voisins
-    int di[8] = { -1,-1,-1, 0, 1, 1, 1, 0 };
-    int dj[8] = { -1, 0, 1, 1, 1, 0,-1,-1 };
+    float talus = 0.f;
 
-    float dist[8] = {
-        1.4142f, 1.0f, 1.4142f,
-        1.0f,    1.4142f, 1.0f,
-        1.4142f, 1.0f
-    };
+    if (!m_data) {
+        std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
+        return;
+    }
 
-    std::vector<float> delta(terrain.height * terrain.width, 0.0f);
+    std::vector<float>& data = *m_data;
+    std::vector<float> newData = data; // Copie pour éviter les effets immédiats
 
-    for (int i = 0; i < terrain.height; i++)
-    {
-        for (int j = 0; j < terrain.width; j++)
-        {
-            float currentHeight = terrain.getHeight(i, j);
+    int changes = 0;
 
-            int lowestI = -1; 
-            int lowestJ = -1;
-            float maxSlope = -1;
-            int lowestIndex = -1;
+    // Boucle sur le terrain
+    for (int i = 1; i < H - 1; i++) {
+        for (int j = 1; j < W - 1; j++) {
 
-            for (int k = 0; k < 8; k++)
-            {
-                int ni = i + di[k];
-                int nj = j + dj[k];
+            float currentHeight = newData[i * W + j];
 
-                if (!terrain.inside(ni, nj))
-                    continue;
+            // Hauteurs des voisins
+            float diffUp    = currentHeight - newData[(i - 1) * W + j];
+            float diffDown  = currentHeight - newData[(i + 1) * W + j];
+            float diffLeft  = currentHeight - newData[i * W + (j - 1)];
+            float diffRight = currentHeight - newData[i * W + (j + 1)];
 
-                float diff = currentHeight - terrain.getHeight(ni, nj);
+            //std::cout << diffUp <<" "<<  diffDown <<" "<< diffLeft <<" "<< diffRight <<" "<< std::endl;
 
-                if (diff > maxSlope && diff > 0.0f)
-                {
-                    maxSlope = diff;
-                    lowestI = ni;
-                    lowestJ = nj;
-                    lowestIndex = k;
+            float dist[4] = { diffUp, diffDown, diffLeft, diffRight };
+            int neighbors[4][2] = { {-1,0}, {1,0}, {0,-1}, {0,1} };
+
+            float totalDiff = 0.0f;
+            int validNeighbors = 0;
+
+            // Accumulation des différences valides
+            for (int k = 0; k < 4; k++) {
+                if (dist[k] > talus) {
+                    totalDiff += dist[k];
+                    validNeighbors++;
                 }
             }
+            
+            //if(totalDiff != 0){
+                //std::cout << totalDiff << std::endl;
+            //}
 
-            if (lowestI >= 0)
-            {
-                float slopeAngle = maxSlope / (cellSize * dist[lowestIndex]);
+            // Érosion
+            if (totalDiff > 0 && validNeighbors > 0) {
 
-                if (slopeAngle > talusAngle)
-                {
-                    float amount = c * maxSlope;
-                    
-                    delta[i * terrain.width + j] -= amount;
-                    delta[lowestI * terrain.width + lowestJ] += amount;
+                float materialToMove = transferRate * (totalDiff / validNeighbors);
+
+                // Sécurité : ne retire pas plus qu’une fraction de la hauteur actuelle
+                materialToMove = std::min(materialToMove, currentHeight * transferRate);
+
+                // On retire la matière de la cellule courante
+                newData[i * W + j] -= materialToMove;
+
+                // Redistribution aux voisins
+                for (int k = 0; k < 4; k++) {
+                    if (dist[k] > talus) {
+                        float proportion = dist[k] / totalDiff;
+                        float moveAmount = materialToMove * proportion;
+
+                        int ni = i + neighbors[k][0];
+                        int nj = j + neighbors[k][1];
+
+                        newData[ni * W + nj] += moveAmount;
+                    }
                 }
+
+                changes++;
             }
         }
     }
 
-    // appliquer les changements
-    for (int i = 0; i < terrain.width * terrain.height; i++)
-        terrain.data[i] += delta[i];
+    // Mise à jour globale
+    data = newData;
+
+    std::cout << "Cells modified: " << changes << std::endl;
 }
