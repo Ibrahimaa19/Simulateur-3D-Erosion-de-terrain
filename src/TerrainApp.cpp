@@ -1,4 +1,6 @@
 #include "TerrainApp.hpp"
+#include "ThermalErosion.hpp"
+#include "HydraulicErosion.hpp"
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -7,7 +9,9 @@ TerrainApp::TerrainApp(unsigned int seed)
     : mWindow(nullptr), mScreenWidth(1224), mScreenHeight(868),
       mLastX(mScreenWidth/2.0f), mLastY(mScreenHeight/2.0f),
       mFirstMouse(true), mMouseSensitivity(0.1f),
-      mCameraSpeed(5.0f)
+      mCameraSpeed(5.0f),
+      thermalEnabled(false), thermalStarted(false),
+      hydraulicEnabled(false), hydraulicStarted(false)
 {
     std::srand(seed);
 }
@@ -78,12 +82,36 @@ void TerrainApp::InitScene()
 
 void TerrainApp::Run()
 {
+    // --- Initialisation de l'érosion thermique
+    ThermalErosion thermalErosion;
+    thermalErosion.loadTerrainInfo(&mTerrain);
+
+    int stepCounter = 0;
+
     while (!glfwWindowShouldClose(mWindow))
     {
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         RenderScene();
+
+        // --- Erosion thermique
+        if (thermalEnabled)
+        {
+            thermalErosion.step();
+            stepCounter++;
+
+            mTerrain.update_vertices();
+
+            glBindBuffer(GL_ARRAY_BUFFER, mVBO);
+            glBufferSubData(GL_ARRAY_BUFFER, 0,
+                mTerrain.get_vertices().size() * sizeof(float),
+                mTerrain.get_vertices().data());
+
+            if (stepCounter % 10 == 0) {
+                std::cout << "Thermal erosion step " << stepCounter << std::endl;
+            }
+        }
 
         glfwSwapBuffers(mWindow);
         glfwPollEvents();
@@ -128,6 +156,24 @@ void TerrainApp::KeyCallback(GLFWwindow* window, int key, int scancode, int acti
             else
             {
                 glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+            }
+            break;
+        case GLFW_KEY_F:
+            app->thermalEnabled = !app->thermalEnabled;
+            if (app->thermalEnabled && !app->thermalStarted) {
+                std::cout << "Thermal erosion STARTED" << std::endl;
+                app->thermalStarted = true;
+            } else if (!app->thermalEnabled) {
+                std::cout << "Thermal erosion PAUSED" << std::endl;
+            }
+            break;
+        case GLFW_KEY_G:
+            app->hydraulicEnabled = !app->hydraulicEnabled;
+            if (app->hydraulicEnabled && !app->hydraulicStarted) {
+                std::cout << "Hydraulic erosion STARTED" << std::endl;
+                app->hydraulicStarted = true;
+            } else if (!app->hydraulicEnabled) {
+                std::cout << "Hydraulic erosion PAUSED" << std::endl;
             }
             break;
         }

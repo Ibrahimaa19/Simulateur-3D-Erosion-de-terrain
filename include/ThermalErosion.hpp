@@ -1,29 +1,31 @@
 #include "Terrain.hpp"
+#include <vector>
 
-/**
- * @class ThermalErosion
- * @brief Classe pour simuler l'érosion thermique d'un terrain
- *
- * L'érosion thermique déplace la matière des pentes trop raides vers les voisins plus bas
- * afin de stabiliser le relief et lisser les pentes
- */
 class ThermalErosion
 {
 public:
-    /**
-     * @brief Constructeur de la classe ThermalErosion
-     * @param talusAngle Angle critique des pentes (tangent), au-dessus duquel la matière est déplacée
-     * @param c Fraction de matériau transférée par itération
-     */
-    ThermalErosion(float talusAngle = 0.6f, float c = 0.1f);
 
-    /**
-     * @brief Applique une itération d'érosion thermique sur le terrain
-     * @param terrain Terrain sur lequel appliquer l'érosion
-     */
-    void step(Terrain& terrain);
+    void loadTerrainInfo(Terrain* terrain) {
+        m_data  = terrain->get_data(); 
+        m_height = terrain->get_terrain_height();
+        m_width  = terrain->get_terrain_width();
+    }
+    
+    void setTalusAngle(float talus) { talusAngle = talus; }
+    void setTransferRate(float c)   { transferRate = c; }
+
+    void step();
 
 private:
-    float talusAngle;
-    float c;      
+    std::vector<float>* m_data = nullptr;
+    int m_height = 0;
+    int m_width = 0;
+    float talusAngle = 0.06f;
+    float transferRate = 0.1f;
+
+    float get_height(int i, int j) const {
+        return (*m_data)[i * m_width + j];
+    }
+
+    float get_talus(){ return talusAngle;}
 };

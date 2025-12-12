@@ -1,6 +1,3 @@
-#pragma once
-
-
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -23,10 +20,9 @@ class TerrainApp
 {
 public:
     /**
-     * @brief Constructs a TerrainApp instance
-     * @param seed Seed used to initialize the random number generator
+     * @brief Default constructor.
      */
-    TerrainApp(unsigned int seed = 1);
+    TerrainApp();
 
     /**
      * @brief Destructor.
@@ -86,13 +82,20 @@ private:
     glm::mat4 mProjection;            ///< Projection matrix
 
     Shader* mShader;                  ///< Pointer to the shader program
-    PerlinNoiseTerrain mTerrain;      ///< Terrain object
+    //PerlinNoiseTerrain mTerrain;      ///< Terrain object
+    Terrain mTerrain;                 ///< Terrain object
 
     GLuint mVAO;                      ///< Vertex Array Object
     GLuint mVBO;                      ///< Vertex Buffer Object
     GLuint mIBO;                      ///< Index Buffer Object
 
     float mCameraSpeed;               ///< Speed used for keyboard movement
+
+    bool thermalEnabled;
+    bool thermalStarted;
+
+    bool hydraulicEnabled;
+    bool hydraulicStarted;
 
 private:
     /** Keyboard callback wrapper */

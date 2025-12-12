@@ -107,6 +107,10 @@ void Terrain::setup_terrain(GLuint &VAO, GLuint &VBO, GLuint &EBO){
     
 }
 
+void Terrain::update_vertices() {
+    load_vectices();
+}
+
 void Terrain::renderer(){
     glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
 }
@@ -119,8 +123,8 @@ void Terrain::set_data(int i, float value){
     this->data[i] = value;
 }
 
-std::vector<float> Terrain::get_data(){
-    return this->data;
+std::vector<float>* Terrain::get_data(){
+    return &(this->data);
 }
 
 int Terrain::get_indices_size() const{
