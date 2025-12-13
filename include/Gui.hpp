@@ -7,6 +7,12 @@
 struct GLFWwindow;
 class Terrain; 
 
+enum GenMethod {
+    GEN_HEIGHTMAP = 0,
+    GEN_FAULT_FORMATION = 1,
+    GEN_MIDPOINT_DISPLACEMENT = 2
+};
+
 class Gui {
 public:
     Gui();
@@ -16,10 +22,43 @@ public:
     void Render(Terrain* terrain = nullptr);
     void Shutdown();
 
-    // VARIABLES DE CONTRÔLE
-
+    // =========================================================
+    // VARIABLES D'ÉTAT 
+    // =========================================================
     bool showWelcomeScreen = true; 
+    bool showConfigScreen = false; 
 
+    bool startGeneration = false;  
+    bool resetSimulation = false;  
+
+    // =========================================================
+    // PARAMÈTRES DE GÉNÉRATION 
+    // =========================================================
+   
+    int selectedMethod = GEN_HEIGHTMAP; 
+
+    // --- Paramètres Méthode 1 : Heightmap (Image) ---
+    int selectedImage = 0; 
+
+    // --- Paramètres Méthode 2 : Fault Formation ---
+    int faultWidth = 512;
+    int faultHeight = 512;
+    int faultIterations = 500;
+    float faultMinHeight = 0.0f;
+    float faultMaxHeight = 255.0f;
+    bool faultUseFilter = true;
+    float faultFilter = 0.5f;
+
+    // --- Paramètres Méthode 3 : Midpoint Displacement ---
+    int midpointSize = 513; 
+    float midpointRoughness = 1.0f;
+    float midpointMinHeight = 0.0f;
+    float midpointMaxHeight = 255.0f;
+
+
+    // =========================================================
+    // PARAMÈTRES DE SIMULATION 
+    // =========================================================
     bool isPaused = false;      
     float timeSpeed = 1.0f;     
 

@@ -6,10 +6,14 @@
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 #include <iostream>
+#include <memory> 
 
 #include "Camera.hpp"
 #include "Shader.hpp"
 #include "Terrain.hpp"
+#include "FaultFormationTerrain.hpp"
+#include "MidpointDisplacement.hpp"
+#include "PerlinNoiseTerrain.hpp" 
 
 #include "Gui.hpp"
 
@@ -23,9 +27,10 @@ class TerrainApp
 {
 public:
     /**
-     * @brief Default constructor.
+     * @brief Constructs a TerrainApp instance
+     * @param seed Seed used to initialize the random number generator
      */
-    TerrainApp();
+    TerrainApp(unsigned int seed = 1);
 
     /**
      * @brief Destructor.
@@ -68,6 +73,11 @@ private:
      */
     void RenderScene();
 
+    /**
+     * @brief Handles terrain regeneration based on GUI settings.
+     */
+    void GenerateTerrainFromGui();
+
 private:
     GLFWwindow* mWindow;              ///< Pointer to the GLFW window
 
@@ -85,7 +95,8 @@ private:
     glm::mat4 mProjection;            ///< Projection matrix
 
     Shader* mShader;                  ///< Pointer to the shader program
-    Terrain mTerrain;                 ///< Terrain object
+    
+    std::unique_ptr<Terrain> mTerrain; ///< Smart pointer to the Terrain object (Polymorphic)
 
     GLuint mVAO;                      ///< Vertex Array Object
     GLuint mVBO;                      ///< Vertex Buffer Object
@@ -93,8 +104,8 @@ private:
 
     float mCameraSpeed;               ///< Speed used for keyboard movement
 
-    Gui mGui;                         ///< Instance de l'interface graphique
-    bool mShowMenu;                   ///< État du menu (Vrai = Menu, Faux = Jeu)
+    Gui mGui;                         ///< User Interface instance
+    bool mShowMenu;                   ///< Boolean to toggle menu visibility
 
 private:
     /** Keyboard callback wrapper */

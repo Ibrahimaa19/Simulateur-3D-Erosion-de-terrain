@@ -7,6 +7,19 @@
 #include <GLFW/glfw3.h>
 #include <cstdio> 
 
+static void HelpMarker(const char* desc)
+{
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered())
+    {
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+        ImGui::TextUnformatted(desc);
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+}
+
 Gui::Gui() {}
 
 Gui::~Gui() {
@@ -32,12 +45,12 @@ void Gui::Render(Terrain* terrain) {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+    ImGuiIO& io = ImGui::GetIO();
+
     // ============================================================
-    // CAS 1 : ECRAN D'ACCUEIL
+    // ÉTAPE 1 : ECRAN D'ACCUEIL 
     // ============================================================
     if (showWelcomeScreen) {
-        ImGuiIO& io = ImGui::GetIO();
-        
         ImGui::SetNextWindowPos(ImVec2(0, 0));
         ImGui::SetNextWindowSize(io.DisplaySize);
         ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
@@ -55,13 +68,13 @@ void Gui::Render(Terrain* terrain) {
         ImGui::TextColored(ImVec4(0.2f, 0.6f, 1.0f, 1.0f), "%s", title);
         
         ImGui::SetWindowFontScale(1.5f); 
-        const char* subtitle = "Projet M1 CHPC - Universite de Versailles";
+        const char* subtitle = "Projet M1 CHPS";
         textWidth = ImGui::CalcTextSize(subtitle).x;
         ImGui::SetCursorPosX((windowWidth - textWidth) * 0.5f);
         ImGui::Text("%s", subtitle);
 
         ImGui::SetCursorPosY(windowHeight * 0.6f); 
-        const char* btnText = "LANCER LA SIMULATION";
+        const char* btnText = "COMMENCER";
         float btnWidth = 300.0f;
         float btnHeight = 60.0f;
         ImGui::SetCursorPosX((windowWidth - btnWidth) * 0.5f);
@@ -71,22 +84,95 @@ void Gui::Render(Terrain* terrain) {
         
         if (ImGui::Button(btnText, ImVec2(btnWidth, btnHeight))) {
             showWelcomeScreen = false; 
+            showConfigScreen = true;
         }
         
         ImGui::PopStyleColor(2); 
         ImGui::SetWindowFontScale(1.0f); 
+        ImGui::End();
+    }
+    // ============================================================
+    // ÉTAPE 2 : MENU DE CONFIGURATION_Choix de la méthode
+    // ============================================================
+    else if (showConfigScreen) {
+        ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(500, 500));
+        
+        ImGui::Begin("Configuration du Terrain", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
+
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "1. Choisissez une methode de generation :");
+        
+        const char* items[] = { "Image (Heightmap)", "Faille (Fault Formation)", "Deplacement (Midpoint)" };
+        ImGui::Combo("##Method", &selectedMethod, items, IM_ARRAYSIZE(items));
+        
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "2. Parametres :");
+        ImGui::Spacing();
+
+        if (selectedMethod == GEN_HEIGHTMAP) {
+            ImGui::Text("Chargement depuis un fichier image PNG.");
+            const char* imgItems[] = { "iceland_heightmap.png", "heightmap.png" };
+            ImGui::Combo("Fichier Source", &selectedImage, imgItems, 2);
+        }
+        else if (selectedMethod == GEN_FAULT_FORMATION) {
+            ImGui::Text("Generation procedurale par failles.");
+            ImGui::InputInt("Largeur (X)", &faultWidth);
+            ImGui::InputInt("Hauteur (Z)", &faultHeight);
+            ImGui::InputInt("Iterations", &faultIterations, 10, 100);
+            ImGui::DragFloatRange2("Hauteur Min/Max", &faultMinHeight, &faultMaxHeight, 1.0f, 0.0f, 500.0f);
+            
+            ImGui::Checkbox("Appliquer Filtre Lissage", &faultUseFilter);
+            if(faultUseFilter) {
+                ImGui::SliderFloat("Intensite Filtre", &faultFilter, 0.0f, 1.0f);
+            }
+        }
+        else if (selectedMethod == GEN_MIDPOINT_DISPLACEMENT) {
+            ImGui::Text("Generation fractale (Diamant-Carre).");
+            ImGui::InputInt("Taille (2^n + 1)", &midpointSize);
+            HelpMarker("La taille doit etre une puissance de 2 plus 1 (ex: 129, 257, 513, 1025).");
+            
+            ImGui::SliderFloat("Rugosite (Roughness)", &midpointRoughness, 0.0f, 2.0f);
+            ImGui::DragFloatRange2("Hauteur Min/Max", &midpointMinHeight, &midpointMaxHeight, 1.0f, 0.0f, 500.0f);
+        }
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        float windowWidth = ImGui::GetWindowSize().x;
+        ImGui::SetCursorPosX((windowWidth - 200) * 0.5f);
+        
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.6f, 0.8f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.7f, 0.9f, 1.0f));
+
+        if (ImGui::Button("GENERER LE TERRAIN", ImVec2(200, 50))) {
+            startGeneration = true; 
+            showConfigScreen = false;
+        }
+        ImGui::PopStyleColor(2);
 
         ImGui::End();
     }
     // ============================================================
-    // CAS 2 : INTERFACE DE SIMULATION
+    // ÉTAPE 3 : INTERFACE DE SIMULATION 
     // ============================================================
     else {
-        ImGui::SetNextWindowSize(ImVec2(380, 400), ImGuiCond_FirstUseEver); 
+        ImGui::SetNextWindowSize(ImVec2(380, 500), ImGuiCond_FirstUseEver); 
         ImGui::Begin("Controle Simulation", nullptr);
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
+        if (ImGui::Button("<- Retour au Menu (Reset)", ImVec2(-1, 30))) {
+             resetSimulation = true; 
+             showConfigScreen = true; 
+        }
+        ImGui::PopStyleColor();
+        ImGui::Separator();
 
         if (ImGui::BeginTabBar("MyTabBar"))
         {
+            // ONGLET SIMULATION
             if (ImGui::BeginTabItem("Simulation"))
             {
                 ImGui::Spacing();
@@ -94,10 +180,6 @@ void Gui::Render(Terrain* terrain) {
                 
                 if (ImGui::Button(isPaused ? "Reprendre" : "Pause", ImVec2(100, 30))) {
                     isPaused = !isPaused;
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Reset", ImVec2(100, 30))) {
-                    printf("Reset du terrain demande !\n");
                 }
 
                 ImGui::DragFloat("Vitesse", &timeSpeed, 0.1f, 0.0f, 10.0f);
@@ -121,17 +203,17 @@ void Gui::Render(Terrain* terrain) {
                 ImGui::EndTabItem();
             }
 
+            // ONGLET VISUEL
             if (ImGui::BeginTabItem("Visuel"))
             {
-                ImGui::Spacing();
-                ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "--- Parametres Rendu ---");
-                
-                ImGui::DragFloat("Echelle Verticale", &verticalScale, 0.1f, 0.1f, 10.0f);
-                ImGui::ColorEdit3("Couleur Sol", terrainColor);
-                
+                //ImGui::Spacing();
+               // ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "--- Parametres Rendu ---");
+                //ImGui::DragFloat("Echelle Verticale", &verticalScale, 0.1f, 0.1f, 10.0f);
+                //ImGui::ColorEdit3("Couleur Sol", terrainColor);
                 ImGui::EndTabItem();
             }
 
+            // ONGLET INFOS 
             if (ImGui::BeginTabItem("Infos"))
             {
                 ImGui::Spacing();
@@ -146,7 +228,7 @@ void Gui::Render(Terrain* terrain) {
                 ImGui::BulletText("E : Move down");
                 ImGui::BulletText("M : Toggle Mouse/Menu");
                 ImGui::BulletText("ESC : Quit");
-                ImGui::BulletText("H : Show this menu"); 
+                //ImGui::BulletText("H : Show this menu"); 
 
                 ImGui::Spacing();
                 ImGui::Text("Mouse :");
@@ -162,7 +244,6 @@ void Gui::Render(Terrain* terrain) {
 
             ImGui::EndTabBar();
         }
-
         ImGui::End();
     }
 
