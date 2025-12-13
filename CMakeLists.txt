@@ -68,7 +68,7 @@ set(SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/src/TerrainApp.cpp
     ${PROJECT_SOURCE_DIR}/src/FaultFormationTerrain.cpp
     ${PROJECT_SOURCE_DIR}/src/MidpointDisplacement.cpp
-    ${PROJECT_SOURCE_DIR}/src/PerlinNoiseTerrain.cpp 
+    ${PROJECT_SOURCE_DIR}/src/PerlinNoiseTerrain.cpp
 )
 
 # Create the executable
