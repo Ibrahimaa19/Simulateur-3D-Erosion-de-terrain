@@ -47,6 +47,11 @@ public:
      */
     void Run();
 
+    /**
+     * @brief Change the camera speed
+     */
+    void setCameraSpeed(float value);
+
 private:
     /**
      * @brief Internal function to initialize the window.

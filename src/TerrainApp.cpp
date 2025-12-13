@@ -8,6 +8,10 @@
 #include "MidpointDisplacement.hpp"
 #include "PerlinNoiseTerrain.hpp" 
 
+void TerrainApp::setCameraSpeed(float value){
+    mCameraSpeed = value;
+}
+
 TerrainApp::TerrainApp(unsigned int seed)
     : mWindow(nullptr), mScreenWidth(1224), mScreenHeight(868),
       mLastX(mScreenWidth/2.0f), mLastY(mScreenHeight/2.0f),
@@ -108,17 +112,19 @@ void TerrainApp::GenerateTerrainFromGui()
 
     if (mGui.selectedMethod == GEN_HEIGHTMAP) 
     {
-        mShader = new Shader("../shaders/shader.vs", "../shaders/shader.fs");
+        mShader = new Shader("../shaders/terrain.vs", "../shaders/terrain.fs");
         
         mTerrain = std::make_unique<Terrain>(); 
 
         const char* path = "../src/heightmap/iceland_heightmap.png";
         if (mGui.selectedImage == 1) path = "../src/heightmap/heightmap.png";
 
-        mTerrain->load_terrain(path, 400.0f, 1.0f);
+        mTerrain->load_terrain(path, 1.0f, 100.0f);
 
         mCamera.MoveTo(glm::vec3{0.0f, 5.0f, 0.0f});
         mCamera.TurnTo(glm::vec3{mTerrain->get_terrain_width()/2.0f, 0.0f, mTerrain->get_terrain_height()/2.0f});
+
+        setCameraSpeed(0.2);
     }
     
     else 
@@ -135,6 +141,7 @@ void TerrainApp::GenerateTerrainFromGui()
                 1.0f, mGui.faultUseFilter, mGui.faultFilter
             );
             mTerrain = std::move(generator);
+
         }
         else if (mGui.selectedMethod == GEN_MIDPOINT_DISPLACEMENT) 
         {
@@ -145,6 +152,7 @@ void TerrainApp::GenerateTerrainFromGui()
                 1.0f, mGui.midpointRoughness
             );
             mTerrain = std::move(generator);
+
         }
         else if (mGui.selectedMethod == GEN_PERLIN_NOISE)
         {
@@ -164,6 +172,7 @@ void TerrainApp::GenerateTerrainFromGui()
 
         mCamera.MoveTo(glm::vec3{-54.0f, 220.0f, -42.0f});
         mCamera.TurnTo(glm::vec3{mTerrain->get_terrain_width()/2.0f, 0.0f, mTerrain->get_terrain_height()/2.0f});
+        setCameraSpeed(5.);
     }
 
     mShader->Use();
@@ -217,7 +226,7 @@ void TerrainApp::RenderScene()
     
     mShader->SetMat4("gFinalMatrix", finalMatrix);
     mShader->SetFloat("gMaxHeight", mTerrain->get_max_height());
-    mShader->SetFloat("gMixHeight", mTerrain->get_min_height());
+    mShader->SetFloat("gMinHeight", mTerrain->get_min_height());
     
     glBindVertexArray(mVAO);
     mTerrain->renderer(); 
