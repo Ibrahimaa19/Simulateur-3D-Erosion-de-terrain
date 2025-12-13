@@ -26,7 +26,8 @@ void MidpointDisplacement::CreateMidpointDisplacement(int size, float minHeight,
     this->xzfactor = 1.0f / scale;
     this->borderSize = 0;
 
-    this->data.assign(width * height, 0.0f);
+    auto* data = get_data();
+    data->assign(width * height, 0.0f);
     
     if(!isPowerOfTwo(size - 1))
     {
@@ -55,14 +56,16 @@ void MidpointDisplacement::CreateMidpointDisplacementInterne(float roughness)
 
 void MidpointDisplacement::Normalize()
 {
-    auto minMax = std::minmax_element(data.begin(), data.end());
+    auto* data = get_data();
+    
+    auto minMax = std::minmax_element(data->begin(), data->end());
     float min = *minMax.first;
     float max = *minMax.second;
 
     float minMaxDelta = max - min;
     float targetRange = max_height - min_height;
 
-    for(auto& element : data)
+    for(auto& element : *data)
     {
         element = (element - min) / minMaxDelta * targetRange + min_height;
     }

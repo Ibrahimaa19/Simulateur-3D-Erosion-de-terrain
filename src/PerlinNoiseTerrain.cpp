@@ -22,7 +22,8 @@ void PerlinNoiseTerrain::CreatePerlinNoise(int width, int height,
     this->xzfactor = 1.0f / scale;
     this->borderSize = 0;
 
-    this->data.assign(width * height, 0.0f);
+    auto* data = get_data();
+    data->assign(width * height, 0.0f);
 
     mBaseFrequency = frequency;
     mNumOctaves = octaves;
@@ -131,7 +132,9 @@ inline float PerlinNoiseTerrain::Lerp(float a, float b, float t) const
 
 void PerlinNoiseTerrain::Normalize()
 {
-    auto minMax = std::minmax_element(data.begin(), data.end());
+    auto* data = get_data();
+
+    auto minMax = std::minmax_element(data->begin(), data->end());
 
     float min = *minMax.first;
     float max = *minMax.second;
@@ -139,7 +142,7 @@ void PerlinNoiseTerrain::Normalize()
     float minMaxDelta = max - min;
     float minMaxRange = max_height - min_height;
 
-    for (auto& element : data)
+    for (auto& element : *data)
     {
         element = (element - min) / minMaxDelta * minMaxRange + min_height;
     }

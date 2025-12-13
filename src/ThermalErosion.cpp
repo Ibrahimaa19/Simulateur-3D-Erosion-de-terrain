@@ -30,7 +30,6 @@ void ThermalErosion::step()
             float diffLeft  = currentHeight - newData[i * W + (j - 1)];
             float diffRight = currentHeight - newData[i * W + (j + 1)];
 
-            //std::cout << diffUp <<" "<<  diffDown <<" "<< diffLeft <<" "<< diffRight <<" "<< std::endl;
 
             float dist[4] = { diffUp, diffDown, diffLeft, diffRight };
             int neighbors[4][2] = { {-1,0}, {1,0}, {0,-1}, {0,1} };
@@ -45,10 +44,6 @@ void ThermalErosion::step()
                     validNeighbors++;
                 }
             }
-            
-            //if(totalDiff != 0){
-                //std::cout << totalDiff << std::endl;
-            //}
 
             // Érosion
             if (totalDiff > 0 && validNeighbors > 0) {
@@ -58,7 +53,7 @@ void ThermalErosion::step()
                 // Sécurité : ne retire pas plus qu’une fraction de la hauteur actuelle
                 materialToMove = std::min(materialToMove, currentHeight * transferRate);
 
-                // On retire la matière de la cellule courante
+                // On retire la matière de la cellule actuelle
                 newData[i * W + j] -= materialToMove;
 
                 // Redistribution aux voisins

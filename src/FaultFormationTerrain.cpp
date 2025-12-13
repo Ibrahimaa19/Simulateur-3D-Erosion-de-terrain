@@ -17,8 +17,9 @@ void FaultFormationTerrain::CreateFaultFormation(int width, int height, int iter
     this->yfactor = 1;
     this->xzfactor = 1.0f / scale;
     this->borderSize = 0;
-
-    this->data.assign(width * height, 0.0f);
+    
+    auto* data = get_data();
+    data->assign(width * height, 0.0f);
 
     CreateFaultFormationInternal(iterations, minHeight, maxHeight, applyFilter, filter);
 
@@ -87,14 +88,16 @@ void FaultFormationTerrain::GenRandomTerrainPoints(TerrainPoint& p1, TerrainPoin
 
 void FaultFormationTerrain::Normalize()
 {
-    auto minMax = std::minmax_element(data.begin(), data.end());
+    auto* data = get_data();
+
+    auto minMax = std::minmax_element(data->begin(), data->end());
 
     float min = *minMax.first;
     float max = *minMax.second;
 
     float minMaxDelta = max - min;
     float minMaxRange = max_height - min_height;
-    for(auto& element: data)
+    for(auto& element: *data)
     {
         element = (element - min)/minMaxDelta * minMaxRange + min_height;
     }

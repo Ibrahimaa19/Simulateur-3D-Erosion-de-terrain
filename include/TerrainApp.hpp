@@ -86,8 +86,8 @@ private:
     glm::mat4 mProjection;            ///< Projection matrix
 
     Shader* mShader;                  ///< Pointer to the shader program
-    //PerlinNoiseTerrain mTerrain;      ///< Terrain object
-    Terrain mTerrain;                 ///< Terrain object
+    PerlinNoiseTerrain mTerrain;      ///< Terrain object
+    //Terrain mTerrain;                 ///< Terrain object
 
     GLuint mVAO;                      ///< Vertex Array Object
     GLuint mVBO;                      ///< Vertex Buffer Object
