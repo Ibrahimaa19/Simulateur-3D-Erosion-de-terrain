@@ -20,7 +20,7 @@ private:
     std::vector<float>* m_data = nullptr;
     int m_height = 0;
     int m_width = 0;
-    float talusAngle = 0.06f;
+    float talusAngle = 45.f; //en degré
     float transferRate = 0.1f;
 
     float get_height(int i, int j) const {

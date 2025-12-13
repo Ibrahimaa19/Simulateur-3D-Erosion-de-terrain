@@ -7,7 +7,8 @@ void ThermalErosion::step()
     const int W = m_width;
     const int H = m_height;
 
-    float talus = 0.f;
+    float talusAng = get_talus()/180; // Conversion en radian
+    float talus = std::tan(talusAng);
 
     if (!m_data) {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
