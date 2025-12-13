@@ -10,7 +10,8 @@ class Terrain;
 enum GenMethod {
     GEN_HEIGHTMAP = 0,
     GEN_FAULT_FORMATION = 1,
-    GEN_MIDPOINT_DISPLACEMENT = 2
+    GEN_MIDPOINT_DISPLACEMENT = 2,
+    GEN_PERLIN_NOISE = 3 
 };
 
 class Gui {
@@ -54,6 +55,16 @@ public:
     float midpointRoughness = 1.0f;
     float midpointMinHeight = 0.0f;
     float midpointMaxHeight = 255.0f;
+
+    // --- Paramètres Méthode 4 : Perlin Noise (AJOUT) ---
+    int perlinWidth = 512;
+    int perlinHeight = 512;
+    float perlinMinHeight = 0.0f;
+    float perlinMaxHeight = 255.0f;
+    float perlinFrequency = 0.005f;
+    int perlinOctaves = 6;      
+    float perlinPersistence = 0.5f;
+    float perlinLacunarity = 2.0f;
 
 
     // =========================================================

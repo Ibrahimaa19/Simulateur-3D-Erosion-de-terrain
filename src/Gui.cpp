@@ -96,13 +96,13 @@ void Gui::Render(Terrain* terrain) {
     // ============================================================
     else if (showConfigScreen) {
         ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(500, 500));
+        ImGui::SetNextWindowSize(ImVec2(500, 550)); 
         
         ImGui::Begin("Configuration du Terrain", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
 
         ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "1. Choisissez une methode de generation :");
         
-        const char* items[] = { "Image (Heightmap)", "Faille (Fault Formation)", "Deplacement (Midpoint)" };
+        const char* items[] = { "Image (Heightmap)", "Faille (Fault Formation)", "Deplacement (Midpoint)", "Perlin Noise" };
         ImGui::Combo("##Method", &selectedMethod, items, IM_ARRAYSIZE(items));
         
         ImGui::Separator();
@@ -110,6 +110,8 @@ void Gui::Render(Terrain* terrain) {
 
         ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "2. Parametres :");
         ImGui::Spacing();
+
+        // --- GESTION DES MENUS PAR METHODE ---
 
         if (selectedMethod == GEN_HEIGHTMAP) {
             ImGui::Text("Chargement depuis un fichier image PNG.");
@@ -135,6 +137,21 @@ void Gui::Render(Terrain* terrain) {
             
             ImGui::SliderFloat("Rugosite (Roughness)", &midpointRoughness, 0.0f, 2.0f);
             ImGui::DragFloatRange2("Hauteur Min/Max", &midpointMinHeight, &midpointMaxHeight, 1.0f, 0.0f, 500.0f);
+        }
+        else if (selectedMethod == GEN_PERLIN_NOISE) {
+            ImGui::Text("Generation procedurale par Bruit de Perlin.");
+            
+            ImGui::InputInt("Largeur (X)", &perlinWidth);
+            ImGui::InputInt("Hauteur (Z)", &perlinHeight);
+            ImGui::DragFloatRange2("Hauteur Min/Max", &perlinMinHeight, &perlinMaxHeight, 1.0f, 0.0f, 500.0f);
+            
+            ImGui::Separator();
+            ImGui::Text("Reglages du Bruit :");
+            
+            ImGui::SliderFloat("Frequence", &perlinFrequency, 0.001f, 0.1f, "%.4f");
+            ImGui::SliderInt("Octaves", &perlinOctaves, 1, 10);
+            ImGui::SliderFloat("Persistance", &perlinPersistence, 0.1f, 1.5f);
+            ImGui::SliderFloat("Lacunarite", &perlinLacunarity, 1.0f, 5.0f);
         }
 
         ImGui::Spacing();

@@ -100,6 +100,7 @@ void TerrainApp::GenerateTerrainFromGui()
     if (mGui.selectedMethod == GEN_HEIGHTMAP) nomMethode = "Image (Heightmap)";
     else if (mGui.selectedMethod == GEN_FAULT_FORMATION) nomMethode = "Faille (Fault Formation)";
     else if (mGui.selectedMethod == GEN_MIDPOINT_DISPLACEMENT) nomMethode = "Deplacement (Midpoint)";
+    else if (mGui.selectedMethod == GEN_PERLIN_NOISE) nomMethode = "Perlin Noise";
 
     std::cout << "Generation via GUI... Methode: " << nomMethode << std::endl;
 
@@ -119,6 +120,7 @@ void TerrainApp::GenerateTerrainFromGui()
         mCamera.MoveTo(glm::vec3{0.0f, 5.0f, 0.0f});
         mCamera.TurnTo(glm::vec3{mTerrain->get_terrain_width()/2.0f, 0.0f, mTerrain->get_terrain_height()/2.0f});
     }
+    
     else 
     {
         mShader = new Shader("../shaders/terrain.vs", "../shaders/terrain.fs");
@@ -144,6 +146,21 @@ void TerrainApp::GenerateTerrainFromGui()
             );
             mTerrain = std::move(generator);
         }
+        else if (mGui.selectedMethod == GEN_PERLIN_NOISE)
+        {
+            auto generator = std::make_unique<PerlinNoiseTerrain>();
+            generator->CreatePerlinNoise(
+                mGui.perlinWidth, mGui.perlinHeight,
+                mGui.perlinMinHeight, mGui.perlinMaxHeight,
+                1.0f, 
+                mGui.perlinFrequency,
+                mGui.perlinOctaves,
+                mGui.perlinPersistence,
+                mGui.perlinLacunarity
+            );
+            mTerrain = std::move(generator);
+        }
+        // -----------------------------------------------
 
         mCamera.MoveTo(glm::vec3{-54.0f, 220.0f, -42.0f});
         mCamera.TurnTo(glm::vec3{mTerrain->get_terrain_width()/2.0f, 0.0f, mTerrain->get_terrain_height()/2.0f});
