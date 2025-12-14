@@ -5,11 +5,7 @@
 /**
  * @class ThermalErosion
  * @brief Implémente un algorithme d’érosion thermique sur un terrain.
- *
- * L’érosion thermique simule les glissements de matière lorsque
- * la pente locale dépasse un angle critique (angle de talus).
- * Cette classe agit directement sur les données de hauteur du terrain.
- */
+**/
 class ThermalErosion
 {
 public:
@@ -57,17 +53,17 @@ private:
     /** Pointeur vers les données de hauteur du terrain */
     std::vector<float>* m_data = nullptr;
 
-    /** Nombre de lignes du terrain */
+    /** hauteur du terrain */
     int m_height = 0;
 
-    /** Nombre de colonnes du terrain */
+    /** largeur du terrain */
     int m_width = 0;
 
     /** Angle de talus critique (en degrés) */
-    float talusAngle = 45.f;
+    float talusAngle = 0.f;
 
     /** Taux de transfert de matière */
-    float transferRate = 0.1f;
+    float transferRate = 0.f;
 
     /**
      * @brief Retourne la hauteur au point (i, j).
