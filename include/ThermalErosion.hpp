@@ -21,10 +21,10 @@ public:
      * @param terrain Pointeur vers le terrain à éroder
      *
      */
-    void loadTerrainInfo(std::unique_ptr<Terrain>& terrain) {
-        m_data   = terrain->get_data();
-        m_height = terrain->get_terrain_height();
-        m_width  = terrain->get_terrain_width();
+    void loadTerrainInfo(Terrain& terrain) {
+        m_data   = terrain.get_data();
+        m_height = terrain.get_terrain_height();
+        m_width  = terrain.get_terrain_width();
     }
     
     /**

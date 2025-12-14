@@ -6,7 +6,7 @@ void ThermalErosion::step()
     const int W = m_width;
     const int H = m_height;
 
-    std::cout << talusAngle << std::endl;
+    //std::cout << talusAngle << std::endl;
 
     if (!m_data) {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
@@ -74,5 +74,5 @@ void ThermalErosion::step()
 
     data = newData;
 
-    std::cout << "Cells modified: " << changes << std::endl;
+    //std::cout << "Cells modified: " << changes << std::endl;
 }

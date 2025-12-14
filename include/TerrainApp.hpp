@@ -6,17 +6,13 @@
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 #include <iostream>
-#include <memory> 
 
 #include "Camera.hpp"
 #include "Shader.hpp"
 #include "Terrain.hpp"
 #include "FaultFormationTerrain.hpp"
 #include "MidpointDisplacement.hpp"
-#include "PerlinNoiseTerrain.hpp" 
-
-#include "Gui.hpp"
-
+#include "PerlinNoiseTerrain.hpp"
 /**
  * @class TerrainApp
  * @brief Manages window creation, input callbacks, camera, rendering loop, and terrain rendering.
@@ -47,11 +43,6 @@ public:
      */
     void Run();
 
-    /**
-     * @brief Change the camera speed
-     */
-    void setCameraSpeed(float value);
-
 private:
     /**
      * @brief Internal function to initialize the window.
@@ -78,11 +69,6 @@ private:
      */
     void RenderScene();
 
-    /**
-     * @brief Handles terrain regeneration based on GUI settings.
-     */
-    void GenerateTerrainFromGui();
-
 private:
     GLFWwindow* mWindow;              ///< Pointer to the GLFW window
 
@@ -100,9 +86,7 @@ private:
     glm::mat4 mProjection;            ///< Projection matrix
 
     Shader* mShader;                  ///< Pointer to the shader program
-    //PerlinNoiseTerrain mTerrain;      ///< Terrain object
-    
-    std::unique_ptr<Terrain> mTerrain; ///< Smart pointer to the Terrain object (Polymorphic)
+    PerlinNoiseTerrain mTerrain;      ///< Terrain object
 
     GLuint mVAO;                      ///< Vertex Array Object
     GLuint mVBO;                      ///< Vertex Buffer Object
@@ -116,9 +100,6 @@ private:
     bool hydraulicEnabled;
     bool hydraulicStarted;
     
-    Gui mGui;                         ///< User Interface instance
-    bool mShowMenu;                   ///< Boolean to toggle menu visibility
-
 private:
     /** Keyboard callback wrapper */
     static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
