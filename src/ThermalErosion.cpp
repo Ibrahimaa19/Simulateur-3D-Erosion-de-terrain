@@ -1,13 +1,12 @@
 #include "ThermalErosion.hpp"
 #include <iostream>
-#include <vector>
 
 void ThermalErosion::step()
 {
     const int W = m_width;
     const int H = m_height;
 
-    // std::cout << talusAngle << std::endl;
+    //std::cout << talusAngle << std::endl;
 
     if (!m_data) {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
@@ -16,6 +15,7 @@ void ThermalErosion::step()
 
     std::vector<float>& data = *m_data;
     std::vector<float> newData = data; // Copie
+        
 
     int changes = 0;
 
@@ -53,7 +53,7 @@ void ThermalErosion::step()
 
             // Érosion
             if (totalDiff > 0 && validNeighbors > 0) {
-
+                
                 float materialToMove = transferRate * (totalDiff / validNeighbors);
                 materialToMove = std::min(materialToMove, currentHeight * transferRate);
 
@@ -79,5 +79,6 @@ void ThermalErosion::step()
     }
 
     data = newData;
-    //std::cout << "Cells modified: " << changes << std::endl;
+
+    std::cout << "Cells modified: " << changes << std::endl;
 }
