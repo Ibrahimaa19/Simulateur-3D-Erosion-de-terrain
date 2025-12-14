@@ -6,7 +6,7 @@ void ThermalErosion::step()
     const int W = m_width;
     const int H = m_height;
 
-    //std::cout << talusAngle << std::endl;
+    std::cout << talusAngle << std::endl;
 
     if (!m_data) {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
@@ -23,15 +23,13 @@ void ThermalErosion::step()
     for (int i = 1; i < H - 1; i++) {
         for (int j = 1; j < W - 1; j++) {
 
-            float currentHeight = newData[i * W + j];
+            float currentHeight = data[i * W + j];
 
             // Hauteurs des voisins
-            float diffUp    = currentHeight - newData[(i - 1) * W + j];
-            float diffDown  = currentHeight - newData[(i + 1) * W + j];
-            float diffLeft  = currentHeight - newData[i * W + (j - 1)];
-            float diffRight = currentHeight - newData[i * W + (j + 1)];
-
-            //std::cout << diffUp <<" "<<  diffDown <<" "<< diffLeft <<" "<< diffRight <<" "<< std::endl;
+            float diffUp    = currentHeight - data[(i - 1) * W + j];
+            float diffDown  = currentHeight - data[(i + 1) * W + j];
+            float diffLeft  = currentHeight - data[i * W + (j - 1)];
+            float diffRight = currentHeight - data[i * W + (j + 1)];
 
             float dist[4] = { diffUp, diffDown, diffLeft, diffRight };
             int neighbors[4][2] = { {-1,0}, {1,0}, {0,-1}, {0,1} };
@@ -46,10 +44,6 @@ void ThermalErosion::step()
                     validNeighbors++;
                 }
             }
-            
-            //if(totalDiff != 0){
-                //std::cout << totalDiff << std::endl;
-            //}
 
             // Érosion
             if (totalDiff > 0 && validNeighbors > 0) {

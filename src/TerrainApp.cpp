@@ -259,7 +259,7 @@ void TerrainApp::Run()
 
             // Paramètres initiaux (modifiables plus tard via l’UI)
             thermalErosion.setTalusAngle(25.0f);
-            thermalErosion.setTransferRate(0.05f);
+            thermalErosion.setTransferRate(0.1f);
 
             int stepCounter = 0;
 

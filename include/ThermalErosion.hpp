@@ -33,9 +33,10 @@ public:
      * @param talus Angle de talus en degrés
      */
     void setTalusAngle(float angle) { 
-        float talus = std::tan(angle/180);
-        //talusAngle = talus; 
-        talusAngle = 0.006; 
+        float PI = 3.14159265f;
+        float talus = std::tan(angle * PI / 180.0);
+        talusAngle = talus; 
+        //talusAngle = 0.006; 
     }
 
     /**
