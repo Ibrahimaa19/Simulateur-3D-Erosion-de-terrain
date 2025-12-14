@@ -6,6 +6,7 @@
 #include <iostream>
 #include <algorithm>
 #include <GL/glew.h>
+#include <fstream>
 
 #include "stb_image.hpp"
 
@@ -148,6 +149,14 @@ public:
     */
     void update_vertices();
     const std::vector<float>& get_vertices() const { return vertices; }
+
+    /**
+     * @brief Exporte le terrain vers un fichier CSV
+     * @param filename Nom du fichier de sortie
+     */
+    static void export_terrain_to_csv(const std::vector<float>& data,
+                                  int width, int height,
+                                  const std::string& filename);
 
 };
 

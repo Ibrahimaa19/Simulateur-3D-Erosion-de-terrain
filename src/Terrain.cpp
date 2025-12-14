@@ -1,5 +1,6 @@
 #include "Terrain.hpp"
 #include "ThermalErosion.hpp"
+#include <fstream>
 
 
 void Terrain::load_terrain (const char* image_path,float yfactor,float xzfactor){
@@ -133,4 +134,16 @@ int Terrain::get_indices_size() const{
 
 int Terrain::get_vertices_size() const{
     return this->vertices.size();
+}
+
+void Terrain::export_terrain_to_csv(const std::vector<float>& data, int W, int H, const std::string& filename) {
+    std::ofstream file(filename);
+    for (int i = 0; i < H; i++) {
+        for (int j = 0; j < W; j++) {
+            file << data[i * W + j];
+            if (j < W - 1) file << ",";
+        }
+        file << "\n";
+    }
+    file.close();
 };

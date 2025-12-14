@@ -4,6 +4,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
+#include <string.h>
 
 TerrainApp::TerrainApp(unsigned int seed)
     : mWindow(nullptr), mScreenWidth(1224), mScreenHeight(868),
@@ -114,8 +115,10 @@ void TerrainApp::Run()
                 mTerrain.get_vertices().size() * sizeof(float),
                 mTerrain.get_vertices().data());
 
-            if (stepCounter % 10 == 0) {
+            std::string PATH = "../validation/data/terrain_step_" + std::to_string(stepCounter) + ".csv";
+            if (stepCounter % 100 == 0) {
                 std::cout << "Thermal erosion step " << stepCounter << std::endl;
+                mTerrain.export_terrain_to_csv(*mTerrain.get_data(), mTerrain.get_terrain_width(), mTerrain.get_terrain_height(), PATH);
             }
         }
 

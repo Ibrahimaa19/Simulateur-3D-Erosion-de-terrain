@@ -78,6 +78,5 @@ void ThermalErosion::step()
     }
 
     data = newData;
-
-    std::cout << "Cells modified: " << changes << std::endl;
+    //std::cout << "Cells modified: " << changes << std::endl;
 }
