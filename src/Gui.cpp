@@ -2,7 +2,6 @@
 #include "Terrain.hpp" 
 
 #include <GL/glew.h> 
-
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
 #include <GLFW/glfw3.h>
@@ -21,158 +20,249 @@ static void HelpMarker(const char* desc)
     }
 }
 
-// Constructeur
-Gui::Gui() {
-}
+Gui::Gui() {}
 
-// Destructeur
 Gui::~Gui() {
     Shutdown();
 }
 
 void Gui::Init(GLFWwindow* window) {
-    // 1. Initialisation du contexte ImGui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     
-    // 2. Configuration du style 
     ImGui::StyleColorsDark();
-    
     ImGuiStyle& style = ImGui::GetStyle();
     style.WindowRounding = 5.0f;
     style.FrameRounding = 4.0f;
     
-    // 3. Initialisation des Backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 130"); 
 }
 
 void Gui::Render(Terrain* terrain) {
-    // --- Début de la frame ImGui ---
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    // --- Configuration de la fenêtre principale ---
-    ImGui::SetNextWindowSize(ImVec2(350, 400), ImGuiCond_FirstUseEver); 
-    
-    ImGui::Begin("Controle Simulation", nullptr);
+    ImGuiIO& io = ImGui::GetIO();
 
-    // Affichage des FPS en haut
-    ImGui::Text("FPS moyen : %.1f", ImGui::GetIO().Framerate);
-    ImGui::Separator();
+    // ============================================================
+    // ÉTAPE 1 : ECRAN D'ACCUEIL 
+    // ============================================================
+    if (showWelcomeScreen) {
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(io.DisplaySize);
+        ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
 
-    // --- DÉBUT DES ONGLETS ---
-    if (ImGui::BeginTabBar("MyTabBar"))
-    {
-        // ============================================================
-        // ONGLET 1 : SIMULATION
-        // ============================================================
-        if (ImGui::BeginTabItem("Simulation"))
-        {
-            ImGui::Spacing();
-            
-            // --- Contrôle du Temps ---
-            ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "--- Controle Temporel ---");
-            
-            // Bouton Pause / Reprendre
-            if (ImGui::Button(isPaused ? "Reprendre" : "Pause", ImVec2(100, 30))) {
-                isPaused = !isPaused;
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Reset", ImVec2(100, 30))) {
+        ImGui::Begin("Welcome", nullptr, window_flags);
 
-                printf("Reset du terrain demande !\n");
-            }
+        float windowWidth = ImGui::GetWindowSize().x;
+        float windowHeight = ImGui::GetWindowSize().y;
+        
+        ImGui::SetCursorPosY(windowHeight * 0.3f); 
+        ImGui::SetWindowFontScale(3.0f); 
+        const char* title = "SIMULATEUR D'EROSION 3D";
+        float textWidth = ImGui::CalcTextSize(title).x;
+        ImGui::SetCursorPosX((windowWidth - textWidth) * 0.5f);
+        ImGui::TextColored(ImVec4(0.2f, 0.6f, 1.0f, 1.0f), "%s", title);
+        
+        ImGui::SetWindowFontScale(1.5f); 
+        const char* subtitle = "Projet M1 CHPS";
+        textWidth = ImGui::CalcTextSize(subtitle).x;
+        ImGui::SetCursorPosX((windowWidth - textWidth) * 0.5f);
+        ImGui::Text("%s", subtitle);
 
-            ImGui::DragFloat("Vitesse", &timeSpeed, 0.1f, 0.0f, 10.0f);
-            HelpMarker("Multiplicateur de temps pour la simulation.");
-
-            ImGui::Separator();
-
-            // --- Paramètres d'Érosion ---
-            if (ImGui::CollapsingHeader("Erosion Thermique", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                ImGui::SliderInt("Iterations", &thermalIterations, 0, 50000);
-                ImGui::SliderFloat("Angle Talus", &talusAngle, 0.0f, 90.0f, "%.1f deg");
-                ImGui::SliderFloat("Constante K", &thermalK, 0.0f, 1.0f);
-            }
-
-            if (ImGui::CollapsingHeader("Erosion Hydraulique"))
-            {
-                ImGui::SliderInt("Iterations", &hydroIterations, 0, 100000);
-                ImGui::SliderFloat("Pluie", &rainAmount, 0.0f, 5.0f);
-                ImGui::SliderFloat("Evaporation", &evaporationRate, 0.0f, 1.0f);
-            }
-
-            ImGui::EndTabItem();
+        ImGui::SetCursorPosY(windowHeight * 0.6f); 
+        const char* btnText = "COMMENCER";
+        float btnWidth = 300.0f;
+        float btnHeight = 60.0f;
+        ImGui::SetCursorPosX((windowWidth - btnWidth) * 0.5f);
+        
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.7f, 0.2f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.8f, 0.3f, 1.0f));
+        
+        if (ImGui::Button(btnText, ImVec2(btnWidth, btnHeight))) {
+            showWelcomeScreen = false; 
+            showConfigScreen = true;
         }
-
-        // ============================================================
-        // ONGLET 2 : VISUEL
-        // ============================================================
-        if (ImGui::BeginTabItem("Visuel"))
-        {
-            ImGui::Spacing();
-            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "--- Parametres Rendu ---");
-
-            // --- Gestion du Wireframe ---
-            if (ImGui::Checkbox("Mode Fil de fer (Wireframe)", &showWireframe)) {
-                if(showWireframe) 
-                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                else 
-                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-            }
-
-            ImGui::Separator();
-
-            ImGui::DragFloat("Echelle Verticale", &verticalScale, 0.1f, 0.1f, 10.0f);
-            HelpMarker("Permet d'exagerer le relief pour mieux voir les details.");
-
-            ImGui::ColorEdit3("Couleur Sol", terrainColor);
-            
-            ImGui::Spacing();
-            ImGui::Text("Position Soleil :");
-            ImGui::DragFloat3("##SunPos", sunPosition, 1.0f, -100.0f, 100.0f);
-
-            ImGui::EndTabItem();
-        }
-
-        // ============================================================
-        // ONGLET 3 : INFOS & DEBUG
-        // ============================================================
-        if (ImGui::BeginTabItem("Infos"))
-        {
-            ImGui::Spacing();
-            ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "--- Stats Terrain ---");
-            
-            if (terrain != nullptr) {
-            
-                ImGui::Text("Nombre de Triangles : %zu", terrain->get_indices_size() / 3);
-                ImGui::Text("Nombre de Sommets   : %zu", terrain->get_vertices_size());
-            } else {
-                ImGui::TextColored(ImVec4(1,0,0,1), "Terrain non connecte !");
-            }
-
-            ImGui::Separator();
-            ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "--- Camera ---");
-            
-            // Affiche la position de la caméra 
-            ImGui::Text("X : %.2f", cameraPos.x);
-            ImGui::Text("Y : %.2f", cameraPos.y);
-            ImGui::Text("Z : %.2f", cameraPos.z);
-            
-            ImGui::Separator();
-            ImGui::TextDisabled("Simulateur-3D-Erosion-de-terrain - M1 CHPS");
-
-            ImGui::EndTabItem();
-        }
-
-        ImGui::EndTabBar();
+        
+        ImGui::PopStyleColor(2); 
+        ImGui::SetWindowFontScale(1.0f); 
+        ImGui::End();
     }
+    // ============================================================
+    // ÉTAPE 2 : MENU DE CONFIGURATION_Choix de la méthode
+    // ============================================================
+    else if (showConfigScreen) {
+        ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(500, 550)); 
+        
+        ImGui::Begin("Configuration du Terrain", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
 
-    ImGui::End();
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "1. Choisissez une methode de generation :");
+        
+        const char* items[] = { "Image (Heightmap)", "Faille (Fault Formation)", "Deplacement (Midpoint)", "Perlin Noise" };
+        ImGui::Combo("##Method", &selectedMethod, items, IM_ARRAYSIZE(items));
+        
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "2. Parametres :");
+        ImGui::Spacing();
+
+        // --- GESTION DES MENUS PAR METHODE ---
+
+        if (selectedMethod == GEN_HEIGHTMAP) {
+            ImGui::Text("Chargement depuis un fichier image PNG.");
+            const char* imgItems[] = { "iceland_heightmap.png", "heightmap.png" };
+            ImGui::Combo("Fichier Source", &selectedImage, imgItems, 2);
+        }
+        else if (selectedMethod == GEN_FAULT_FORMATION) {
+            ImGui::Text("Generation procedurale par failles.");
+            ImGui::InputInt("Largeur (X)", &faultWidth);
+            ImGui::InputInt("Hauteur (Z)", &faultHeight);
+            ImGui::InputInt("Iterations", &faultIterations, 10, 100);
+            ImGui::DragFloatRange2("Hauteur Min/Max", &faultMinHeight, &faultMaxHeight, 1.0f, 0.0f, 500.0f);
+            
+            ImGui::Checkbox("Appliquer Filtre Lissage", &faultUseFilter);
+            if(faultUseFilter) {
+                ImGui::SliderFloat("Intensite Filtre", &faultFilter, 0.0f, 1.0f);
+            }
+        }
+        else if (selectedMethod == GEN_MIDPOINT_DISPLACEMENT) {
+            ImGui::Text("Generation fractale (Diamant-Carre).");
+            ImGui::InputInt("Taille (2^n + 1)", &midpointSize);
+            HelpMarker("La taille doit etre une puissance de 2 plus 1 (ex: 129, 257, 513, 1025).");
+            
+            ImGui::SliderFloat("Rugosite (Roughness)", &midpointRoughness, 0.0f, 2.0f);
+            ImGui::DragFloatRange2("Hauteur Min/Max", &midpointMinHeight, &midpointMaxHeight, 1.0f, 0.0f, 500.0f);
+        }
+        else if (selectedMethod == GEN_PERLIN_NOISE) {
+            ImGui::Text("Generation procedurale par Bruit de Perlin.");
+            
+            ImGui::InputInt("Largeur (X)", &perlinWidth);
+            ImGui::InputInt("Hauteur (Z)", &perlinHeight);
+            ImGui::DragFloatRange2("Hauteur Min/Max", &perlinMinHeight, &perlinMaxHeight, 1.0f, 0.0f, 500.0f);
+            
+            ImGui::Separator();
+            ImGui::Text("Reglages du Bruit :");
+            
+            ImGui::SliderFloat("Frequence", &perlinFrequency, 0.001f, 0.1f, "%.4f");
+            ImGui::SliderInt("Octaves", &perlinOctaves, 1, 10);
+            ImGui::SliderFloat("Persistance", &perlinPersistence, 0.1f, 1.5f);
+            ImGui::SliderFloat("Lacunarite", &perlinLacunarity, 1.0f, 5.0f);
+        }
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        float windowWidth = ImGui::GetWindowSize().x;
+        ImGui::SetCursorPosX((windowWidth - 200) * 0.5f);
+        
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.6f, 0.8f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.7f, 0.9f, 1.0f));
+
+        if (ImGui::Button("GENERER LE TERRAIN", ImVec2(200, 50))) {
+            startGeneration = true; 
+            showConfigScreen = false;
+        }
+        ImGui::PopStyleColor(2);
+
+        ImGui::End();
+    }
+    // ============================================================
+    // ÉTAPE 3 : INTERFACE DE SIMULATION 
+    // ============================================================
+    else {
+        ImGui::SetNextWindowSize(ImVec2(380, 500), ImGuiCond_FirstUseEver); 
+        ImGui::Begin("Controle Simulation", nullptr);
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
+        if (ImGui::Button("<- Retour au Menu (Reset)", ImVec2(-1, 30))) {
+             resetSimulation = true; 
+             showConfigScreen = true; 
+        }
+        ImGui::PopStyleColor();
+        ImGui::Separator();
+
+        if (ImGui::BeginTabBar("MyTabBar"))
+        {
+            // ONGLET SIMULATION
+            if (ImGui::BeginTabItem("Simulation"))
+            {
+                ImGui::Spacing();
+                ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "--- Controle Temporel ---");
+                
+                if (ImGui::Button(isPaused ? "Reprendre" : "Pause", ImVec2(100, 30))) {
+                    isPaused = !isPaused;
+                }
+
+                ImGui::DragFloat("Vitesse", &timeSpeed, 0.1f, 0.0f, 10.0f);
+
+                ImGui::Separator();
+
+                if (ImGui::CollapsingHeader("Erosion Thermique", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    ImGui::InputInt("Iterations##Therm", &thermalIterations, 1000, 5000); 
+                    ImGui::SliderFloat("Angle Talus", &talusAngle, 0.0f, 90.0f, "%.1f deg");
+                    ImGui::SliderFloat("Constante K", &thermalK, 0.0f, 1.0f);
+                }
+
+                if (ImGui::CollapsingHeader("Erosion Hydraulique"))
+                {
+                    ImGui::InputInt("Iterations##Hydro", &hydroIterations, 1000, 5000);
+                    ImGui::SliderFloat("Pluie", &rainAmount, 0.0f, 5.0f);
+                    ImGui::SliderFloat("Evaporation", &evaporationRate, 0.0f, 1.0f);
+                }
+
+                ImGui::EndTabItem();
+            }
+
+            // ONGLET VISUEL
+            if (ImGui::BeginTabItem("Visuel"))
+            {
+                //ImGui::Spacing();
+               // ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "--- Parametres Rendu ---");
+                //ImGui::DragFloat("Echelle Verticale", &verticalScale, 0.1f, 0.1f, 10.0f);
+                //ImGui::ColorEdit3("Couleur Sol", terrainColor);
+                ImGui::EndTabItem();
+            }
+
+            // ONGLET INFOS 
+            if (ImGui::BeginTabItem("Infos"))
+            {
+                ImGui::Spacing();
+                ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.5f, 1.0f), "====== CAMERA CONTROL MENU ======");
+                
+                ImGui::Text("Keyboard :");
+                ImGui::BulletText("W : Move forward");
+                ImGui::BulletText("S : Move backward");
+                ImGui::BulletText("A : Move left");
+                ImGui::BulletText("D : Move right");
+                ImGui::BulletText("Q : Move up");
+                ImGui::BulletText("E : Move down");
+                ImGui::BulletText("M : Toggle Mouse/Menu");
+                ImGui::BulletText("ESC : Quit");
+                //ImGui::BulletText("H : Show this menu"); 
+
+                ImGui::Spacing();
+                ImGui::Text("Mouse :");
+                ImGui::BulletText("Move mouse : Rotate camera");
+                ImGui::BulletText("Scroll wheel : Zoom in/out");
+                
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::TextDisabled("=================================");
+
+                ImGui::EndTabItem();
+            }
+
+            ImGui::EndTabBar();
+        }
+        ImGui::End();
+    }
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

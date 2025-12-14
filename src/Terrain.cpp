@@ -127,6 +127,10 @@ void Terrain::set_data(int i, float value){
 std::vector<float>* Terrain::get_data(){
     return &(this->data);
 }
+/*
+std::vector<float> Terrain::get_data(){
+    return this->data;
+}*/
 
 int Terrain::get_indices_size() const{
     return this->indices.size();

@@ -1,4 +1,5 @@
 #include "Terrain.hpp"
+#include <memory>
 #include <cmath>
 #include <vector>
 
@@ -20,7 +21,7 @@ public:
      * @param terrain Pointeur vers le terrain à éroder
      *
      */
-    void loadTerrainInfo(Terrain* terrain) {
+    void loadTerrainInfo(std::unique_ptr<Terrain>& terrain) {
         m_data   = terrain->get_data();
         m_height = terrain->get_terrain_height();
         m_width  = terrain->get_terrain_width();
@@ -33,7 +34,8 @@ public:
      */
     void setTalusAngle(float angle) { 
         float talus = std::tan(angle/180);
-        talusAngle = talus; 
+        //talusAngle = talus; 
+        talusAngle = 0.006; 
     }
 
     /**

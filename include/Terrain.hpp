@@ -48,6 +48,14 @@ protected:
 
 public:
     /**
+     * @brief Destructeur virtuel par défaut.
+     * 
+     * Nécessaire pour permettre le polymorphisme (dynamic_cast) et assurer
+     * la destruction correcte des classes filles.
+     */
+    virtual ~Terrain() = default;
+
+    /**
      * @brief Contructeur de la structure de données Terrain avec l'image passer en paramètre
      *
      * @param image_path Un chemin vers une image à lire
@@ -128,6 +136,7 @@ public:
      * @brief Retourne le vecteur data du terrain
     */
     std::vector<float>* get_data();
+    //std::vector<float> get_data();
 
     /**
      * @brief Retourne la size du vecteur indices
