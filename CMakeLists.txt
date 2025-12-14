@@ -71,6 +71,19 @@ set(SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/src/PerlinNoiseTerrain.cpp
 )
 
+set(SOURCE_FILES
+    ${PROJECT_SOURCE_DIR}/src/main.cpp # Commenter et decommenter pour échanger de main
+    #${PROJECT_SOURCE_DIR}/src/mainGui.cpp
+    ${PROJECT_SOURCE_DIR}/src/Camera.cpp
+    ${PROJECT_SOURCE_DIR}/src/Shader.cpp
+    ${PROJECT_SOURCE_DIR}/src/Terrain.cpp
+    ${PROJECT_SOURCE_DIR}/src/ThermalErosion.cpp
+    ${PROJECT_SOURCE_DIR}/src/Gui.cpp
+    ${PROJECT_SOURCE_DIR}/src/TerrainApp.cpp
+    ${PROJECT_SOURCE_DIR}/src/FaultFormationTerrain.cpp
+    ${PROJECT_SOURCE_DIR}/src/MidpointDisplacement.cpp
+    ${PROJECT_SOURCE_DIR}/src/PerlinNoiseTerrain.cpp
+)
 # Create the executable
 # Note : On a retiré ${IMGUI_SOURCES} car c'est géré par la lib imgui_lib
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
@@ -82,6 +95,15 @@ target_link_libraries(${PROJECT_NAME}
         OpenGL::GL
         GLEW::GLEW
         glfw
+)
+
+# Link the libraries
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE
+        OpenGL::GL
+        GLEW::GLEW
+        glfw
+        
 )
 
 # Include header directories

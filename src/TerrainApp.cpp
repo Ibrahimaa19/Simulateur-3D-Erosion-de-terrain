@@ -1,4 +1,5 @@
 #include "TerrainApp.hpp"
+#include <string.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -7,6 +8,7 @@
 #include "FaultFormationTerrain.hpp"
 #include "MidpointDisplacement.hpp"
 #include "PerlinNoiseTerrain.hpp" 
+#include "ThermalErosion.hpp"
 
 void TerrainApp::setCameraSpeed(float value){
     mCameraSpeed = value;
@@ -17,6 +19,8 @@ TerrainApp::TerrainApp(unsigned int seed)
       mLastX(mScreenWidth/2.0f), mLastY(mScreenHeight/2.0f),
       mFirstMouse(true), mMouseSensitivity(0.1f),
       mCameraSpeed(5.0f),
+      thermalEnabled(false), thermalStarted(false),
+      hydraulicEnabled(false), hydraulicStarted(false),
       mShowMenu(true)
 {
     std::srand(seed);
@@ -77,6 +81,7 @@ void TerrainApp::InitCallbacks()
 void TerrainApp::InitCamera()
 {
     mCamera.MoveTo(glm::vec3{-54.0f, 220.0f, -42.0f});
+    //mCamera.TurnTo(glm::vec3{mTerrain.get_terrain_width() / 2, 0.0f, mTerrain.get_terrain_height()/ 2});
     mCamera.TurnTo(glm::vec3{0.0f, 0.0f, 0.0f});
 }
 
@@ -85,6 +90,8 @@ void TerrainApp::InitScene()
     mShader = new Shader("../shaders/terrain.vs", "../shaders/terrain.fs");
     mShader->Use();
 
+    //mTerrain.CreatePerlinNoise(1000, 1000, 0, 100);
+    //mTerrain.setup_terrain(mVAO, mVBO, mIBO);
     mTerrain = std::make_unique<PerlinNoiseTerrain>();
     
     if (auto perlin = dynamic_cast<PerlinNoiseTerrain*>(mTerrain.get())) {
@@ -186,6 +193,39 @@ void TerrainApp::Run()
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        /*
+        RenderScene();
+
+        // --- Initialisation de l'érosion thermique
+        ThermalErosion thermalErosion;
+        thermalErosion.loadTerrainInfo(&mTerrain);
+
+        // Paramètres initiaux (modifiables plus tard via l’UI)
+        thermalErosion.setTalusAngle(25.0f);
+        thermalErosion.setTransferRate(0.05f);
+
+        int stepCounter = 0;
+
+        // --- Erosion thermique
+        if (thermalEnabled)
+        {
+            thermalErosion.step();
+            stepCounter++;
+
+            // Mise à jour des vertices
+            mTerrain.update_vertices();
+
+            // Mise à jour affichage
+            glBindBuffer(GL_ARRAY_BUFFER, mVBO);
+            glBufferSubData(GL_ARRAY_BUFFER, 0,
+                mTerrain.get_vertices().size() * sizeof(float),
+                mTerrain.get_vertices().data());
+
+            std::string PATH = "../validation/data/terrain_step_" + std::to_string(stepCounter) + ".csv";
+            if (stepCounter % 100 == 0) {
+                std::cout << "Thermal erosion step " << stepCounter << std::endl;
+                mTerrain.export_terrain_to_csv(*mTerrain.get_data(), mTerrain.get_terrain_width(), mTerrain.get_terrain_height(), PATH);
+                */
         if (mGui.startGeneration) {
             GenerateTerrainFromGui();
             mGui.startGeneration = false;
@@ -208,6 +248,45 @@ void TerrainApp::Run()
         }
         else {
             RenderScene();
+
+
+
+            // -----------------
+
+            // --- Initialisation de l'érosion thermique
+            ThermalErosion thermalErosion;
+            thermalErosion.loadTerrainInfo(mTerrain);
+
+            // Paramètres initiaux (modifiables plus tard via l’UI)
+            thermalErosion.setTalusAngle(25.0f);
+            thermalErosion.setTransferRate(0.05f);
+
+            int stepCounter = 0;
+
+
+            if (thermalEnabled)
+            {
+                thermalErosion.step();
+                stepCounter++;
+
+                // Mise à jour des vertices
+                mTerrain->update_vertices();
+
+                // Mise à jour affichage
+                glBindBuffer(GL_ARRAY_BUFFER, mVBO);
+                glBufferSubData(GL_ARRAY_BUFFER, 0,
+                    mTerrain->get_vertices().size() * sizeof(float),
+                    mTerrain->get_vertices().data());
+
+
+                std::string PATH = "../validation/data/terrain_step_" + std::to_string(stepCounter) + ".csv";
+                if (stepCounter % 100 == 0) {
+                    std::cout << "Thermal erosion step " << stepCounter << std::endl;
+                    mTerrain->export_terrain_to_csv(*mTerrain->get_data(), mTerrain->get_terrain_width(), mTerrain->get_terrain_height(), PATH);
+                }
+            }
+            // ----------------
+
             mGui.cameraPos = glm::vec3(glm::inverse(mView)[3]);
             if (mShowMenu) {
                 mGui.Render(mTerrain.get()); 
@@ -256,19 +335,44 @@ void TerrainApp::KeyCallback(GLFWwindow* window, int key, int scancode, int acti
     {
         switch (key)
         {
-        case GLFW_KEY_ESCAPE: glfwSetWindowShouldClose(window, GLFW_TRUE); break;
-        case GLFW_KEY_W: app->mCamera.Move(app->mCamera.GetForward(), app->mCameraSpeed); break;
-        case GLFW_KEY_S: app->mCamera.Move(-app->mCamera.GetForward(), app->mCameraSpeed); break;
-        case GLFW_KEY_D: app->mCamera.Move(app->mCamera.GetRight(), app->mCameraSpeed); break;
-        case GLFW_KEY_A: app->mCamera.Move(-app->mCamera.GetRight(), app->mCameraSpeed); break;
-        case GLFW_KEY_Q: app->mCamera.Move(app->mCamera.GetUp(), app->mCameraSpeed); break;
-        case GLFW_KEY_E: app->mCamera.Move(-app->mCamera.GetUp(), app->mCameraSpeed); break;
-        case GLFW_KEY_P: 
-            static bool state{false};
-            state = !state;
-            if(state) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-            else glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-            break;
+            case GLFW_KEY_ESCAPE: glfwSetWindowShouldClose(window, GLFW_TRUE); break;
+            case GLFW_KEY_W: app->mCamera.Move(app->mCamera.GetForward(), app->mCameraSpeed); break;
+            case GLFW_KEY_S: app->mCamera.Move(-app->mCamera.GetForward(), app->mCameraSpeed); break;
+            case GLFW_KEY_D: app->mCamera.Move(app->mCamera.GetRight(), app->mCameraSpeed); break;
+            case GLFW_KEY_A: app->mCamera.Move(-app->mCamera.GetRight(), app->mCameraSpeed); break;
+            case GLFW_KEY_Q: app->mCamera.Move(app->mCamera.GetUp(), app->mCameraSpeed); break;
+            case GLFW_KEY_E: app->mCamera.Move(-app->mCamera.GetUp(), app->mCameraSpeed); break;
+            case GLFW_KEY_P:
+            {
+                static bool state{false};
+                state = !state;
+                if(state) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                else glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                break;
+            }
+
+            case GLFW_KEY_F:{
+                app->thermalEnabled = !app->thermalEnabled;
+                if (app->thermalEnabled && !app->thermalStarted) {
+                    std::cout << "Thermal erosion STARTED" << std::endl;
+                    app->thermalStarted = true;
+                } else if (!app->thermalEnabled) {
+                    std::cout << "Thermal erosion PAUSED" << std::endl;
+                }
+                break;
+            }
+            
+            case GLFW_KEY_G:
+            {
+                app->hydraulicEnabled = !app->hydraulicEnabled;
+                if (app->hydraulicEnabled && !app->hydraulicStarted) {
+                    std::cout << "Hydraulic erosion STARTED" << std::endl;
+                    app->hydraulicStarted = true;
+                } else if (!app->hydraulicEnabled) {
+                    std::cout << "Hydraulic erosion PAUSED" << std::endl;
+                }
+            }
+
         }
     }
 }

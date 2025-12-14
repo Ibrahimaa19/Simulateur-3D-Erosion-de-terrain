@@ -100,6 +100,7 @@ private:
     glm::mat4 mProjection;            ///< Projection matrix
 
     Shader* mShader;                  ///< Pointer to the shader program
+    //PerlinNoiseTerrain mTerrain;      ///< Terrain object
     
     std::unique_ptr<Terrain> mTerrain; ///< Smart pointer to the Terrain object (Polymorphic)
 
@@ -109,6 +110,12 @@ private:
 
     float mCameraSpeed;               ///< Speed used for keyboard movement
 
+    bool thermalEnabled;
+    bool thermalStarted;
+
+    bool hydraulicEnabled;
+    bool hydraulicStarted;
+    
     Gui mGui;                         ///< User Interface instance
     bool mShowMenu;                   ///< Boolean to toggle menu visibility
 
