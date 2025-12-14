@@ -10,13 +10,9 @@
 #include "stb_image.hpp"
 
 class Terrain{ 
-private:
-    std::vector<float> data; // matrice des valeurs de chaque pixel
-    std::vector<float> vertices;
-    std::vector<unsigned int> indices;
-
-
 protected:
+
+	std::vector<float> data; // matrice des valeurs de chaque pixel
 	int height;
 	int width;
     float yfactor;
@@ -25,6 +21,8 @@ protected:
     float min_height;
 	int borderSize;
     int cellSpacing;
+	std::vector<float> vertices;
+	std::vector<unsigned int> indices;
 
     /**
      * @brief Met à jours le vecteur vertices, en fonction des valeurs dans data
@@ -56,7 +54,6 @@ public:
      */
     void load_terrain(const char* image_path,float yfactor,float xzfactor);
 
-
     /**
      * @brief Met en place les buffers pour le terrain
      * 
@@ -78,8 +75,8 @@ public:
      * @param i l'indice de la ligne
      * @param j l'indice de la colonne
     */
-    float get_height(int i, int j) const{
-        return data[i * width + j];
+    int get_height(int i, int j) const{
+        return data[j * width + i];
     };
 
     /**
@@ -89,7 +86,7 @@ public:
      * @param value la valeur a insérer à la position(i,j)
     */
     void set_height(int i, int j, float value){
-        data[i * width + j] = value;
+        data[j * width + i] = value;
     };
 
     /**
@@ -146,6 +143,9 @@ public:
     */
     bool inside(int i, int j) const;
 
+    /**
+     * @brief Met à jour les vertices
+    */
     void update_vertices();
     const std::vector<float>& get_vertices() const { return vertices; }
 

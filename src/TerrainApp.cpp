@@ -5,14 +5,15 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 
-TerrainApp::TerrainApp()
+TerrainApp::TerrainApp(unsigned int seed)
     : mWindow(nullptr), mScreenWidth(1224), mScreenHeight(868),
       mLastX(mScreenWidth/2.0f), mLastY(mScreenHeight/2.0f),
       mFirstMouse(true), mMouseSensitivity(0.1f),
-      mCameraSpeed(0.1f),
+      mCameraSpeed(5.0f),
       thermalEnabled(false), thermalStarted(false),
       hydraulicEnabled(false), hydraulicStarted(false)
 {
+    std::srand(seed);
 }
 
 TerrainApp::~TerrainApp()
@@ -62,21 +63,21 @@ void TerrainApp::InitCallbacks()
 
 void TerrainApp::InitCamera()
 {
-    mCamera.MoveTo(glm::vec3{0.0f, 5.0f, 0.0f});
+    mCamera.MoveTo(glm::vec3{-54.0f, 220.0f, -42.0f});
     mCamera.TurnTo(glm::vec3{mTerrain.get_terrain_width() / 2, 0.0f, mTerrain.get_terrain_height()/ 2});
 }
 
 void TerrainApp::InitScene()
 {
-    mShader = new Shader("../shaders/shader.vs", "../shaders/shader.fs");
+    mShader = new Shader("../shaders/terrain.vs", "../shaders/terrain.fs");
     mShader->Use();
 
-    mTerrain.load_terrain("../src/heightmap/iceland_heightmap.png", 1.f, 100.f);
+    mTerrain.CreatePerlinNoise(1000, 1000, 0, 100);
     mTerrain.setup_terrain(mVAO, mVBO, mIBO);
 
     mModel = glm::mat4(1.0f);
     mView = mCamera.GetViewMatrix();
-    mProjection = glm::perspective(glm::radians(45.0f), (float)mScreenWidth / (float)mScreenHeight, 0.1f, 100.0f);
+    mProjection = glm::perspective(glm::radians(45.0f), (float)mScreenWidth / (float)mScreenHeight, 0.1f, 5000.0f);
 }
 
 void TerrainApp::Run()
@@ -86,7 +87,7 @@ void TerrainApp::Run()
     thermalErosion.loadTerrainInfo(&mTerrain);
 
     // Paramètres initiaux (modifiables plus tard via l’UI)
-    thermalErosion.setTalusAngle(0.6f);
+    thermalErosion.setTalusAngle(25.0f);
     thermalErosion.setTransferRate(0.05f);
 
     int stepCounter = 0;
@@ -104,10 +105,10 @@ void TerrainApp::Run()
             thermalErosion.step();
             stepCounter++;
 
-            // Mise à jour CPU des vertices
+            // Mise à jour des vertices
             mTerrain.update_vertices();
 
-            // Mise à jour GPU
+            // Mise à jour affichage
             glBindBuffer(GL_ARRAY_BUFFER, mVBO);
             glBufferSubData(GL_ARRAY_BUFFER, 0,
                 mTerrain.get_vertices().size() * sizeof(float),
@@ -123,13 +124,14 @@ void TerrainApp::Run()
     }
 }
 
-
 void TerrainApp::RenderScene()
 {
     mView = mCamera.GetViewMatrix();
     glm::mat4 finalMatrix = mProjection * mView * mModel;
     
     mShader->SetMat4("gFinalMatrix", finalMatrix);
+    mShader->SetFloat("gMaxHeight", mTerrain.get_max_height());
+    mShader->SetFloat("gMixHeight", mTerrain.get_min_height());
     glBindVertexArray(mVAO);
     mTerrain.renderer();
 }
@@ -162,6 +164,7 @@ void TerrainApp::KeyCallback(GLFWwindow* window, int key, int scancode, int acti
                 glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
             }
             break;
+
         case GLFW_KEY_F:
             app->thermalEnabled = !app->thermalEnabled;
             if (app->thermalEnabled && !app->thermalStarted) {
@@ -225,7 +228,7 @@ void TerrainApp::FramebufferCallback(GLFWwindow* window, int width, int height)
     app->mScreenHeight = height;
 
     glViewport(0, 0, width, height);
-    app->mProjection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 100.0f);
+    app->mProjection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 5000.0f);
 
     app->mLastX = width / 2.0f;
     app->mLastY = height / 2.0f;

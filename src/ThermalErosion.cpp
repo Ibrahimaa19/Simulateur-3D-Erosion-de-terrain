@@ -1,5 +1,4 @@
 #include "ThermalErosion.hpp"
-#include <cmath>
 #include <iostream>
 
 void ThermalErosion::step()
@@ -7,8 +6,7 @@ void ThermalErosion::step()
     const int W = m_width;
     const int H = m_height;
 
-    float talusAng = get_talus()/180; // Conversion en radian
-    float talus = std::tan(talusAng);
+    // std::cout << talusAngle << std::endl;
 
     if (!m_data) {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
@@ -16,7 +14,7 @@ void ThermalErosion::step()
     }
 
     std::vector<float>& data = *m_data;
-    std::vector<float> newData = data; // Copie pour éviter les effets immédiats
+    std::vector<float> newData = data; // Copie
 
     int changes = 0;
 
@@ -42,7 +40,7 @@ void ThermalErosion::step()
 
             // Accumulation des différences valides
             for (int k = 0; k < 4; k++) {
-                if (dist[k] > talus) {
+                if (dist[k] > talusAngle) {
                     totalDiff += dist[k];
                     validNeighbors++;
                 }
@@ -56,16 +54,14 @@ void ThermalErosion::step()
             if (totalDiff > 0 && validNeighbors > 0) {
 
                 float materialToMove = transferRate * (totalDiff / validNeighbors);
-
-                // Sécurité : ne retire pas plus qu’une fraction de la hauteur actuelle
                 materialToMove = std::min(materialToMove, currentHeight * transferRate);
 
-                // On retire la matière de la cellule courante
+                // On retire la matière de la cellule actuelle
                 newData[i * W + j] -= materialToMove;
 
                 // Redistribution aux voisins
                 for (int k = 0; k < 4; k++) {
-                    if (dist[k] > talus) {
+                    if (dist[k] > talusAngle) {
                         float proportion = dist[k] / totalDiff;
                         float moveAmount = materialToMove * proportion;
 
@@ -81,7 +77,6 @@ void ThermalErosion::step()
         }
     }
 
-    // Mise à jour globale
     data = newData;
 
     std::cout << "Cells modified: " << changes << std::endl;

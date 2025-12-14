@@ -1,3 +1,6 @@
+#pragma once
+
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -7,7 +10,9 @@
 #include "Camera.hpp"
 #include "Shader.hpp"
 #include "Terrain.hpp"
-
+#include "FaultFormationTerrain.hpp"
+#include "MidpointDisplacement.hpp"
+#include "PerlinNoiseTerrain.hpp"
 /**
  * @class TerrainApp
  * @brief Manages window creation, input callbacks, camera, rendering loop, and terrain rendering.
@@ -18,9 +23,10 @@ class TerrainApp
 {
 public:
     /**
-     * @brief Default constructor.
+     * @brief Constructs a TerrainApp instance
+     * @param seed Seed used to initialize the random number generator
      */
-    TerrainApp();
+    TerrainApp(unsigned int seed = 1);
 
     /**
      * @brief Destructor.
@@ -80,7 +86,7 @@ private:
     glm::mat4 mProjection;            ///< Projection matrix
 
     Shader* mShader;                  ///< Pointer to the shader program
-    Terrain mTerrain;                 ///< Terrain object
+    PerlinNoiseTerrain mTerrain;      ///< Terrain object
 
     GLuint mVAO;                      ///< Vertex Array Object
     GLuint mVBO;                      ///< Vertex Buffer Object
@@ -93,7 +99,7 @@ private:
 
     bool hydraulicEnabled;
     bool hydraulicStarted;
-
+    
 private:
     /** Keyboard callback wrapper */
     static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
