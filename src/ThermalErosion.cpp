@@ -6,8 +6,6 @@ void ThermalErosion::step()
     const int W = m_width;
     const int H = m_height;
 
-    std::cout << talusAngle << std::endl;
-
     if (!m_data) {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
         return;
@@ -16,7 +14,6 @@ void ThermalErosion::step()
     std::vector<float>& data = *m_data;
     std::vector<float> newData = data; // Copie
         
-
     int changes = 0;
 
     // Boucle sur le terrain
@@ -25,20 +22,30 @@ void ThermalErosion::step()
 
             float currentHeight = data[i * W + j];
 
-            // Hauteurs des voisins
-            float diffUp    = currentHeight - data[(i - 1) * W + j];
-            float diffDown  = currentHeight - data[(i + 1) * W + j];
-            float diffLeft  = currentHeight - data[i * W + (j - 1)];
-            float diffRight = currentHeight - data[i * W + (j + 1)];
+            // Hauteurs des 8 voisins (Moore neighborhood)
+            float diffUp         = currentHeight - data[(i - 1) * W + j];
+            float diffDown       = currentHeight - data[(i + 1) * W + j];
+            float diffLeft       = currentHeight - data[i * W + (j - 1)];
+            float diffRight      = currentHeight - data[i * W + (j + 1)];
+            float diffUpLeft     = currentHeight - data[(i - 1) * W + (j - 1)];
+            float diffUpRight    = currentHeight - data[(i - 1) * W + (j + 1)];
+            float diffDownLeft   = currentHeight - data[(i + 1) * W + (j - 1)];
+            float diffDownRight  = currentHeight - data[(i + 1) * W + (j + 1)];
 
-            float dist[4] = { diffUp, diffDown, diffLeft, diffRight };
-            int neighbors[4][2] = { {-1,0}, {1,0}, {0,-1}, {0,1} };
+            // Stockage des différences et indices des voisins
+            float dist[8] = { diffUp, diffDown, diffLeft, diffRight,
+                              diffUpLeft, diffUpRight, diffDownLeft, diffDownRight };
+            
+            int neighbors[8][2] = { 
+                {-1, 0}, {1, 0}, {0, -1}, {0, 1},     // 4 voisins directs
+                {-1, -1}, {-1, 1}, {1, -1}, {1, 1}    // 4 voisins diagonaux
+            };
 
             float totalDiff = 0.0f;
             int validNeighbors = 0;
 
             // Accumulation des différences valides
-            for (int k = 0; k < 4; k++) {
+            for (int k = 0; k < 8; k++) {
                 if (dist[k] > talusAngle) {
                     totalDiff += dist[k];
                     validNeighbors++;
@@ -55,7 +62,7 @@ void ThermalErosion::step()
                 newData[i * W + j] -= materialToMove;
 
                 // Redistribution aux voisins
-                for (int k = 0; k < 4; k++) {
+                for (int k = 0; k < 8; k++) {
                     if (dist[k] > talusAngle) {
                         float proportion = dist[k] / totalDiff;
                         float moveAmount = materialToMove * proportion;
@@ -74,5 +81,5 @@ void ThermalErosion::step()
 
     data = newData;
 
-    std::cout << "Cells modified: " << changes << std::endl;
+    //std::cout << "Cells modified: " << changes << std::endl;
 }
