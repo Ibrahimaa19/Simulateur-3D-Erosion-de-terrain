@@ -1,14 +1,14 @@
 #include "ThermalErosion.hpp"
 #include <iostream>
 
-void ThermalErosion::step()
+int ThermalErosion::step()
 {
     const int W = m_width;
     const int H = m_height;
 
     if (!m_data) {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
-        return;
+        return 0;
     }
 
     std::vector<float>& data = *m_data;
@@ -82,4 +82,5 @@ void ThermalErosion::step()
     data = newData;
 
     //std::cout << "Cells modified: " << changes << std::endl;
+    return changes;
 }

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Terrain.hpp"
 #include <memory>
 #include <cmath>
@@ -50,7 +52,7 @@ public:
      * @brief Exécute une étape de l’algorithme d’érosion thermique.
      *
      */
-    void step();
+    int step();
 
 private:
     /** Pointeur vers les données de hauteur du terrain */

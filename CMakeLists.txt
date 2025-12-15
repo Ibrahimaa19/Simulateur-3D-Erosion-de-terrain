@@ -69,20 +69,7 @@ set(SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/src/FaultFormationTerrain.cpp
     ${PROJECT_SOURCE_DIR}/src/MidpointDisplacement.cpp
     ${PROJECT_SOURCE_DIR}/src/PerlinNoiseTerrain.cpp
-)
-
-set(SOURCE_FILES
-    ${PROJECT_SOURCE_DIR}/src/main.cpp # Commenter et decommenter pour échanger de main
-    #${PROJECT_SOURCE_DIR}/src/mainGui.cpp
-    ${PROJECT_SOURCE_DIR}/src/Camera.cpp
-    ${PROJECT_SOURCE_DIR}/src/Shader.cpp
-    ${PROJECT_SOURCE_DIR}/src/Terrain.cpp
-    ${PROJECT_SOURCE_DIR}/src/ThermalErosion.cpp
-    ${PROJECT_SOURCE_DIR}/src/Gui.cpp
-    ${PROJECT_SOURCE_DIR}/src/TerrainApp.cpp
-    ${PROJECT_SOURCE_DIR}/src/FaultFormationTerrain.cpp
-    ${PROJECT_SOURCE_DIR}/src/MidpointDisplacement.cpp
-    ${PROJECT_SOURCE_DIR}/src/PerlinNoiseTerrain.cpp
+    ${PROJECT_SOURCE_DIR}/src/ValidationTest.cpp
 )
 # Create the executable
 # Note : On a retiré ${IMGUI_SOURCES} car c'est géré par la lib imgui_lib
@@ -132,4 +119,4 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(googletest)
 enable_testing()
-add_subdirectory(tests)
+add_subdirectory(tests)  
