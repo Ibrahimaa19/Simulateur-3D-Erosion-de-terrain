@@ -27,20 +27,21 @@
 class ValidationTest {
 public:
     /**
-     * @brief Lance l’ensemble des tests de validation de l’érosion thermique.
+     * @brief Exécute les tests de validation de l’érosion thermique et sauvegarde les résultats.
      *
-     * Cette fonction :
-     *  - initialise l’algorithme d’érosion thermique,
-     *  - sauvegarde l’état initial du terrain,
-     *  - applique l’érosion sur un nombre donné d’itérations,
-     *  - exécute les tests de conservation de la masse et de validité
-     *    des hauteurs,
-     *  - affiche un rapport récapitulatif des résultats.
+     * Cette fonction applique l’algorithme d’érosion thermique sur un terrain
+     * pendant un nombre donné d’itérations, puis vérifie la conservation de la masse
+     * et la validité des hauteurs obtenues.
      *
-     * @param terrain Terrain sur lequel les tests sont appliqués.
+     * Les résultats sont enregistrés dans le dossier :
+     * resultat/<typeDeTerrain>/
+     * sous forme de fichiers CSV et TXT.
+     *
+     * @param terrain Terrain sur lequel l’érosion et les tests sont appliqués.
+     * @param terrainType Nom du type de terrain, utilisé pour organiser les résultats.
      * @param steps Nombre total d’itérations d’érosion.
      */
-    static void run_all_tests(std::unique_ptr<Terrain>& terrain, int steps);
+    static void run_all_tests(std::unique_ptr<Terrain>& terrain, const std::string& terrainType, int steps);
 private:
     /**
      * @brief Test de conservation de la masse du terrain.

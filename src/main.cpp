@@ -31,15 +31,26 @@ int main(int argc, char const *argv[])
         app.Init();
         app.Run();
     }
-    else if(State::Test == dicState[argv[1]]){
+    else if (State::Test == dicState[argv[1]]) {
 
         std::unique_ptr<Terrain> terrain;
-        if(argc < 3){
-            fprintf(stdout, "Usage: %s test <typeTerrain>\n", argv[0]);
-            fprintf(stdout, "<typeTerrain> : loadHeightmap | faulFormation | midpointDisplacement | perlinNoise");
+
+        if (argc < 4) {
+            std::cerr << "Usage: " << argv[0]
+                    << " test <typeTerrain> <steps>\n";
+            std::cerr << "<typeTerrain> : loadHeightmap | faulFormation | midpointDisplacement | perlinNoise\n";
             exit(1);
         }
-        switch (dicHeightmap[argv[2]])
+
+        std::string terrainType = argv[2];
+        int steps = std::atoi(argv[3]);
+
+        if (steps <= 0) {
+            std::cerr << "Erreur: steps doit être strictement positif\n";
+            exit(1);
+        }
+
+        switch (dicHeightmap[terrainType])
         {
         case Heightmap::LoadHeightmap:
             terrain = std::make_unique<Terrain>();
@@ -63,7 +74,7 @@ int main(int argc, char const *argv[])
         case Heightmap::PerlinNoise:
             {
                 auto generator = std::make_unique<PerlinNoiseTerrain>();
-                generator->CreatePerlinNoise(1000, 1000, 0, 70, 1, 0.005);
+                generator->CreatePerlinNoise(2624, 1756, 0, 70, 1, 0.005);
                 terrain = std::move(generator);
                 break;
             }
@@ -72,11 +83,7 @@ int main(int argc, char const *argv[])
             exit(1);
             break;
         }
-        int steps = 100;
-        if(argc == 4){
-            steps = atoi(argv[3]);
-        }
-        ValidationTest::run_all_tests(terrain, steps);
+        ValidationTest::run_all_tests(terrain, terrainType, steps);
     }
     else{
         fprintf(stdout, "Usage: %s render\n", argv[0]);

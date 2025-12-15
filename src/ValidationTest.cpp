@@ -1,6 +1,8 @@
 #include "ValidationTest.hpp"
 #include <algorithm>
 #include <iomanip>
+#include <filesystem>
+#include <fstream>
 
 std::vector<float> ValidationTest::initialData;
 
@@ -14,7 +16,6 @@ float ValidationTest::test_mass_conservation(std::vector<float>& finalData) {
 }
 
 bool ValidationTest::test_height_limits(std::vector<float>& finalData) {
-    std::cout << "\n[TEST 2] Limites de hauteur...\n";
 
     for (float h : finalData) {
         if (h < 0.0f) {
@@ -28,9 +29,12 @@ bool ValidationTest::test_height_limits(std::vector<float>& finalData) {
     return true;
 }
 
-void ValidationTest::run_all_tests(std::unique_ptr<Terrain>& terrain, int steps){
-    std::cout << "  VALIDATION DE L'ÉROSION THERMIQUE\n";
-    
+void ValidationTest::run_all_tests(std::unique_ptr<Terrain>& terrain, const std::string& terrainType, int steps){
+    namespace fs = std::filesystem;
+
+    fs::path baseDir = "./resultat/" + terrainType;
+    fs::create_directories(baseDir);
+
     ThermalErosion erosion;
     erosion.loadTerrainInfo(terrain);
     erosion.setTalusAngle(25.f);
@@ -50,8 +54,25 @@ void ValidationTest::run_all_tests(std::unique_ptr<Terrain>& terrain, int steps)
         cellsModified[i] = erosion.step();
     }
 
+    fs::path cellFile = baseDir / ("cellModified" + std::to_string(steps) + ".csv");
+
+    std::ofstream cellOut(cellFile);
+    cellOut << "step,cells_modified\n";
+
+    for (int i = 0; i < steps; ++i) {
+        cellOut << i << "," << cellsModified[i] << "\n";
+    }
+
+    cellOut.close();
+
     float errorFromTimesteps = test_mass_conservation(*terrain->get_data());
-    
+    fs::path errorFile = baseDir / ("errorTimeStep" + std::to_string(steps) + ".csv");
+
+    std::ofstream errorOut(errorFile);
+    errorOut << errorFromTimesteps << std::endl;
+
+    errorOut.close();
+
     int passed = 0;
     int total = 2;
 
@@ -61,13 +82,13 @@ void ValidationTest::run_all_tests(std::unique_ptr<Terrain>& terrain, int steps)
     if (test_height_limits(*terrain->get_data()))
         ++passed;
 
-    std::cout << "RÉSULTATS: " << std::endl; 
-    std::cout << "Steps : "<< steps << std::endl;
-    std::cout << "Test " << total << " : Passed " << passed << std::endl;
-    std::cout << "Conservation error pour 100 steps: " << error << std::endl;
-    std::cout << "Conservation error pour "<< steps << " steps: " << errorFromTimesteps << std::endl;
-    std::cout << "Nombre de cellule modifie step 1: " << cellsModified[0] << std::endl ;
-    std::cout << "Nombre de cellule modifie step " << steps << ": " << cellsModified[steps-1];
+    // std::cout << "RÉSULTATS: " << std::endl; 
+    // std::cout << "Steps : "<< steps << std::endl;
+    // std::cout << "Test " << total << " : Passed " << passed << std::endl;
+    // std::cout << "Conservation error pour 100 steps: " << error << std::endl;
+    // std::cout << "Conservation error pour "<< steps << " steps: " << errorFromTimesteps << std::endl;
+    // std::cout << "Nombre de cellule modifie step 1: " << cellsModified[0] << std::endl ;
+    // std::cout << "Nombre de cellule modifie step " << steps << ": " << cellsModified[steps-1] << std::endl;
 }
 
 float ValidationTest::calculate_total_mass(const std::vector<float>& data) {
