@@ -205,6 +205,7 @@ void TerrainApp::Run()
             
             stepCounter = 0;
             mGui.thermalCurrentStep = 0;
+            mGui.thermalCellsModified = 0; 
             mGui.thermalRunning = false;
             thermalEnabled = false;
 
@@ -217,6 +218,7 @@ void TerrainApp::Run()
             mGui.thermalRunning = false;
             stepCounter = 0;
             mGui.thermalCurrentStep = 0;
+            mGui.thermalCellsModified = 0; 
             glfwSetInputMode(mWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         }
 
@@ -239,9 +241,11 @@ void TerrainApp::Run()
 
             if (thermalEnabled)
             {
-                mThermalErosion.step();
-                stepCounter++;
+                int nbChanges = mThermalErosion.step();
+                mGui.thermalCellsModified = nbChanges; 
+                // ------------------------------------------------------------
                 
+                stepCounter++;
                 mGui.thermalCurrentStep = stepCounter;
 
                 mTerrain->update_vertices_gpu(mVBO);

@@ -129,7 +129,7 @@ void Gui::Render(Terrain* terrain) {
             }
         }
         else if (selectedMethod == GEN_MIDPOINT_DISPLACEMENT) {
-            ImGui::Text("Generation fractale (Diamant-Carre).");
+            ImGui::Text("Generation fractale");
             ImGui::InputInt("Taille (2^n + 1)", &midpointSize);
             HelpMarker("La taille doit etre une puissance de 2 plus 1 (ex: 129, 257, 513, 1025).");
             
@@ -175,7 +175,7 @@ void Gui::Render(Terrain* terrain) {
         ImGui::Begin("Controle Simulation", nullptr);
 
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
-        if (ImGui::Button("<- Retour au Menu (Reset)", ImVec2(-1, 30))) {
+        if (ImGui::Button("<- Retour au Menu", ImVec2(-1, 30))) {
              resetSimulation = true; 
              showConfigScreen = true; 
         }
@@ -192,38 +192,40 @@ void Gui::Render(Terrain* terrain) {
                 if (ImGui::CollapsingHeader("Erosion Thermique", ImGuiTreeNodeFlags_DefaultOpen))
                 {
                     ImGui::SliderFloat("Angle Talus", &talusAngle, 0.0f, 90.0f, "%.1f deg");
-                    ImGui::SliderFloat("Constante K", &thermalK, 0.0f, 1.0f);
+                    ImGui::SliderFloat("Taux de transfert", &thermalK, 0.0f, 1.0f);
 
                     ImGui::Spacing();
                     
                     if (thermalRunning) {
                         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.4f, 0.4f, 1.0f));
-                        if (ImGui::Button("PAUSE ##Thermal", ImVec2(100, 30))) {
+                        if (ImGui::Button("PAUSE ##Thermal", ImVec2(-1, 35))) { 
                             thermalRunning = false;
                         }
                         ImGui::PopStyleColor();
                     } else {
                         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.7f, 0.2f, 1.0f));
-                        if (ImGui::Button("LANCER ##Thermal", ImVec2(100, 30))) {
+                        if (ImGui::Button("LANCER ##Thermal", ImVec2(-1, 35))) {
                             thermalRunning = true;
                         }
                         ImGui::PopStyleColor();
                     }
 
-                    ImGui::SameLine();
-                    ImGui::Text("Step: %d", thermalCurrentStep);
+                    ImGui::Spacing(); 
+                    ImGui::Text("Step               : %d", thermalCurrentStep);
+                    ImGui::Text("Cellules modifiees : %d", thermalCellsModified);
                 }
 
+                /*
                 if (ImGui::CollapsingHeader("Erosion Hydraulique"))
                 {
                     ImGui::InputInt("Iterations##Hydro", &hydroIterations, 1000, 5000);
                     ImGui::SliderFloat("Pluie", &rainAmount, 0.0f, 5.0f);
                     ImGui::SliderFloat("Evaporation", &evaporationRate, 0.0f, 1.0f);
                 }
+                */
 
                 ImGui::EndTabItem();
             }
-
 
             // ONGLET INFOS 
             if (ImGui::BeginTabItem("Infos"))
