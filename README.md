@@ -42,8 +42,8 @@ docker run -it -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix erosion
 
 ## Si vous n'utiliser pas X11 ou n'arrivez pas a utiliser docker
 Vous devez installer les dépendances suivantes : 
-- libglew2.2 libglew-dev
-- libglfw3 libglfw3-dev
+- libglew2.2, libglew-dev
+- libglfw3, libglfw3-dev
 - libgl1-mesa-dri 
 - libx11-6 
 
