@@ -160,12 +160,20 @@ public:
     const std::vector<float>& get_vertices() const { return vertices; }
 
     /**
-     * @brief Exporte le terrain vers un fichier CSV
-     * @param filename Nom du fichier de sortie
+     * @brief Met à jour les sommets du terrain sur le GPU.
+     *
+     * Cette fonction met à jour le Vertex Buffer Object (VBO) du terrain
+     * sans recréer les buffers OpenGL. Elle recalcule les positions des sommets
+     * à partir des données de hauteur actuelles et transfère les nouvelles valeurs
+     * vers le GPU à l’aide d’une mise à jour dynamique du buffer.
+     *
+     * Cette méthode est destinée à être appelée lors des étapes de simulation
+     * (érosion thermique ou hydraulique), lorsque la topologie du terrain
+     * reste inchangée et que seules les hauteurs des sommets évoluent.
+     *
+     * @param VBO Identifiant du Vertex Buffer Object OpenGL à mettre à jour.
      */
-    static void export_terrain_to_csv(const std::vector<float>& data,
-                                  int width, int height,
-                                  const std::string& filename);
+    void update_vertices_gpu(GLuint VBO);
 
 };
 

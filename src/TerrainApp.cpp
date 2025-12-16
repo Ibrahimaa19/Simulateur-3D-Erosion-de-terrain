@@ -8,7 +8,6 @@
 #include "FaultFormationTerrain.hpp"
 #include "MidpointDisplacement.hpp"
 #include "PerlinNoiseTerrain.hpp" 
-#include "ThermalErosion.hpp"
 
 void TerrainApp::setCameraSpeed(float value){
     mCameraSpeed = value;
@@ -28,9 +27,18 @@ TerrainApp::TerrainApp(unsigned int seed)
 
 TerrainApp::~TerrainApp()
 {
-    delete mShader;
+    if (mVAO) glDeleteVertexArrays(1, &mVAO);
+    if (mVBO) glDeleteBuffers(1, &mVBO);
+    if (mIBO) glDeleteBuffers(1, &mIBO);
+
+    mShader.reset();
+
+    if (mWindow)
+        glfwDestroyWindow(mWindow);
+
     glfwTerminate();
 }
+
 
 bool TerrainApp::Init()
 {
@@ -86,7 +94,7 @@ void TerrainApp::InitCamera()
 
 void TerrainApp::InitScene()
 {
-    mShader = new Shader("../shaders/terrain.vs", "../shaders/terrain.fs");
+    mShader = std::make_unique<Shader>("../shaders/terrain.vs", "../shaders/terrain.fs");
     mShader->Use();
 
     mTerrain = std::make_unique<PerlinNoiseTerrain>();
@@ -112,11 +120,9 @@ void TerrainApp::GenerateTerrainFromGui()
 
     std::cout << "Generation via GUI... Methode: " << nomMethode << std::endl;
 
-    delete mShader;
-
     if (mGui.selectedMethod == GEN_HEIGHTMAP) 
     {
-        mShader = new Shader("../shaders/terrain.vs", "../shaders/terrain.fs");
+        mShader = std::make_unique<Shader>("../shaders/terrain.vs", "../shaders/terrain.fs");
         
         mTerrain = std::make_unique<Terrain>(); 
 
@@ -133,7 +139,7 @@ void TerrainApp::GenerateTerrainFromGui()
     
     else 
     {
-        mShader = new Shader("../shaders/terrain.vs", "../shaders/terrain.fs");
+        mShader = std::make_unique<Shader>("../shaders/terrain.vs", "../shaders/terrain.fs");
 
         if (mGui.selectedMethod == GEN_FAULT_FORMATION) 
         {
@@ -172,7 +178,6 @@ void TerrainApp::GenerateTerrainFromGui()
             );
             mTerrain = std::move(generator);
         }
-        // -----------------------------------------------
 
         mCamera.MoveTo(glm::vec3{-54.0f, 220.0f, -42.0f});
         mCamera.TurnTo(glm::vec3{mTerrain->get_terrain_width()/2.0f, 0.0f, mTerrain->get_terrain_height()/2.0f});
@@ -181,6 +186,7 @@ void TerrainApp::GenerateTerrainFromGui()
 
     mShader->Use();
     mTerrain->setup_terrain(mVAO, mVBO, mIBO);
+    mThermalErosion.loadTerrainInfo(mTerrain);
 }
 
 void TerrainApp::Run()
@@ -224,29 +230,21 @@ void TerrainApp::Run()
         }
         else {
             RenderScene();
-            
-            ThermalErosion thermalErosion;
-            thermalErosion.loadTerrainInfo(mTerrain);
 
-            thermalErosion.setTalusAngle(mGui.talusAngle);
-            thermalErosion.setTransferRate(mGui.thermalK);
+            mThermalErosion.setTalusAngle(mGui.talusAngle);
+            mThermalErosion.setTransferRate(mGui.thermalK);
 
             if (mGui.thermalRunning) thermalEnabled = true;
             else thermalEnabled = false;
 
             if (thermalEnabled)
             {
-                thermalErosion.step();
+                mThermalErosion.step();
                 stepCounter++;
                 
                 mGui.thermalCurrentStep = stepCounter;
 
-                mTerrain->setup_terrain(mVAO, mVBO, mIBO);
-
-                std::string PATH = "../validation/data/terrain_step_" + std::to_string(stepCounter) + ".csv";
-                if (stepCounter % 100 == 0) {
-                    std::cout << "Thermal erosion step " << stepCounter << std::endl;
-                }
+                mTerrain->update_vertices_gpu(mVBO);
             }
 
             mGui.cameraPos = glm::vec3(glm::inverse(mView)[3]);
