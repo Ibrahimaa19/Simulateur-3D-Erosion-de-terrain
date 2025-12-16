@@ -20,7 +20,7 @@ enum class Heightmap{
 };
 
 std::map<std::string, State> dicState{{"render", State::Render}, {"test", State::Test}};
-std::map<std::string, Heightmap> dicHeightmap{{"loadHeightmap", Heightmap::LoadHeightmap}, {"faulFormation", Heightmap::FaultFormation}
+std::map<std::string, Heightmap> dicHeightmap{{"loadHeightmap", Heightmap::LoadHeightmap}, {"faultFormation", Heightmap::FaultFormation}
                                                 ,{"midpointDisplacement", Heightmap::MidpointDisplacement}, {"perlinNoise", Heightmap::PerlinNoise} };
 
 int main(int argc, char const *argv[])
@@ -38,7 +38,7 @@ int main(int argc, char const *argv[])
         if (argc < 4) {
             std::cerr << "Usage: " << argv[0]
                     << " test <typeTerrain> <steps>\n";
-            std::cerr << "<typeTerrain> : loadHeightmap | faulFormation | midpointDisplacement | perlinNoise\n";
+            std::cerr << "<typeTerrain> : loadHeightmap | faultFormation | midpointDisplacement | perlinNoise\n";
             exit(1);
         }
 
@@ -59,7 +59,7 @@ int main(int argc, char const *argv[])
         case Heightmap::FaultFormation:
             {
                 auto generator = std::make_unique<FaultFormationTerrain>();
-                generator->CreateFaultFormation(2624, 1756, 2000, 0, 70, 1);
+                generator->CreateFaultFormation(1024, 1024, 1000, 0, 255, 1);
                 terrain = std::move(generator);
                 break;
             }
@@ -67,14 +67,14 @@ int main(int argc, char const *argv[])
         case Heightmap::MidpointDisplacement:
             {
                 auto generator = std::make_unique<MidpointDisplacement>();
-                generator->CreateMidpointDisplacement(std::pow(2, 9) + 1, 0, 70, 1, 0.5);
+                generator->CreateMidpointDisplacement(std::pow(2, 10) + 1, 0, 70, 1, 0.5);
                 terrain = std::move(generator);
                 break;
             }
         case Heightmap::PerlinNoise:
             {
                 auto generator = std::make_unique<PerlinNoiseTerrain>();
-                generator->CreatePerlinNoise(2624, 1756, 0, 70, 1, 0.005);
+                generator->CreatePerlinNoise(1024, 1024, 0, 70, 1, 0.005);
                 terrain = std::move(generator);
                 break;
             }
@@ -88,7 +88,7 @@ int main(int argc, char const *argv[])
     else{
         fprintf(stdout, "Usage: %s render\n", argv[0]);
         fprintf(stdout, "Usage: %s test <typeTerrain>\n", argv[0]);
-        fprintf(stdout, "<typeTerrain> : loadHeightmap | faulFormation | midpointDisplacement | perlinNoise");
+        fprintf(stdout, "<typeTerrain> : loadHeightmap | faultFormation | midpointDisplacement | perlinNoise");
     }
     return 0;
 }
