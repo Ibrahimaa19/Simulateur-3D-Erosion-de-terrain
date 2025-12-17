@@ -11,8 +11,7 @@ int ThermalErosion::step()
         return 0;
     }
 
-    std::vector<float>& data = *m_data;
-    std::vector<float> newData = data; // Copie
+    std::vector<float> data = *m_data;; // Copie
         
     int changes = 0;
 
@@ -59,7 +58,7 @@ int ThermalErosion::step()
                 materialToMove = std::min(materialToMove, currentHeight * transferRate);
 
                 // On retire la matière de la cellule actuelle
-                newData[i * W + j] -= materialToMove;
+                data[i * W + j] -= materialToMove;
 
                 // Redistribution aux voisins
                 for (int k = 0; k < 8; k++) {
@@ -70,7 +69,7 @@ int ThermalErosion::step()
                         int ni = i + neighbors[k][0];
                         int nj = j + neighbors[k][1];
 
-                        newData[ni * W + nj] += moveAmount;
+                        data[ni * W + nj] += moveAmount;
                     }
                 }
 
@@ -79,7 +78,7 @@ int ThermalErosion::step()
         }
     }
 
-    data = newData;
+    *m_data = data;
 
     //std::cout << "Cells modified: " << changes << std::endl;
     return changes;
