@@ -92,7 +92,7 @@ void Gui::Render(Terrain* terrain) {
         ImGui::End();
     }
     // ============================================================
-    // ÉTAPE 2 : MENU DE CONFIGURATION_Choix de la méthode
+    // ÉTAPE 2 : MENU DE CONFIGURATION
     // ============================================================
     else if (showConfigScreen) {
         ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
@@ -110,8 +110,6 @@ void Gui::Render(Terrain* terrain) {
 
         ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "2. Parametres :");
         ImGui::Spacing();
-
-        // --- GESTION DES MENUS PAR METHODE ---
 
         if (selectedMethod == GEN_HEIGHTMAP) {
             ImGui::Text("Chargement depuis un fichier image PNG.");
@@ -131,7 +129,7 @@ void Gui::Render(Terrain* terrain) {
             }
         }
         else if (selectedMethod == GEN_MIDPOINT_DISPLACEMENT) {
-            ImGui::Text("Generation fractale (Diamant-Carre).");
+            ImGui::Text("Generation fractale");
             ImGui::InputInt("Taille (2^n + 1)", &midpointSize);
             HelpMarker("La taille doit etre une puissance de 2 plus 1 (ex: 129, 257, 513, 1025).");
             
@@ -140,14 +138,11 @@ void Gui::Render(Terrain* terrain) {
         }
         else if (selectedMethod == GEN_PERLIN_NOISE) {
             ImGui::Text("Generation procedurale par Bruit de Perlin.");
-            
             ImGui::InputInt("Largeur (X)", &perlinWidth);
             ImGui::InputInt("Hauteur (Z)", &perlinHeight);
             ImGui::DragFloatRange2("Hauteur Min/Max", &perlinMinHeight, &perlinMaxHeight, 1.0f, 0.0f, 500.0f);
-            
             ImGui::Separator();
             ImGui::Text("Reglages du Bruit :");
-            
             ImGui::SliderFloat("Frequence", &perlinFrequency, 0.001f, 0.1f, "%.4f");
             ImGui::SliderInt("Octaves", &perlinOctaves, 1, 10);
             ImGui::SliderFloat("Persistance", &perlinPersistence, 0.1f, 1.5f);
@@ -180,7 +175,7 @@ void Gui::Render(Terrain* terrain) {
         ImGui::Begin("Controle Simulation", nullptr);
 
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
-        if (ImGui::Button("<- Retour au Menu (Reset)", ImVec2(-1, 30))) {
+        if (ImGui::Button("<- Retour au Menu", ImVec2(-1, 30))) {
              resetSimulation = true; 
              showConfigScreen = true; 
         }
@@ -193,40 +188,42 @@ void Gui::Render(Terrain* terrain) {
             if (ImGui::BeginTabItem("Simulation"))
             {
                 ImGui::Spacing();
-                ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "--- Controle Temporel ---");
                 
-                if (ImGui::Button(isPaused ? "Reprendre" : "Pause", ImVec2(100, 30))) {
-                    isPaused = !isPaused;
-                }
-
-                ImGui::DragFloat("Vitesse", &timeSpeed, 0.1f, 0.0f, 10.0f);
-
-                ImGui::Separator();
-
                 if (ImGui::CollapsingHeader("Erosion Thermique", ImGuiTreeNodeFlags_DefaultOpen))
                 {
-                    ImGui::InputInt("Iterations##Therm", &thermalIterations, 1000, 5000); 
                     ImGui::SliderFloat("Angle Talus", &talusAngle, 0.0f, 90.0f, "%.1f deg");
-                    ImGui::SliderFloat("Constante K", &thermalK, 0.0f, 1.0f);
+                    ImGui::SliderFloat("Taux de transfert", &thermalK, 0.0f, 1.0f);
+
+                    ImGui::Spacing();
+                    
+                    if (thermalRunning) {
+                        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.4f, 0.4f, 1.0f));
+                        if (ImGui::Button("PAUSE ##Thermal", ImVec2(-1, 35))) { 
+                            thermalRunning = false;
+                        }
+                        ImGui::PopStyleColor();
+                    } else {
+                        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.7f, 0.2f, 1.0f));
+                        if (ImGui::Button("LANCER ##Thermal", ImVec2(-1, 35))) {
+                            thermalRunning = true;
+                        }
+                        ImGui::PopStyleColor();
+                    }
+
+                    ImGui::Spacing(); 
+                    ImGui::Text("Step               : %d", thermalCurrentStep);
+                    ImGui::Text("Cellules modifiees : %d", thermalCellsModified);
                 }
 
+                /*
                 if (ImGui::CollapsingHeader("Erosion Hydraulique"))
                 {
                     ImGui::InputInt("Iterations##Hydro", &hydroIterations, 1000, 5000);
                     ImGui::SliderFloat("Pluie", &rainAmount, 0.0f, 5.0f);
                     ImGui::SliderFloat("Evaporation", &evaporationRate, 0.0f, 1.0f);
                 }
+                */
 
-                ImGui::EndTabItem();
-            }
-
-            // ONGLET VISUEL
-            if (ImGui::BeginTabItem("Visuel"))
-            {
-                //ImGui::Spacing();
-               // ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "--- Parametres Rendu ---");
-                //ImGui::DragFloat("Echelle Verticale", &verticalScale, 0.1f, 0.1f, 10.0f);
-                //ImGui::ColorEdit3("Couleur Sol", terrainColor);
                 ImGui::EndTabItem();
             }
 
@@ -245,17 +242,16 @@ void Gui::Render(Terrain* terrain) {
                 ImGui::BulletText("E : Move down");
                 ImGui::BulletText("M : Toggle Mouse/Menu");
                 ImGui::BulletText("ESC : Quit");
-                //ImGui::BulletText("H : Show this menu"); 
 
                 ImGui::Spacing();
                 ImGui::Text("Mouse :");
                 ImGui::BulletText("Move mouse : Rotate camera");
                 ImGui::BulletText("Scroll wheel : Zoom in/out");
                 
-                ImGui::Spacing();
                 ImGui::Separator();
-                ImGui::TextDisabled("=================================");
-
+                if (terrain != nullptr) {
+                     ImGui::Text("Taille Terrain: %d x %d", terrain->get_terrain_width(), terrain->get_terrain_height());
+                }
                 ImGui::EndTabItem();
             }
 

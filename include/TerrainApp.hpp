@@ -14,6 +14,7 @@
 #include "FaultFormationTerrain.hpp"
 #include "MidpointDisplacement.hpp"
 #include "PerlinNoiseTerrain.hpp" 
+#include "ThermalErosion.hpp"
 
 #include "Gui.hpp"
 
@@ -99,10 +100,10 @@ private:
     glm::mat4 mView;                  ///< View matrix
     glm::mat4 mProjection;            ///< Projection matrix
 
-    Shader* mShader;                  ///< Pointer to the shader program
-    //PerlinNoiseTerrain mTerrain;      ///< Terrain object
-    
+    std::unique_ptr<Shader> mShader;  ///< Smart pointer to the shader program
+
     std::unique_ptr<Terrain> mTerrain; ///< Smart pointer to the Terrain object (Polymorphic)
+    ThermalErosion mThermalErosion;    ///< Objet gérant l’érosion thermique appliquée au terrain courant
 
     GLuint mVAO;                      ///< Vertex Array Object
     GLuint mVBO;                      ///< Vertex Buffer Object

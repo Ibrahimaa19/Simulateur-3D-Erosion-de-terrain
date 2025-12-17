@@ -37,32 +37,27 @@ public:
     // =========================================================
    
     int selectedMethod = GEN_HEIGHTMAP; 
-
-    // --- Paramètres Méthode 1 : Heightmap (Image) ---
     int selectedImage = 0; 
 
-    // --- Paramètres Méthode 2 : Fault Formation ---
-    int faultWidth = 512;
-    int faultHeight = 512;
+    int faultWidth = 1024;
+    int faultHeight = 1024;
     int faultIterations = 500;
     float faultMinHeight = 0.0f;
     float faultMaxHeight = 255.0f;
     bool faultUseFilter = true;
     float faultFilter = 0.5f;
 
-    // --- Paramètres Méthode 3 : Midpoint Displacement ---
-    int midpointSize = 513; 
+    int midpointSize = 1025; 
     float midpointRoughness = 1.0f;
     float midpointMinHeight = 0.0f;
     float midpointMaxHeight = 255.0f;
 
-    // --- Paramètres Méthode 4 : Perlin Noise (AJOUT) ---
-    int perlinWidth = 512;
-    int perlinHeight = 512;
+    int perlinWidth = 1024;
+    int perlinHeight = 1024;
     float perlinMinHeight = 0.0f;
     float perlinMaxHeight = 255.0f;
     float perlinFrequency = 0.005f;
-    int perlinOctaves = 6;      
+    int perlinOctaves = 4;      
     float perlinPersistence = 0.5f;
     float perlinLacunarity = 2.0f;
 
@@ -76,7 +71,12 @@ public:
     float verticalScale = 1.0f; 
     float terrainColor[3] = {0.3f, 0.5f, 0.3f};   
 
-    int thermalIterations = 10000;
+    bool thermalRunning = false;   
+    int thermalCurrentStep = 0;
+    
+    int thermalCellsModified = 0;  
+    
+    
     float talusAngle = 30.0f;   
     float thermalK = 0.5f;      
 

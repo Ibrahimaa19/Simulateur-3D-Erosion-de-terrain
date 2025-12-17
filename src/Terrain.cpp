@@ -140,14 +140,13 @@ int Terrain::get_vertices_size() const{
     return this->vertices.size();
 }
 
-void Terrain::export_terrain_to_csv(const std::vector<float>& data, int W, int H, const std::string& filename) {
-    std::ofstream file(filename);
-    for (int i = 0; i < H; i++) {
-        for (int j = 0; j < W; j++) {
-            file << data[i * W + j];
-            if (j < W - 1) file << ",";
-        }
-        file << "\n";
-    }
-    file.close();
-};
+void Terrain::update_vertices_gpu(GLuint VBO)
+{
+    load_vectices();
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferSubData(GL_ARRAY_BUFFER,
+                    0,
+                    vertices.size() * sizeof(float),
+                    vertices.data());
+}
