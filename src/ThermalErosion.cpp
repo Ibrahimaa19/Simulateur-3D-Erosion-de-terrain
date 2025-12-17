@@ -11,7 +11,7 @@ int ThermalErosion::step()
         return 0;
     }
 
-    std::vector<float> data = *m_data;; // Copie
+    std::vector<float> data = *m_data;// Copie
         
     int changes = 0;
 
@@ -19,17 +19,17 @@ int ThermalErosion::step()
     for (int i = 1; i < H - 1; i++) {
         for (int j = 1; j < W - 1; j++) {
 
-            float currentHeight = data[i * W + j];
+            float currentHeight = (*m_data)[i * W + j];
 
             // Hauteurs des 8 voisins (Moore neighborhood)
-            float diffUp         = currentHeight - data[(i - 1) * W + j];
-            float diffDown       = currentHeight - data[(i + 1) * W + j];
-            float diffLeft       = currentHeight - data[i * W + (j - 1)];
-            float diffRight      = currentHeight - data[i * W + (j + 1)];
-            float diffUpLeft     = currentHeight - data[(i - 1) * W + (j - 1)];
-            float diffUpRight    = currentHeight - data[(i - 1) * W + (j + 1)];
-            float diffDownLeft   = currentHeight - data[(i + 1) * W + (j - 1)];
-            float diffDownRight  = currentHeight - data[(i + 1) * W + (j + 1)];
+            float diffUp         = currentHeight - (*m_data)[(i - 1) * W + j];
+            float diffDown       = currentHeight - (*m_data)[(i + 1) * W + j];
+            float diffLeft       = currentHeight - (*m_data)[i * W + (j - 1)];
+            float diffRight      = currentHeight - (*m_data)[i * W + (j + 1)];
+            float diffUpLeft     = currentHeight - (*m_data)[(i - 1) * W + (j - 1)];
+            float diffUpRight    = currentHeight - (*m_data)[(i - 1) * W + (j + 1)];
+            float diffDownLeft   = currentHeight - (*m_data)[(i + 1) * W + (j - 1)];
+            float diffDownRight  = currentHeight - (*m_data)[(i + 1) * W + (j + 1)];
 
             // Stockage des différences et indices des voisins
             float dist[8] = { diffUp, diffDown, diffLeft, diffRight,

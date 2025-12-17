@@ -67,14 +67,14 @@ int main(int argc, char const *argv[])
         case Heightmap::MidpointDisplacement:
             {
                 auto generator = std::make_unique<MidpointDisplacement>();
-                generator->CreateMidpointDisplacement(std::pow(2, 10) + 1, 0, 70, 1, 0.5);
+                generator->CreateMidpointDisplacement(std::pow(2, 10) + 1, 0, 255, 1, 0.5);
                 terrain = std::move(generator);
                 break;
             }
         case Heightmap::PerlinNoise:
             {
                 auto generator = std::make_unique<PerlinNoiseTerrain>();
-                generator->CreatePerlinNoise(1024, 1024, 0, 70, 1, 0.005);
+                generator->CreatePerlinNoise(1024, 1024, 0, 255, 1, 0.005);
                 terrain = std::move(generator);
                 break;
             }

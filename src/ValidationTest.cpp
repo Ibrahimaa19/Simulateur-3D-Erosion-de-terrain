@@ -44,13 +44,11 @@ void ValidationTest::run_all_tests(std::unique_ptr<Terrain>& terrain, const std:
     
     int cellsModified[steps];
 
-    for(int i = 0; i < 100; ++i){
-        cellsModified[i] = erosion.step();
-    }
+    cellsModified[0] = erosion.step();
 
     float error = test_mass_conservation(*terrain->get_data());
 
-    for(int i = 100; i < steps; ++i){
+    for(int i = 1; i < steps; ++i){
         cellsModified[i] = erosion.step();
     }
 
@@ -82,13 +80,13 @@ void ValidationTest::run_all_tests(std::unique_ptr<Terrain>& terrain, const std:
     if (test_height_limits(*terrain->get_data()))
         ++passed;
 
-    // std::cout << "RÉSULTATS: " << std::endl; 
-    // std::cout << "Steps : "<< steps << std::endl;
-    // std::cout << "Test " << total << " : Passed " << passed << std::endl;
-    // std::cout << "Conservation error pour 100 steps: " << error << std::endl;
-    // std::cout << "Conservation error pour "<< steps << " steps: " << errorFromTimesteps << std::endl;
-    // std::cout << "Nombre de cellule modifie step 1: " << cellsModified[0] << std::endl ;
-    // std::cout << "Nombre de cellule modifie step " << steps << ": " << cellsModified[steps-1] << std::endl;
+    std::cout << "RÉSULTATS: " << std::endl; 
+    std::cout << "Steps : "<< steps << std::endl;
+    std::cout << "Test " << total << " : Passed " << passed << std::endl;
+    std::cout << "Conservation error pour 1 step: " << error << std::endl;
+    std::cout << "Conservation error pour "<< steps << " steps: " << errorFromTimesteps << std::endl;
+    std::cout << "Nombre de cellule modifie step 1: " << cellsModified[0] << std::endl ;
+    std::cout << "Nombre de cellule modifie step " << steps << ": " << cellsModified[steps-1] << std::endl;
 }
 
 float ValidationTest::calculate_total_mass(const std::vector<float>& data) {
