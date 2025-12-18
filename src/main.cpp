@@ -24,7 +24,6 @@ enum class Heightmap{
     PerlinNoise
 };
 
-// Dictionnaires pour récupérer les enums à partir de chaînes
 std::map<std::string, State> dicState{{"render", State::Render}, {"test", State::Test}};
 std::map<std::string, Heightmap> dicHeightmap{
     {"loadHeightmap", Heightmap::LoadHeightmap}, 
@@ -92,7 +91,7 @@ int main(int argc, char const *argv[])
 
         for(const auto& terrainType : terrains){
 
-            std::string filename = "../performance_" + terrainType + ".csv";
+            std::string filename = "../performance/data/performance_" + terrainType + ".csv";
             std::ofstream csvFile(filename);
             csvFile << "Size,Steps,Duration_ms\n";
 
