@@ -86,14 +86,13 @@ int main(int argc, char const *argv[])
     else if(argc == 2 && std::string(argv[1]) == "bench") {
 
         std::vector<std::string> terrains = {"faultFormation", "midpointDisplacement", "perlinNoise"};
-        std::vector<int> sizes = {512, 1024, 2048};
-        std::vector<int> stepsList = {100, 200, 500, 1000, 1500, 2000, 2500, 3000, 4000, 5000};
+        std::vector<int> sizes = {256, 512, 1024, 2048, 4096, 8192};
 
         for(const auto& terrainType : terrains){
 
             std::string filename = "../performance/data/performance_" + terrainType + ".csv";
             std::ofstream csvFile(filename);
-            csvFile << "Size,Steps,Duration_ms\n";
+            csvFile << "Size,Duration_ms\n";
 
             for(const auto& size : sizes){
                 std::unique_ptr<Terrain> terrain;
@@ -116,17 +115,15 @@ int main(int argc, char const *argv[])
                 ThermalErosion erosion;
                 erosion.loadTerrainInfo(terrain);
 
-                for(const auto& steps : stepsList){
-                    auto start = std::chrono::high_resolution_clock::now();
-                    for(int s=0; s<steps; ++s) erosion.step();
-                    auto end = std::chrono::high_resolution_clock::now();
+                auto start = std::chrono::high_resolution_clock::now();
+                erosion.step();
+                auto end = std::chrono::high_resolution_clock::now();
 
-                    auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
+                auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
 
-                    std::cout << "Terrain: " << terrainType << ", Size: " << size << ", Steps: " << steps << ", Duration: " << duration_ms << " ms" << std::endl;
+                std::cout << "Terrain: " << terrainType << ", Size: " << size  << ", Duration: " << duration_ms << " ms" << std::endl;
 
-                    csvFile << size << "," << steps << "," << duration_ms << "\n";
-                }
+                csvFile << size << "," << duration_ms << "\n";
             }
             csvFile.close();
             std::cout << "Résultats enregistrés dans " << filename << std::endl;

@@ -37,8 +37,8 @@ void ValidationTest::run_all_tests(std::unique_ptr<Terrain>& terrain, const std:
 
     ThermalErosion erosion;
     erosion.loadTerrainInfo(terrain);
-    erosion.setTalusAngle(25.f);
-    erosion.setTransferRate(0.1f);
+    erosion.setTalusAngle(30.f);
+    erosion.setTransferRate(0.5f);
 
     initialData = *(terrain->get_data());
     
@@ -80,13 +80,13 @@ void ValidationTest::run_all_tests(std::unique_ptr<Terrain>& terrain, const std:
     if (test_height_limits(*terrain->get_data()))
         ++passed;
 
-    std::cout << "RÉSULTATS: " << std::endl; 
-    std::cout << "Steps : "<< steps << std::endl;
-    std::cout << "Test " << total << " : Passed " << passed << std::endl;
-    std::cout << "Conservation error pour 1 step: " << error << std::endl;
-    std::cout << "Conservation error pour "<< steps << " steps: " << errorFromTimesteps << std::endl;
-    std::cout << "Nombre de cellule modifie step 1: " << cellsModified[0] << std::endl ;
-    std::cout << "Nombre de cellule modifie step " << steps << ": " << cellsModified[steps-1] << std::endl;
+    // std::cout << "RÉSULTATS: " << std::endl; 
+    // std::cout << "Steps : "<< steps << std::endl;
+    // std::cout << "Test " << total << " : Passed " << passed << std::endl;
+    // std::cout << "Conservation error pour 1 step: " << error << std::endl;
+    // std::cout << "Conservation error pour "<< steps << " steps: " << errorFromTimesteps << std::endl;
+    // std::cout << "Nombre de cellule modifie step 1: " << cellsModified[0] << std::endl ;
+    // std::cout << "Nombre de cellule modifie step " << steps << ": " << cellsModified[steps-1] << std::endl;
 }
 
 float ValidationTest::calculate_total_mass(const std::vector<float>& data) {
