@@ -48,8 +48,19 @@ void ValidationTest::run_all_tests(std::unique_ptr<Terrain>& terrain, const std:
 
     float error = test_mass_conservation(*terrain->get_data());
 
+    std::string fichier_name = "./resultat/resultats_error_" +terrainType +".csv";
+    std::ofstream fichier(fichier_name, std::ios::app);
+    if (!fichier.is_open()) {
+        std::cerr << "Erreur d'ouverture du fichier" << std::endl;
+        exit(1);
+    }
+    
     for(int i = 1; i < steps; ++i){
         cellsModified[i] = erosion.step();
+        if (i % 100 == 0) {
+            fichier << i << "," << test_mass_conservation(*terrain->get_data()) << "\n";
+            fichier.flush();
+        }
     }
 
     fs::path cellFile = baseDir / ("cellModified" + std::to_string(steps) + ".csv");
@@ -57,8 +68,11 @@ void ValidationTest::run_all_tests(std::unique_ptr<Terrain>& terrain, const std:
     std::ofstream cellOut(cellFile);
     cellOut << "step,cells_modified\n";
 
+
     for (int i = 0; i < steps; ++i) {
         cellOut << i << "," << cellsModified[i] << "\n";
+
+        
     }
 
     cellOut.close();
