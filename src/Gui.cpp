@@ -215,6 +215,34 @@ void Gui::Render(Terrain* terrain) {
                     ImGui::Text("Cellules modifiees : %d", thermalCellsModified);
                 }
 
+                if (ImGui::CollapsingHeader("Erosion Hydraulique", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    ImGui::SliderFloat("Pluie", &mRainRate, 0.0f, 0.1f, "%.4f");
+                    ImGui::SliderFloat("Évaporation", &mEvaporationRate, 0.0f, 1.0f, "%.3f");
+                    ImGui::SliderFloat("Solubilité", &mSolubility, 0.0f, 1.0f, "%.3f");
+                    ImGui::SliderFloat("Capacité séd.", &mSedimentCapacity, 0.0f, 10.0f, "%.2f");
+                    ImGui::SliderFloat("Pente min", &mMinSlope, 0.0f, 0.01f, "%.6f");                    
+                    ImGui::Spacing();
+                    
+                    if (hydraulicRunning) {
+                        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.3f, 0.3f, 1.0f));
+                        if (ImGui::Button("PAUSE ##Hydro", ImVec2(-1, 35))) {
+                            hydraulicRunning = false;
+                        }
+                        ImGui::PopStyleColor();
+                    } else {
+                        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.3f, 0.8f, 1.0f));
+                        if (ImGui::Button("LANCER ##Hydro", ImVec2(-1, 35))) {
+                            hydraulicRunning = true;
+                        }
+                        ImGui::PopStyleColor();
+                    }
+                    
+                    // Aide
+                    ImGui::Spacing();
+                    ImGui::TextDisabled("(Appuyez sur H pour activer/désactiver)");
+                }
+
                 /*
                 if (ImGui::CollapsingHeader("Erosion Hydraulique"))
                 {

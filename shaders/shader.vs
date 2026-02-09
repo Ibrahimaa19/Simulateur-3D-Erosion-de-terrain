@@ -1,15 +1,12 @@
 #version 330 core
+layout (location = 0) in vec3 position;
 
-layout(location = 0) in vec3 aPos; // vertex position
+out vec3 FragPos;
 
-out float height;
-
-uniform mat4 gFinalMatrix; // MVP matrix
+uniform mat4 gFinalMatrix;
 
 void main()
 {
-    vec4 v = vec4(aPos.x, aPos.y, aPos.z, 1.0); 
-    height = aPos.y;
-
-    gl_Position = gFinalMatrix * v;
+    FragPos = position;
+    gl_Position = gFinalMatrix * vec4(position, 1.0f);
 }

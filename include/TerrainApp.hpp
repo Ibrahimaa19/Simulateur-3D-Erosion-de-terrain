@@ -15,6 +15,7 @@
 #include "MidpointDisplacement.hpp"
 #include "PerlinNoiseTerrain.hpp" 
 #include "ThermalErosion.hpp"
+#include "HydraulicErosion.hpp"
 
 #include "Gui.hpp"
 
@@ -104,6 +105,7 @@ private:
 
     std::unique_ptr<Terrain> mTerrain; ///< Smart pointer to the Terrain object (Polymorphic)
     ThermalErosion mThermalErosion;    ///< Objet gérant l’érosion thermique appliquée au terrain courant
+    HydraulicErosion mHydraulicErosion;
 
     GLuint mVAO;                      ///< Vertex Array Object
     GLuint mVBO;                      ///< Vertex Buffer Object
@@ -113,9 +115,12 @@ private:
 
     bool thermalEnabled;
     bool thermalStarted;
+    
+    bool mHydraulicEnabled = false;
 
-    bool hydraulicEnabled;
-    bool hydraulicStarted;
+    // Pour l'eau dans le shader
+    float mWaterLevel = 0.0f;
+    bool mHasWater = false;
     
     Gui mGui;                         ///< User Interface instance
     bool mShowMenu;                   ///< Boolean to toggle menu visibility

@@ -78,13 +78,17 @@ public:
     
     
     float talusAngle = 30.0f;   
-    float thermalK = 0.5f;      
-
-    int hydroIterations = 50000;
-    float rainAmount = 1.0f;
-    float evaporationRate = 0.5f;
+    float thermalK = 0.5f;
 
     glm::vec3 cameraPos = glm::vec3(0.0f); 
+
+    //HYDRAULIC
+    bool hydraulicRunning = false;
+    float mRainRate = 0.1f;         
+    float mEvaporationRate = 0.01f;  
+    float mSolubility = 0.3f;       
+    float mSedimentCapacity = 2.0f; 
+    float mMinSlope = 0.000001f; 
 };
 
 #endif

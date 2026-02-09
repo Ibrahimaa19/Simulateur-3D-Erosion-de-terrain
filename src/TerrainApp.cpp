@@ -19,7 +19,7 @@ TerrainApp::TerrainApp(unsigned int seed)
       mFirstMouse(true), mMouseSensitivity(0.1f),
       mCameraSpeed(5.0f),
       thermalEnabled(false), thermalStarted(false),
-      hydraulicEnabled(false), hydraulicStarted(false),
+      mHydraulicEnabled(false),
       mShowMenu(true)
 {
     std::srand(seed);
@@ -186,7 +186,9 @@ void TerrainApp::GenerateTerrainFromGui()
 
     mShader->Use();
     mTerrain->setup_terrain(mVAO, mVBO, mIBO);
+
     mThermalErosion.loadTerrainInfo(mTerrain);
+    mHydraulicErosion.loadTerrainInfo(mTerrain.get());
 }
 
 void TerrainApp::Run()
@@ -251,6 +253,49 @@ void TerrainApp::Run()
                 mTerrain->update_vertices_gpu(mVBO);
             }
 
+            // ===== ÉROSION HYDRAULIQUE =====
+            if (mGui.hydraulicRunning) {
+                mHydraulicEnabled = true;
+            } else {
+                mHydraulicEnabled = false;
+            }
+
+            if (mHydraulicEnabled) {
+                // Exécuter une étape
+                mHydraulicErosion.step();
+                
+                // Calculer le niveau d'eau pour le shader
+                const auto& waterData = mHydraulicErosion.getWaterData();
+                float maxWaterHeight = 0.0f;
+                mHasWater = false;
+                
+                if (!waterData.empty()) {
+                    float* terrainData = mTerrain->get_data()->data();
+                    float waterSum = 0.0f;
+                    int waterCells = 0;
+                    
+                    for (size_t i = 0; i < waterData.size(); i++) {
+                        if (waterData[i] > 0.01f) {
+                            waterSum += terrainData[i] + waterData[i];
+                            waterCells++;
+                            mHasWater = true;
+                        }
+                    }
+                    
+                    if (waterCells > 0) {
+                        mWaterLevel = waterSum / waterCells;
+                    }
+                }
+                
+                // Mettre à jour l'affichage
+                mTerrain->update_vertices_gpu(mVBO);
+                
+                // DEBUG dans console
+                static int waterStep = 0;
+                if (waterStep++ % 20 == 0 && mHasWater) {
+                    std::cout << "💧 Eau visible! Niveau: " << mWaterLevel << std::endl;                }
+            }
+
             mGui.cameraPos = glm::vec3(glm::inverse(mView)[3]);
             if (mShowMenu) {
                 mGui.Render(mTerrain.get()); 
@@ -270,7 +315,10 @@ void TerrainApp::RenderScene()
     mShader->SetMat4("gFinalMatrix", finalMatrix);
     mShader->SetFloat("gMaxHeight", mTerrain->get_max_height());
     mShader->SetFloat("gMinHeight", mTerrain->get_min_height());
-    
+
+    mShader->SetFloat("uHasWater", mHasWater ? 1.0f : 0.0f);
+    mShader->SetFloat("uWaterLevel", mWaterLevel);    
+
     glBindVertexArray(mVAO);
     mTerrain->renderer(); 
 }
@@ -323,6 +371,16 @@ void TerrainApp::KeyCallback(GLFWwindow* window, int key, int scancode, int acti
                     std::cout << "Thermal erosion STARTED" << std::endl;
                 } else {
                     std::cout << "Thermal erosion PAUSED" << std::endl;
+                }
+                break;
+            }
+            case GLFW_KEY_H:{
+                app->mHydraulicEnabled = !app->mHydraulicEnabled;
+                app->mGui.hydraulicRunning = app->mHydraulicEnabled;
+                if (app->mHydraulicEnabled) {
+                    std::cout << "💧 Erosion hydraulique DÉMARRÉE" << std::endl;
+                } else {
+                    std::cout << "💧 Erosion hydraulique ARRÊTÉE" << std::endl;
                 }
                 break;
             }

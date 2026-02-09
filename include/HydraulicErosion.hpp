@@ -1,39 +1,52 @@
+#ifndef HYDRAULIC_EROSION_HPP
+#define HYDRAULIC_EROSION_HPP
+
 #include "Terrain.hpp"
+#include <vector>
 
-/**
- * @class HydraulicErosion
- * @brief Classe pour simuler l'érosion hydraulique d'un terrain
- *
- * Le modèle "goutte d'eau" simule la pluie, l'érosion, le transport et le dépôt de sédiments
- * Chaque goutte se déplace sur le terrain en suivant la pente et modifie les hauteurs locales
- */
-class HydraulicErosion
-{
-public:
-    /**
-     * @brief Constructeur de la classe HydraulicErosion
-     * @param iterations Nombre de gouttes à simuler
-     * @param rain Quantité d'eau ajoutée par goutte
-     * @param erosionRate Taux d'érosion par pente et par goutte
-     * @param depositRate Taux de dépôt de sédiments
-     * @param evaporation Fraction d'eau évaporée par étape
-     */
-    HydraulicErosion(int iterations = 20000,
-                     float rain = 1.0f,
-                     float erosionRate = 0.02f,
-                     float depositRate = 0.05f,
-                     float evaporation = 0.1f);
-
-    /**
-     * @brief Applique l'érosion hydraulique sur le terrain
-     * @param terrain Terrain sur lequel appliquer l'érosion
-     */
-    void apply(Terrain& terrain);
-
+class HydraulicErosion {
 private:
-    int iterations;   
-    float rain;          
-    float erosionRate;   
-    float depositRate;   
-    float evaporation;   
+    Terrain* mTerrain = nullptr;
+    std::vector<float> mWater;
+    std::vector<float> mSediment;
+    
+    int mWidth = 0;
+    int mHeight = 0;
+    
+    // Paramètres (valeurs douces)
+    float mRainRate = 0.001f;
+    float mEvaporationRate = 0.02f;
+    float mSolubility = 0.05f;
+    float mSedimentCapacity = 0.05f;
+    float mMinSlope = 0.02f;
+    
+    // Méthodes internes
+    void addRain();
+    void computeFlow();
+    void transportSediment();
+    void evaporate();
+    
+public:
+    HydraulicErosion();
+    
+    void loadTerrainInfo(Terrain* terrain);
+    int step();  // Retourne 1 si exécuté
+    
+    // Setters
+    void setRainRate(float rate) { mRainRate = rate; }
+    void setEvaporationRate(float rate) { mEvaporationRate = rate; }
+    void setSolubility(float s) { mSolubility = s; }
+    void setSedimentCapacity(float c) { mSedimentCapacity = c; }
+    void setMinSlope(float s) { mMinSlope = s; }
+    
+    // Pour la visualisation
+    const std::vector<float>& getWaterData() const { return mWater; }
+    float getWaterHeightAt(int x, int y) const {
+        if (!mTerrain || x < 0 || x >= mWidth || y < 0 || y >= mHeight) 
+            return 0.0f;
+        int idx = y * mWidth + x;
+        return mWater[idx];
+    }
 };
+
+#endif
