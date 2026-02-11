@@ -1,75 +1,85 @@
-#include <vector>
 #include "ThermalErosion.hpp"
+#include <iostream>
 
-ThermalErosion::ThermalErosion(float talusAngle, float c)
-    : talusAngle(talusAngle), c(c) {}
-
-
-void ThermalErosion::step(Terrain& terrain)
+int ThermalErosion::step()
 {
-    float cellSize = 1.0f;
+    const int W = m_width;
+    const int H = m_height;
 
-    // Les 8 voisins
-    int di[8] = { -1,-1,-1, 0, 1, 1, 1, 0 };
-    int dj[8] = { -1, 0, 1, 1, 1, 0,-1,-1 };
+    if (!m_data) {
+        std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
+        return 0;
+    }
 
-    float dist[8] = {
-        1.4142f, 1.0f, 1.4142f,
-        1.0f,    1.4142f, 1.0f,
-        1.4142f, 1.0f
-    };
+    std::vector<float> data = *m_data;// Copie
+        
+    int changes = 0;
 
-    std::vector<float> delta(terrain.get_terrain_height() * terrain.get_terrain_width(), 0.0f);
+    // Boucle sur le terrain
+    for (int i = 1; i < H - 1; i++) {
+        for (int j = 1; j < W - 1; j++) {
 
-    for (int i = 0; i < terrain.get_terrain_height(); i++)
-    {
-        for (int j = 0; j < terrain.get_terrain_width(); j++)
-        {
-            float currentHeight = terrain.get_height(i, j);
+            float currentHeight = (*m_data)[i * W + j];
 
-            int lowestI = -1; 
-            int lowestJ = -1;
-            float maxSlope = -1;
-            int lowestIndex = -1;
+            // Hauteurs des 8 voisins (Moore neighborhood)
+            float diffUp         = currentHeight - (*m_data)[(i - 1) * W + j];
+            float diffDown       = currentHeight - (*m_data)[(i + 1) * W + j];
+            float diffLeft       = currentHeight - (*m_data)[i * W + (j - 1)];
+            float diffRight      = currentHeight - (*m_data)[i * W + (j + 1)];
+            float diffUpLeft     = currentHeight - (*m_data)[(i - 1) * W + (j - 1)];
+            float diffUpRight    = currentHeight - (*m_data)[(i - 1) * W + (j + 1)];
+            float diffDownLeft   = currentHeight - (*m_data)[(i + 1) * W + (j - 1)];
+            float diffDownRight  = currentHeight - (*m_data)[(i + 1) * W + (j + 1)];
 
-            for (int k = 0; k < 8; k++)
-            {
-                int ni = i + di[k];
-                int nj = j + dj[k];
+            // Stockage des différences et indices des voisins
+            float dist[8] = { diffUp, diffDown, diffLeft, diffRight,
+                              diffUpLeft, diffUpRight, diffDownLeft, diffDownRight };
+            
+            int neighbors[8][2] = { 
+                {-1, 0}, {1, 0}, {0, -1}, {0, 1},     // 4 voisins directs
+                {-1, -1}, {-1, 1}, {1, -1}, {1, 1}    // 4 voisins diagonaux
+            };
 
-                if (!terrain.inside(ni, nj))
-                    continue;
+            float totalDiff = 0.0f;
+            int validNeighbors = 0;
 
-                float diff = currentHeight - terrain.get_height(ni, nj);
-
-                if (diff > maxSlope && diff > 0.0f)
-                {
-                    maxSlope = diff;
-                    lowestI = ni;
-                    lowestJ = nj;
-                    lowestIndex = k;
+            // Accumulation des différences valides
+            for (int k = 0; k < 8; k++) {
+                if (dist[k] > talusAngle) {
+                    totalDiff += dist[k];
+                    validNeighbors++;
                 }
             }
 
-            if (lowestI >= 0)
-            {
-                float slopeAngle = maxSlope / (cellSize * dist[lowestIndex]);
+            // Érosion
+            if (totalDiff > 0 && validNeighbors > 0) {
+                
+                float materialToMove = transferRate * (totalDiff / validNeighbors);
+                materialToMove = std::min(materialToMove, currentHeight * transferRate);
 
-                if (slopeAngle > talusAngle)
-                {
-                    float amount = c * maxSlope;
-                    
-                    delta[i * terrain.get_terrain_width() + j] -= amount;
-                    delta[lowestI * terrain.get_terrain_width() + lowestJ] += amount;
+                // On retire la matière de la cellule actuelle
+                data[i * W + j] -= materialToMove;
+
+                // Redistribution aux voisins
+                for (int k = 0; k < 8; k++) {
+                    if (dist[k] > talusAngle) {
+                        float proportion = dist[k] / totalDiff;
+                        float moveAmount = materialToMove * proportion;
+
+                        int ni = i + neighbors[k][0];
+                        int nj = j + neighbors[k][1];
+
+                        data[ni * W + nj] += moveAmount;
+                    }
                 }
+
+                changes++;
             }
         }
     }
 
-    // appliquer les changements
-    for (int i = 0; i < terrain.get_terrain_width() * terrain.get_terrain_width(); i++){
-        //terrain.data[i] += delta[i];
-        terrain.set_data(i,delta[i]);
-    }
-        
+    *m_data = data;
+
+    //std::cout << "Cells modified: " << changes << std::endl;
+    return changes;
 }

@@ -6,12 +6,18 @@
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 #include <iostream>
+#include <memory> 
 
 #include "Camera.hpp"
 #include "Shader.hpp"
 #include "Terrain.hpp"
 #include "FaultFormationTerrain.hpp"
 #include "MidpointDisplacement.hpp"
+#include "PerlinNoiseTerrain.hpp" 
+#include "ThermalErosion.hpp"
+
+#include "Gui.hpp"
+
 /**
  * @class TerrainApp
  * @brief Manages window creation, input callbacks, camera, rendering loop, and terrain rendering.
@@ -42,6 +48,11 @@ public:
      */
     void Run();
 
+    /**
+     * @brief Change the camera speed
+     */
+    void setCameraSpeed(float value);
+
 private:
     /**
      * @brief Internal function to initialize the window.
@@ -68,6 +79,11 @@ private:
      */
     void RenderScene();
 
+    /**
+     * @brief Handles terrain regeneration based on GUI settings.
+     */
+    void GenerateTerrainFromGui();
+
 private:
     GLFWwindow* mWindow;              ///< Pointer to the GLFW window
 
@@ -84,14 +100,25 @@ private:
     glm::mat4 mView;                  ///< View matrix
     glm::mat4 mProjection;            ///< Projection matrix
 
-    Shader* mShader;                  ///< Pointer to the shader program
-    MidpointDisplacement mTerrain;                 ///< Terrain object
+    std::unique_ptr<Shader> mShader;  ///< Smart pointer to the shader program
 
-    GLuint mVAO[4];                      ///< Vertex Array Object
-    GLuint mVBO[4];                      ///< Vertex Buffer Object
-    GLuint mIBO[4];                      ///< Index Buffer Object
+    std::unique_ptr<Terrain> mTerrain; ///< Smart pointer to the Terrain object (Polymorphic)
+    ThermalErosion mThermalErosion;    ///< Objet gérant l’érosion thermique appliquée au terrain courant
+
+    GLuint mVAO;                      ///< Vertex Array Object
+    GLuint mVBO;                      ///< Vertex Buffer Object
+    GLuint mIBO;                      ///< Index Buffer Object
 
     float mCameraSpeed;               ///< Speed used for keyboard movement
+
+    bool thermalEnabled;
+    bool thermalStarted;
+
+    bool hydraulicEnabled;
+    bool hydraulicStarted;
+    
+    Gui mGui;                         ///< User Interface instance
+    bool mShowMenu;                   ///< Boolean to toggle menu visibility
 
 private:
     /** Keyboard callback wrapper */
@@ -105,7 +132,4 @@ private:
 
     /** Framebuffer resize callback wrapper */
     static void FramebufferCallback(GLFWwindow* window, int width, int height);
-
-    /** Return the LOD levels to use for renderer*/
-    int SelectLOD(const glm::vec3&& cameraPos);
 };

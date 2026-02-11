@@ -1,5 +1,6 @@
 #include "Terrain.hpp"
 #include "ThermalErosion.hpp"
+#include <fstream>
 
 
 void Terrain::load_terrain (const char* image_path,float yfactor,float xzfactor){
@@ -32,106 +33,87 @@ void Terrain::load_terrain (const char* image_path,float yfactor,float xzfactor)
 }
 
 void Terrain::load_vectices(){
-    
-    // Génére positions des points en fonction du LOD
-    for(int k =0;k<4;k++){
-        vertices[k].clear();
-        size_t step = lodSteps[k];
-
-        for (int z = 0; z < height; z+=step) {
-            for (int x = 0; x < width; x+=step) {
-                bool isBorder = (x < borderSize || x >= width - borderSize || z < borderSize || z >= height - borderSize); // Si on est dans le bordure, alors isBorder devient true
-                int index = z * width + x;
-                float y = data[index]*yfactor;
-                
-                
-                vertices[k].push_back((float)x/xzfactor);  
-                if(isBorder){
-                    vertices[k].push_back(0.0f); // en bordure on aplatit
-                }else{
-                    vertices[k].push_back(y);
-                }
-                            
-                vertices[k].push_back((float)z/xzfactor);        
+    vertices.clear();
+    for (int z = 0; z < height; z++) {
+        for (int x = 0; x < width; x++) {
+            bool isBorder = (x < borderSize || x >= width - borderSize || z < borderSize || z >= height - borderSize); // Si on est dans le bordure, alors isBorder devient true
+            int index = z * width + x;
+            float y = data[index]*yfactor;
+            
+            
+            vertices.push_back((float)x/xzfactor);  
+            if(isBorder){
+                vertices.push_back(0.0f); // en bordure on aplatit
+            }else{
+                vertices.push_back(y);
             }
+                        
+            vertices.push_back((float)z/xzfactor);        
         }
-
     }
-
 }
 
 void Terrain::load_incides(){
-    
-    for(int k =0;k<4;k++){
-        indices[k].clear();
-        size_t step = lodSteps[k];
-
-        // On définie height et width en fonction du lod
-        int gridWidth = (width - 1) / step + 1;
-        int gridHeight = (height - 1) / step + 1;
-        
-        for (int z = 0; z < gridHeight - 1; z++) {
-            for (int x = 0; x < gridWidth - 1; x++) {
-                int hautG = z * width + x;
-                int hautD = hautG + 1;
-                int basG = (z + 1) * width + x;
-                int basD = basG + 1;
-                
-                // Premier triangle
-                indices[k].push_back(hautG);
-                indices[k].push_back(basG);
-                indices[k].push_back(hautD);
-                
-                // Deuxieme triangle
-                indices[k].push_back(hautD);
-                indices[k].push_back(basG);
-                indices[k].push_back(basD);
-            }
+    indices.clear();
+    for (int z = 0; z < height - 1; z++) {
+        for (int x = 0; x < width - 1; x++) {
+            
+            int hautG = z * width + x;
+            int hautD = hautG + 1;
+            int basG = (z + 1) * width + x;
+            int basD = basG + 1;
+            
+            // Premier triangle
+            indices.push_back(hautG);
+            indices.push_back(basG);
+            indices.push_back(hautD);
+            
+            // Deuxieme triangle
+            indices.push_back(hautD);
+            indices.push_back(basG);
+            indices.push_back(basD);
         }
     }
-    
 }
 
-void Terrain::setup_terrain(GLuint *VAO, GLuint *VBO, GLuint *EBO){
+void Terrain::setup_terrain(GLuint &VAO, GLuint &VBO, GLuint &EBO){
     this->load_incides();
 	this->load_vectices();
 
+    // Créer un VAO
+    glGenVertexArrays(1, &VAO);
+    glBindVertexArray(VAO);
+    
 
-    glGenVertexArrays(4, VAO);
-    glGenBuffers(4, VBO);
-    glGenBuffers(4, EBO);
+    // Remplis de le buffers VBO de données
+	glGenBuffers(1, &VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, this->vertices.size() * sizeof(float), 
+                this->vertices.data(), GL_DYNAMIC_DRAW);
+    
 
-    for (int lod = 0; lod < 4; lod++) {
-        // Créer un VAO
-        glBindVertexArray(VAO[lod]);
-        
-        // Remplis de le buffers VBO de données
-        glBindBuffer(GL_ARRAY_BUFFER, VBO[lod]);
-        glBufferData(GL_ARRAY_BUFFER, 
-            vertices[lod].size() * sizeof(float), 
-            vertices[lod].data(), 
-            GL_STATIC_DRAW);
-        
-        // Setup de VAO, comment lire le VBO
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-        glEnableVertexAttribArray(0);
-        
-        // Remplis de buffer d'indices
+    // Setup de VAO, comment lire le VBO
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO[lod]);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, 
-            indices[lod].size() * sizeof(unsigned int), 
-            indices[lod].data(), 
-            GL_STATIC_DRAW);
-        
-        // Lie le VAO au contexte courant, on va maintenant utiliser ce VAO
-        glBindVertexArray(0);
-    }
+    // Remplis de buffer d'indices
+	glGenBuffers(1, &EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->indices.size() * sizeof(unsigned int),
+                 this->indices.data(), GL_STATIC_DRAW);
+    
+    // Lie le VAO au contexte courant, on va maintenant utiliser ce VAO
+    glBindVertexArray(0);
     
 }
 
+void Terrain::update_vertices() {
+    load_vectices();
+}
+
 void Terrain::renderer(){
-    glDrawElements(GL_TRIANGLES, indices[0].size(), GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
 }
 
 bool Terrain::inside(int i, int j) const {
@@ -142,22 +124,29 @@ void Terrain::set_data(int i, float value){
     this->data[i] += value;
 }
 
+std::vector<float>* Terrain::get_data(){
+    return &(this->data);
+}
+/*
 std::vector<float> Terrain::get_data(){
     return this->data;
-}
+}*/
 
 int Terrain::get_indices_size() const{
-    return this->indices[0].size();
+    return this->indices.size();
 };
 
 int Terrain::get_vertices_size() const{
-    return this->vertices[0].size();
-};
-
-float Terrain::get_lod_distance(int i) const{
-    return lodDistances[i];
+    return this->vertices.size();
 }
 
-float Terrain::get_xz() const{
-    return this->xzfactor;
+void Terrain::update_vertices_gpu(GLuint VBO)
+{
+    load_vectices();
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferSubData(GL_ARRAY_BUFFER,
+                    0,
+                    vertices.size() * sizeof(float),
+                    vertices.data());
 }

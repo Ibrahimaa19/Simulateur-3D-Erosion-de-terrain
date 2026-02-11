@@ -89,7 +89,7 @@ void MidpointDisplacement::DiamondStep(int rectSize, float curHeight)
 
             float average = (bottomLeft + bottomRight + topLeft + topRight) / 4.0f;
 
-            set_height(midZ, midX, average + RandomFloat(-curHeight, curHeight));
+            set_height(midX, midZ, average + RandomFloat(-curHeight, curHeight));
         }
     }
 }
@@ -107,31 +107,31 @@ void MidpointDisplacement::SquareStep(int rectSize, float curHeight)
 
             if (inside(z - halfRectSize, x))
             {
-                sum += get_height(z - halfRectSize, x);
+                sum += get_height(x, z - halfRectSize);
                 count++;
             }
 
             if (inside(z + halfRectSize, x))
             {
-                sum += get_height(z + halfRectSize, x);
+                sum += get_height(x, z + halfRectSize);
                 count++;
             }
 
             if (inside(z, x - halfRectSize))
             {
-                sum += get_height(z, x - halfRectSize);
+                sum += get_height(x - halfRectSize, z);
                 count++;
             }
 
             if (inside(z, x + halfRectSize))
             {
-                sum += get_height(z, x + halfRectSize);
+                sum += get_height(x + halfRectSize, z);
                 count++;
             }
 
             float average = sum / count;
 
-            set_height(z, x, average + RandomFloat(-curHeight, curHeight));
+            set_height(x, z, average + RandomFloat(-curHeight, curHeight));
         }
     }
 }

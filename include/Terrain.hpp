@@ -6,6 +6,7 @@
 #include <iostream>
 #include <algorithm>
 #include <GL/glew.h>
+#include <fstream>
 
 #include "stb_image.hpp"
 
@@ -21,12 +22,14 @@ protected:
     float min_height;
 	int borderSize;
     int cellSpacing;
-	std::vector<float> vertices[4];
-	std::vector<unsigned int> indices[4];
+	// std::vector<float> vertices[4];
+	// std::vector<unsigned int> indices[4];
 
-    // Paramètres LOD
-    int lodSteps[4] = {1, 2, 4, 8}; 
-    float lodDistances[4] = {2.0f, 4.f, 6.5f, 8.f};
+    // // Paramètres LOD
+    // int lodSteps[4] = {1, 2, 4, 8}; 
+    // float lodDistances[4] = {2.0f, 4.f, 6.5f, 8.f};
+	std::vector<float> vertices;
+	std::vector<unsigned int> indices;
 
     /**
      * @brief Met à jours le vecteur vertices, en fonction des valeurs dans data
@@ -51,6 +54,14 @@ protected:
 
 public:
     /**
+     * @brief Destructeur virtuel par défaut.
+     * 
+     * Nécessaire pour permettre le polymorphisme (dynamic_cast) et assurer
+     * la destruction correcte des classes filles.
+     */
+    virtual ~Terrain() = default;
+
+    /**
      * @brief Contructeur de la structure de données Terrain avec l'image passer en paramètre
      *
      * @param image_path Un chemin vers une image à lire
@@ -67,7 +78,7 @@ public:
      * @param VBO le vertex buffer object, buffer contenant tout les sommets
      * @param EBO le element buffer object, les triangles a afficher
      */
-    void setup_terrain(GLuint *VAO, GLuint *VBO, GLuint *EBO);
+    void setup_terrain(GLuint &VAO, GLuint &VBO, GLuint &EBO);
 
     /**
      * @brief Dessine les triangles avec les données du terrain
@@ -79,8 +90,8 @@ public:
      * @param i l'indice de la ligne
      * @param j l'indice de la colonne
     */
-    float get_height(int i, int j) const{
-        return data[i * width + j];
+    int get_height(int i, int j) const{
+        return data[j * width + i];
     };
 
     /**
@@ -90,7 +101,7 @@ public:
      * @param value la valeur a insérer à la position(i,j)
     */
     void set_height(int i, int j, float value){
-        data[i * width + j] = value;
+        data[j * width + i] = value;
     };
 
     /**
@@ -130,7 +141,8 @@ public:
     /**
      * @brief Retourne le vecteur data du terrain
     */
-    std::vector<float> get_data();
+    std::vector<float>* get_data();
+    //std::vector<float> get_data();
 
     /**
      * @brief Retourne la size du vecteur indices
@@ -148,14 +160,27 @@ public:
     bool inside(int i, int j) const;
 
     /**
-     * @brief Retourne la valeur de distance correspondant a l'indice passer en paramètre
-     */
-    float get_lod_distance(int i) const;
+     * @brief Met à jour les vertices
+    */
+    void update_vertices();
+    const std::vector<float>& get_vertices() const { return vertices; }
 
     /**
-     * @brief Retourne la valeur de xzfactor du terrain
+     * @brief Met à jour les sommets du terrain sur le GPU.
+     *
+     * Cette fonction met à jour le Vertex Buffer Object (VBO) du terrain
+     * sans recréer les buffers OpenGL. Elle recalcule les positions des sommets
+     * à partir des données de hauteur actuelles et transfère les nouvelles valeurs
+     * vers le GPU à l’aide d’une mise à jour dynamique du buffer.
+     *
+     * Cette méthode est destinée à être appelée lors des étapes de simulation
+     * (érosion thermique ou hydraulique), lorsque la topologie du terrain
+     * reste inchangée et que seules les hauteurs des sommets évoluent.
+     *
+     * @param VBO Identifiant du Vertex Buffer Object OpenGL à mettre à jour.
      */
-    float get_xz() const;
+    void update_vertices_gpu(GLuint VBO);
+
 };
 
 #endif
