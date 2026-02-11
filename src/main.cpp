@@ -59,22 +59,22 @@ int main(int argc, char const *argv[])
         case Heightmap::FaultFormation:
             {
                 auto generator = std::make_unique<FaultFormationTerrain>();
-                generator->CreateFaultFormation(1024, 1024, 1000, 0, 255, 1);
+                generator->CreateFaultFormation(2048, 2048, 1000, 0, 255, 1);
                 terrain = std::move(generator);
                 break;
-            }
+            } // 2048 , 4096 , 8192
             
         case Heightmap::MidpointDisplacement:
             {
                 auto generator = std::make_unique<MidpointDisplacement>();
-                generator->CreateMidpointDisplacement(std::pow(2, 10) + 1, 0, 255, 1, 0.5);
+                generator->CreateMidpointDisplacement(std::pow(2, 11) + 1, 0, 255, 1, 0.5);
                 terrain = std::move(generator);
                 break;
             }
         case Heightmap::PerlinNoise:
             {
                 auto generator = std::make_unique<PerlinNoiseTerrain>();
-                generator->CreatePerlinNoise(1024, 1024, 0, 255, 1, 0.005);
+                generator->CreatePerlinNoise(2048, 2048, 0, 255, 1, 0.005);
                 terrain = std::move(generator);
                 break;
             }
