@@ -63,15 +63,13 @@ class Patch{
             }
         }
 
-        void generate_lod_vertices(std::vector<float>& heights,unsigned int width){
+        void generate_lod_vertices(std::vector<float>& heights,unsigned int width,unsigned int height){
 
             for (int k=0;k<1;++k){
                 int step = lodSteps[k];
                 int resolution = (32 / step) + 1;  // 33, 17, ou 9
 
                 //lod[k].vertices.resize(resolution*resolution*3);
-
-                //std::cout << "resolution : " << resolution << std::endl;
                 
                 for (int localY = 0; localY < resolution; localY++) {
                     for (int localX = 0; localX < resolution; localX++) {
@@ -79,7 +77,10 @@ class Patch{
                         int worldX = patch_x * 32 + localX;
                         int worldZ = patch_z * 32 + localY;
                         
-                        //std::cout << "patch[" << patch_x << patch_z << "] wordlz:" << worldZ << " width:" << width << " worldx:"  << worldX << " =" << worldZ * width + worldX << std::endl;
+                        if (worldZ * width + worldX > heights.size() || worldZ * width + worldX < heights.size()){
+                            
+                        }
+
                         float h = heights[worldZ * width + worldX];
                         
                         lod[k].vertices.push_back((float)worldX/xzfactor);
@@ -117,8 +118,6 @@ class Patch{
 
         void render(){
             glBindVertexArray(vao);
-
-            std::cout << "draw patch" << get_patch_x() << "," << get_patch_z() << " , vbo:" << vbo << " vao:" << vao << " ebo:"<< ebo << std::endl;
             glDrawElements(GL_TRIANGLES, lod[0].indices.size(), GL_UNSIGNED_INT, 0);
         }
 

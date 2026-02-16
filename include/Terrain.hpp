@@ -97,6 +97,8 @@ public:
     void renderer();
     void renderer_lod();
 
+    void create_patches();
+
     /**
      * @brief Retourne la height au point (i,j)
      * @param i l'indice de la ligne

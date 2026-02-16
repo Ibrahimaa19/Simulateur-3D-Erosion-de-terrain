@@ -31,12 +31,16 @@ void Terrain::load_terrain (const char* image_path,float yfactor,float xzfactor)
 
     stbi_image_free(image);
 
+    create_patches();
+
+}
+
+void Terrain::create_patches(){
     for(int i=0;i<32;++i){
         for(int j=0;j<32;++j){
             this->patches[i][j].set_patch(i,j,xzfactor);
         }
     }
-
 }
 
 void Terrain::load_vectices(){

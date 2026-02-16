@@ -32,6 +32,8 @@ void PerlinNoiseTerrain::CreatePerlinNoise(int width, int height,
     InitPermutation();
     CreatePerlinNoiseInternal(minHeight, maxHeight);
     Normalize();
+
+    create_patches();
 }
 
 void PerlinNoiseTerrain::CreatePerlinNoiseInternal(float minH, float maxH)

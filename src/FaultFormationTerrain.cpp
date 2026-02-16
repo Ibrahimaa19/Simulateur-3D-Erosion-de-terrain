@@ -23,6 +23,8 @@ void FaultFormationTerrain::CreateFaultFormation(int width, int height, int iter
     CreateFaultFormationInternal(iterations, minHeight, maxHeight, applyFilter, filter);
 
     Normalize();
+    
+    create_patches();
 }
 
 bool FaultFormationTerrain::TerrainPoint::IsEqual(TerrainPoint& p) const
