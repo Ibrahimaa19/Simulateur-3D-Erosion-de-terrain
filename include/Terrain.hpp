@@ -95,6 +95,7 @@ public:
      * @brief Dessine les triangles avec les données du terrain
     */
     void renderer();
+    void renderer_lod();
 
     /**
      * @brief Retourne la height au point (i,j)

@@ -103,7 +103,7 @@ void TerrainApp::InitScene()
        perlin->CreatePerlinNoise(512, 512, 0, 100); 
     }
 
-    mTerrain->setup_terrain_lod(mVAO, mVBO, mIBO);
+    //mTerrain->setup_terrain_lod(mVAO, mVBO, mIBO);
 
     mModel = glm::mat4(1.0f);
     mView = mCamera.GetViewMatrix();
@@ -185,7 +185,7 @@ void TerrainApp::GenerateTerrainFromGui()
     }
 
     mShader->Use();
-    mTerrain->setup_terrain(mVAO, mVBO, mIBO);
+    mTerrain->setup_terrain_lod(mVAO, mVBO, mIBO);
     mThermalErosion.loadTerrainInfo(mTerrain);
 }
 
@@ -291,7 +291,7 @@ void TerrainApp::RenderScene()
     mShader->SetFloat("gMinHeight", mTerrain->get_min_height());
     
     glBindVertexArray(mVAO);
-    mTerrain->renderer(); 
+    mTerrain->renderer_lod(); 
 }
 
 void TerrainApp::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
