@@ -8,7 +8,10 @@
 #include <GL/glew.h>
 #include <fstream>
 
+#include "Patch.hpp"
 #include "stb_image.hpp"
+
+
 
 class Terrain{ 
 protected:
@@ -31,6 +34,11 @@ protected:
 	std::vector<float> vertices;
 	std::vector<unsigned int> indices;
 
+    std::vector<float> vertices_lod[4];
+	std::vector<unsigned int> indices_lod[3];
+    int lodSteps[4] = {2,4,6,8};
+    Patch patches[32][32];
+
     /**
      * @brief Met à jours le vecteur vertices, en fonction des valeurs dans data
      * 
@@ -40,6 +48,7 @@ protected:
      * C'est à dire, si x est compris en [0; borderSize] ou [width-borderSize;width] ou si, z est compris entre [0; borderSize] ou [height-borderSize;height]
      */
     void load_vectices();
+    void load_vectices_lod();
 
     /**
      * @brief Créer un vecteur d'indices représentant les triangles à afficher.
@@ -50,6 +59,7 @@ protected:
      * Alors le premier carré sera T(0,0) T(0,1) T(1,0) T(1,1), donc deux triangles seront générer avec comme indice de sommets : [T(0,0);T(1,0);T(0,1)] et [T(1,0);T(0,0);T(1,1)] 
      */
     void load_incides();
+    void load_incides_lod();
 
 
 public:
@@ -79,6 +89,7 @@ public:
      * @param EBO le element buffer object, les triangles a afficher
      */
     void setup_terrain(GLuint &VAO, GLuint &VBO, GLuint &EBO);
+    void setup_terrain_lod(GLuint &VAO, GLuint &VBO, GLuint &EBO);
 
     /**
      * @brief Dessine les triangles avec les données du terrain

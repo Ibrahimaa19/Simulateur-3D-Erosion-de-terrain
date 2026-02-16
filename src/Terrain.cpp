@@ -30,6 +30,14 @@ void Terrain::load_terrain (const char* image_path,float yfactor,float xzfactor)
     this->min_height = *std::min_element(data.begin(),data.end());
 
     stbi_image_free(image);
+
+    for(int i=0;i<32;++i){
+        for(int j=0;j<32;++j){
+            this->patches[i][j].set_patch(i,j);
+            //std::cout << patches[i][j].get_patch_x() << " , " << patches[i][j].get_patch_z() << std::endl;
+        }
+    }
+
 }
 
 void Terrain::load_vectices(){
@@ -75,6 +83,78 @@ void Terrain::load_incides(){
         }
     }
 }
+
+
+void Terrain::load_vectices_lod(){
+    
+    for(int i =0;i<32;++i){
+        for(int j =0;j<32;++j){
+            patches[i][j].generate_lod_vertices(data,width);
+        }
+    }
+
+}
+
+void Terrain::load_incides_lod(){
+    // LOD0
+    for (int y = 0; y < 32; y++) {
+        for (int x = 0; x < 32; x++) {
+            int topLeft = y * 33 + x;
+            int topRight = y * 33 + x + 1;
+            int bottomLeft = (y+1) * 33 + x;
+            int bottomRight = (y+1) * 33 + x + 1;
+            
+            indices_lod[0].push_back(topLeft);
+            indices_lod[0].push_back(bottomLeft);
+            indices_lod[0].push_back(topRight);
+            indices_lod[0].push_back(topRight);
+            indices_lod[0].push_back(bottomLeft);
+            indices_lod[0].push_back(bottomRight);
+        }
+    }
+    
+    // LOD1 (17×17)
+    for (int y = 0; y < 16; y++) {
+        for (int x = 0; x < 16; x++) {
+            int topLeft = y * 17 + x;
+            int topRight = y * 17 + x + 1;
+            int bottomLeft = (y+1) * 17 + x;
+            int bottomRight = (y+1) * 17 + x + 1;
+            
+            indices_lod[1].push_back(topLeft);
+            indices_lod[1].push_back(bottomLeft);
+            indices_lod[1].push_back(topRight);
+            indices_lod[1].push_back(topRight);
+            indices_lod[1].push_back(bottomLeft);
+            indices_lod[1].push_back(bottomRight);
+        }
+    }
+    
+    // LOD2 (9×9)
+    for (int y = 0; y < 8; y++) {
+        for (int x = 0; x < 8; x++) {
+            int topLeft = y * 9 + x;
+            int topRight = y * 9 + x + 1;
+            int bottomLeft = (y+1) * 9 + x;
+            int bottomRight = (y+1) * 9 + x + 1;
+            
+            indices_lod[2].push_back(topLeft);
+            indices_lod[2].push_back(bottomLeft);
+            indices_lod[2].push_back(topRight);
+            indices_lod[2].push_back(topRight);
+            indices_lod[2].push_back(bottomLeft);
+            indices_lod[2].push_back(bottomRight);
+        }
+    }
+    
+}
+
+void Terrain::setup_terrain_lod(GLuint &VAO, GLuint &VBO, GLuint &EBO){
+    this->load_incides_lod();
+	//this->load_vectices_lod();
+    
+}
+
 
 void Terrain::setup_terrain(GLuint &VAO, GLuint &VBO, GLuint &EBO){
     this->load_incides();

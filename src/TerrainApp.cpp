@@ -103,7 +103,7 @@ void TerrainApp::InitScene()
        perlin->CreatePerlinNoise(512, 512, 0, 100); 
     }
 
-    mTerrain->setup_terrain(mVAO, mVBO, mIBO);
+    mTerrain->setup_terrain_lod(mVAO, mVBO, mIBO);
 
     mModel = glm::mat4(1.0f);
     mView = mCamera.GetViewMatrix();
