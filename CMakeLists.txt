@@ -52,6 +52,7 @@ set(SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/src/Shader.cpp
     ${PROJECT_SOURCE_DIR}/src/Terrain.cpp
     ${PROJECT_SOURCE_DIR}/src/ThermalErosion.cpp
+    ${PROJECT_SOURCE_DIR}/src/HydraulicErosion.cpp
     ${PROJECT_SOURCE_DIR}/src/Gui.cpp
     ${PROJECT_SOURCE_DIR}/src/TerrainApp.cpp
     ${PROJECT_SOURCE_DIR}/src/FaultFormationTerrain.cpp

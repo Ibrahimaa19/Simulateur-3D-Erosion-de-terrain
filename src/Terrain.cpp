@@ -140,6 +140,13 @@ int Terrain::get_vertices_size() const{
     return this->vertices.size();
 }
 
+void Terrain::update_min_max()
+{
+    if (data.empty()) return;
+    min_height = *std::min_element(data.begin(), data.end());
+    max_height = *std::max_element(data.begin(), data.end());
+}
+
 void Terrain::update_vertices_gpu(GLuint VBO)
 {
     load_vectices();

@@ -27,6 +27,7 @@ public:
         m_data   = terrain->get_data();
         m_height = terrain->get_terrain_height();
         m_width  = terrain->get_terrain_width();
+        ensureOutflowBuffer();
     }
     
     /**
@@ -69,6 +70,12 @@ private:
 
     /** Taux de transfert de matière */
     float transferRate = 0.f;
+
+    /** Buffer des flux sortants (8 directions × W × H), réutilisé à chaque step */
+    std::vector<float> m_outflow;
+
+    /** Alloue ou redimensionne le buffer de flux selon les dimensions du terrain */
+    void ensureOutflowBuffer();
 
     /**
      * @brief Retourne la hauteur au point (i, j).

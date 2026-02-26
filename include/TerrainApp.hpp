@@ -15,6 +15,7 @@
 #include "MidpointDisplacement.hpp"
 #include "PerlinNoiseTerrain.hpp" 
 #include "ThermalErosion.hpp"
+#include "HydraulicErosion.hpp"
 
 #include "Gui.hpp"
 
@@ -103,7 +104,8 @@ private:
     std::unique_ptr<Shader> mShader;  ///< Smart pointer to the shader program
 
     std::unique_ptr<Terrain> mTerrain; ///< Smart pointer to the Terrain object (Polymorphic)
-    ThermalErosion mThermalErosion;    ///< Objet gérant l’érosion thermique appliquée au terrain courant
+    ThermalErosion mThermalErosion;
+    HydraulicErosion mHydraulicErosion;
 
     GLuint mVAO;                      ///< Vertex Array Object
     GLuint mVBO;                      ///< Vertex Buffer Object

@@ -1,5 +1,22 @@
 #include "ThermalErosion.hpp"
 #include <iostream>
+#include <algorithm>
+
+// Indices des directions (Moore 8-voisins)
+// k=0: up (-1,0), 1: down (1,0), 2: left (0,-1), 3: right (0,1)
+// k=4: up-left, 5: up-right, 6: down-left, 7: down-right
+static const int DI[8] = {-1, 1, 0, 0, -1, -1, 1, 1};
+static const int DJ[8] = {0, 0, -1, 1, -1, 1, -1, 1};
+// Direction opposée : voisin en k envoie vers nous via OPPOSITE[k]
+static const int OPPOSITE[8] = {1, 0, 3, 2, 7, 6, 5, 4};
+
+void ThermalErosion::ensureOutflowBuffer()
+{
+    const size_t size = static_cast<size_t>(8) * m_width * m_height;
+    if (m_outflow.size() != size) {
+        m_outflow.resize(size, 0.0f);
+    }
+}
 
 int ThermalErosion::step()
 {
@@ -11,75 +28,66 @@ int ThermalErosion::step()
         return 0;
     }
 
-    std::vector<float> data = *m_data;// Copie
-        
+    ensureOutflowBuffer();
+    std::fill(m_outflow.begin(), m_outflow.end(), 0.0f);
+
     int changes = 0;
 
-    // Boucle sur le terrain
+    // Phase 1 : calcul des flux sortants (chaque cellule écrit uniquement dans son propre bloc)
     for (int i = 1; i < H - 1; i++) {
         for (int j = 1; j < W - 1; j++) {
+            const int idx = i * W + j;
+            float currentHeight = (*m_data)[idx];
 
-            float currentHeight = (*m_data)[i * W + j];
-
-            // Hauteurs des 8 voisins (Moore neighborhood)
-            float diffUp         = currentHeight - (*m_data)[(i - 1) * W + j];
-            float diffDown       = currentHeight - (*m_data)[(i + 1) * W + j];
-            float diffLeft       = currentHeight - (*m_data)[i * W + (j - 1)];
-            float diffRight      = currentHeight - (*m_data)[i * W + (j + 1)];
-            float diffUpLeft     = currentHeight - (*m_data)[(i - 1) * W + (j - 1)];
-            float diffUpRight    = currentHeight - (*m_data)[(i - 1) * W + (j + 1)];
-            float diffDownLeft   = currentHeight - (*m_data)[(i + 1) * W + (j - 1)];
-            float diffDownRight  = currentHeight - (*m_data)[(i + 1) * W + (j + 1)];
-
-            // Stockage des différences et indices des voisins
-            float dist[8] = { diffUp, diffDown, diffLeft, diffRight,
-                              diffUpLeft, diffUpRight, diffDownLeft, diffDownRight };
-            
-            int neighbors[8][2] = { 
-                {-1, 0}, {1, 0}, {0, -1}, {0, 1},     // 4 voisins directs
-                {-1, -1}, {-1, 1}, {1, -1}, {1, 1}    // 4 voisins diagonaux
-            };
-
+            float dist[8];
             float totalDiff = 0.0f;
             int validNeighbors = 0;
 
-            // Accumulation des différences valides
             for (int k = 0; k < 8; k++) {
+                int ni = i + DI[k], nj = j + DJ[k];
+                dist[k] = currentHeight - (*m_data)[ni * W + nj];
                 if (dist[k] > talusAngle) {
                     totalDiff += dist[k];
                     validNeighbors++;
                 }
             }
 
-            // Érosion
-            if (totalDiff > 0 && validNeighbors > 0) {
-                
+            if (totalDiff > 0.0f && validNeighbors > 0) {
                 float materialToMove = transferRate * (totalDiff / validNeighbors);
                 materialToMove = std::min(materialToMove, currentHeight * transferRate);
 
-                // On retire la matière de la cellule actuelle
-                data[i * W + j] -= materialToMove;
-
-                // Redistribution aux voisins
                 for (int k = 0; k < 8; k++) {
                     if (dist[k] > talusAngle) {
                         float proportion = dist[k] / totalDiff;
-                        float moveAmount = materialToMove * proportion;
-
-                        int ni = i + neighbors[k][0];
-                        int nj = j + neighbors[k][1];
-
-                        data[ni * W + nj] += moveAmount;
+                        m_outflow[idx * 8 + k] = materialToMove * proportion;
                     }
                 }
-
                 changes++;
             }
         }
     }
 
-    *m_data = data;
+    // Phase 2 : application des deltas (chaque cellule lit les flux voisins, écrit sa propre hauteur)
+    for (int i = 1; i < H - 1; i++) {
+        for (int j = 1; j < W - 1; j++) {
+            const int idx = i * W + j;
 
-    //std::cout << "Cells modified: " << changes << std::endl;
+            float totalOut = 0.0f;
+            for (int k = 0; k < 8; k++) {
+                totalOut += m_outflow[idx * 8 + k];
+            }
+
+            float totalIn = 0.0f;
+            for (int k = 0; k < 8; k++) {
+                int ni = i + DI[k], nj = j + DJ[k];
+                int nidx = ni * W + nj;
+                int ok = OPPOSITE[k];
+                totalIn += m_outflow[nidx * 8 + ok];
+            }
+
+            (*m_data)[idx] += totalIn - totalOut;
+        }
+    }
+
     return changes;
 }

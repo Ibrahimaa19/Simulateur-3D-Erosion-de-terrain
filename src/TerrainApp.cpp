@@ -1,4 +1,5 @@
 #include "TerrainApp.hpp"
+#include <algorithm>
 #include <string.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -7,7 +8,7 @@
 
 #include "FaultFormationTerrain.hpp"
 #include "MidpointDisplacement.hpp"
-#include "PerlinNoiseTerrain.hpp" 
+#include "PerlinNoiseTerrain.hpp"
 
 void TerrainApp::setCameraSpeed(float value){
     mCameraSpeed = value;
@@ -208,6 +209,8 @@ void TerrainApp::Run()
             mGui.thermalCellsModified = 0; 
             mGui.thermalRunning = false;
             thermalEnabled = false;
+            mGui.hydroRunning = false;
+            mGui.hydroDropletsProcessed = 0;
 
             glfwSetInputMode(mWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         }
@@ -216,6 +219,8 @@ void TerrainApp::Run()
             mGui.resetSimulation = false;
             thermalEnabled = false;
             mGui.thermalRunning = false;
+            mGui.hydroRunning = false;
+            mGui.hydroDropletsProcessed = 0;
             stepCounter = 0;
             mGui.thermalCurrentStep = 0;
             mGui.thermalCellsModified = 0; 
@@ -243,11 +248,22 @@ void TerrainApp::Run()
             {
                 int nbChanges = mThermalErosion.step();
                 mGui.thermalCellsModified = nbChanges; 
-                // ------------------------------------------------------------
-                
                 stepCounter++;
                 mGui.thermalCurrentStep = stepCounter;
+                mTerrain->update_vertices_gpu(mVBO);
+            }
 
+            if (mGui.hydroRunning && mTerrain)
+            {
+                mHydraulicErosion.setParams(mGui.hydroIterations, mGui.hydroRain,
+                    mGui.hydroErosionRate, mGui.hydroDepositRate, mGui.hydroEvaporation);
+                mHydraulicErosion.setBatchSize(std::max(1, mGui.hydroBatchSize));
+                if (mGui.hydroDropletsProcessed == 0)
+                    mHydraulicErosion.setSeed(static_cast<unsigned int>(mGui.hydroSeed));
+                int batchSize = std::max(1, mGui.hydroBatchSize);
+                int nb = mHydraulicErosion.applyBatch(*mTerrain, batchSize);
+                mGui.hydroDropletsProcessed += nb;
+                mTerrain->update_min_max();
                 mTerrain->update_vertices_gpu(mVBO);
             }
 
@@ -318,11 +334,12 @@ void TerrainApp::KeyCallback(GLFWwindow* window, int key, int scancode, int acti
             case GLFW_KEY_F:{
                 app->thermalEnabled = !app->thermalEnabled;
                 app->mGui.thermalRunning = app->thermalEnabled;
-                
-                if (app->thermalEnabled) {
-                    std::cout << "Thermal erosion STARTED" << std::endl;
-                } else {
-                    std::cout << "Thermal erosion PAUSED" << std::endl;
+                break;
+            }
+            case GLFW_KEY_H:{
+                app->mGui.hydroRunning = !app->mGui.hydroRunning;
+                if (app->mGui.hydroRunning && app->mGui.hydroDropletsProcessed == 0) {
+                    std::cout << "Erosion hydraulique DEMARREE (touche H)" << std::endl;
                 }
                 break;
             }

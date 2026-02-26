@@ -83,8 +83,9 @@ public:
      * @brief Retourne la height au point (i,j)
      * @param i l'indice de la ligne
      * @param j l'indice de la colonne
+     * @return Hauteur (float) à la position (i,j)
     */
-    int get_height(int i, int j) const{
+    float get_height(int i, int j) const{
         return data[j * width + i];
     };
 
@@ -158,6 +159,11 @@ public:
     */
     void update_vertices();
     const std::vector<float>& get_vertices() const { return vertices; }
+
+    /**
+     * @brief Recalcule min_height et max_height à partir des données (après érosion).
+     */
+    void update_min_max();
 
     /**
      * @brief Met à jour les sommets du terrain sur le GPU.
