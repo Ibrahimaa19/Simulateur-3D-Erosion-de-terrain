@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <GL/glew.h>
 #include <fstream>
+#include <memory>
+#include <glm/glm.hpp>
 
 #include "Patch.hpp"
 #include "stb_image.hpp"
@@ -37,7 +39,8 @@ protected:
     std::vector<float> vertices_lod[4];
 	std::vector<unsigned int> indices_lod[3];
     int lodSteps[4] = {2,4,6,8};
-    Patch patches[32][32];
+    //Patch** patches;
+    std::vector<std::unique_ptr<Patch>> patches;
 
     /**
      * @brief Met à jours le vecteur vertices, en fonction des valeurs dans data
@@ -95,7 +98,7 @@ public:
      * @brief Dessine les triangles avec les données du terrain
     */
     void renderer();
-    void renderer_lod();
+    void renderer_lod(const glm::vec3& camera);
 
     void create_patches();
 
@@ -194,6 +197,7 @@ public:
      * @param VBO Identifiant du Vertex Buffer Object OpenGL à mettre à jour.
      */
     void update_vertices_gpu(GLuint VBO);
+    void update_vertices_gpu_lod();
 
 };
 

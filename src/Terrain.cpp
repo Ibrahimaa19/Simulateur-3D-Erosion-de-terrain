@@ -36,9 +36,15 @@ void Terrain::load_terrain (const char* image_path,float yfactor,float xzfactor)
 }
 
 void Terrain::create_patches(){
-    for(int i=0;i<32;++i){
-        for(int j=0;j<32;++j){
-            this->patches[i][j].set_patch(i,j,xzfactor);
+    int nb_patch_x = std::ceil(width/32);
+    int nb_patch_z = std::ceil(height/32);
+
+    std::cout << "nb_patch_x : "<< nb_patch_x << " ,nb_patch_z : " << nb_patch_z << std::endl;
+    for(int i=0;i<nb_patch_x;++i){
+        for(int j=0;j<nb_patch_z;++j){
+            std::unique_ptr<Patch> p = std::make_unique<Patch>();
+            p->set_patch(i,j,xzfactor);
+            this->patches.push_back(std::move(p));
         }
     }
 }
@@ -165,83 +171,35 @@ void Terrain::update_vertices_gpu(GLuint VBO)
 
 void Terrain::load_vectices_lod(){
 
-    for(int i =0;i<32;++i){
-        for(int j =0;j<32;++j){
-            patches[i][j].generate_lod_vertices(data,width);
-        }
+    for(int i =0;i<patches.size();++i){
+        patches[i]->generate_lod_vertices(data,width,height);
     }
-
 }
 
 void Terrain::load_incides_lod(){
-    
-    for (int y = 0; y < 32; y++) {
-        for (int x = 0; x < 32; x++) {
-            int topLeft = y * 33 + x;
-            int topRight = y * 33 + x + 1;
-            int bottomLeft = (y+1) * 33 + x;
-            int bottomRight = (y+1) * 33 + x + 1;
-            
-            indices_lod[0].push_back(topLeft);
-            indices_lod[0].push_back(bottomLeft);
-            indices_lod[0].push_back(topRight);
-            indices_lod[0].push_back(topRight);
-            indices_lod[0].push_back(bottomLeft);
-            indices_lod[0].push_back(bottomRight);
-        }
+    for(int i =0;i<patches.size();++i){
+        patches[i]->generate_lod_indices(data,width,height);
     }
-    
-    // LOD1 (17×17)
-    for (int y = 0; y < 16; y++) {
-        for (int x = 0; x < 16; x++) {
-            int topLeft = y * 17 + x;
-            int topRight = y * 17 + x + 1;
-            int bottomLeft = (y+1) * 17 + x;
-            int bottomRight = (y+1) * 17 + x + 1;
-            
-            indices_lod[1].push_back(topLeft);
-            indices_lod[1].push_back(bottomLeft);
-            indices_lod[1].push_back(topRight);
-            indices_lod[1].push_back(topRight);
-            indices_lod[1].push_back(bottomLeft);
-            indices_lod[1].push_back(bottomRight);
-        }
-    }
-    
-    // LOD2 (9×9)
-    for (int y = 0; y < 8; y++) {
-        for (int x = 0; x < 8; x++) {
-            int topLeft = y * 9 + x;
-            int topRight = y * 9 + x + 1;
-            int bottomLeft = (y+1) * 9 + x;
-            int bottomRight = (y+1) * 9 + x + 1;
-            
-            indices_lod[2].push_back(topLeft);
-            indices_lod[2].push_back(bottomLeft);
-            indices_lod[2].push_back(topRight);
-            indices_lod[2].push_back(topRight);
-            indices_lod[2].push_back(bottomLeft);
-            indices_lod[2].push_back(bottomRight);
-        }
-    }
-    
 }
 
 void Terrain::setup_terrain_lod(GLuint &VAO, GLuint &VBO, GLuint &EBO){
     this->load_incides_lod();
 	this->load_vectices_lod();
-    
-    for(int i=0;i<32;++i){
-        for(int j=0;j<32;++j){
-            this->patches[i][j].creerBuffersGL();
-        }
+
+    for(int i =0;i<patches.size();++i){
+        patches[i]->creerBuffersGL();
+    }    
+}
+
+void Terrain::renderer_lod(const glm::vec3& cameraPos){
+    for(int i =0;i<patches.size();++i){
+        patches[i]->render(cameraPos.x,cameraPos.z);
     }
 }
 
-void Terrain::renderer_lod(){
-    for(int i=0;i<32;++i){
-        for(int j=0;j<32;++j){
-            this->patches[i][j].render();
-        }
-    }
+
+void Terrain::update_vertices_gpu_lod()
+{
+    load_vectices_lod();
+    
 }

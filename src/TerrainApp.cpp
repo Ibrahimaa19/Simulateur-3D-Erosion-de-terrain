@@ -248,7 +248,8 @@ void TerrainApp::Run()
                 stepCounter++;
                 mGui.thermalCurrentStep = stepCounter;
 
-                mTerrain->update_vertices_gpu(mVBO);
+                //mTerrain->update_vertices_gpu(mVBO);
+                mTerrain->update_vertices_gpu_lod();
             }
 
             mGui.cameraPos = glm::vec3(glm::inverse(mView)[3]);
@@ -291,7 +292,8 @@ void TerrainApp::RenderScene()
     mShader->SetFloat("gMinHeight", mTerrain->get_min_height());
     
     glBindVertexArray(mVAO);
-    mTerrain->renderer_lod(); 
+    mTerrain->renderer_lod(mCamera.GetPosition());
+    std::cout << mCamera.GetPosition().x << "," << mCamera.GetPosition().y << "," << mCamera.GetPosition().z << std::endl;
 }
 
 void TerrainApp::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
