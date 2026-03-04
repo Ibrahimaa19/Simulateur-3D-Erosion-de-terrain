@@ -101,6 +101,7 @@ public:
     void renderer_lod(const glm::vec3& camera);
 
     void create_patches();
+    void correct_lod();
 
     /**
      * @brief Retourne la height au point (i,j)

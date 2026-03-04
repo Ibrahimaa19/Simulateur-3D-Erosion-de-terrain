@@ -47,6 +47,32 @@ void Terrain::create_patches(){
             this->patches.push_back(std::move(p));
         }
     }
+
+    int width = nb_patch_x*nb_patch_z;
+
+    for(int i=0;i<nb_patch_x;++i){
+        for(int j=0;j<nb_patch_z;++j){
+            int top = (i+1)*nb_patch_x + j;
+            int bot = (i-1)*nb_patch_x + j;
+            int right = (i)*nb_patch_x + (j+1);
+            int left = (i+1)*nb_patch_x + (j-1);
+            int cur = (i)*nb_patch_x + j;
+
+            if(top >=0 && top < width)
+                this->patches[cur]->addNeightbour(patches[top].get());
+
+            if(bot >=0 && bot < width)
+                this->patches[cur]->addNeightbour(patches[bot].get());
+
+            if(right >=0 && right < width)
+                this->patches[cur]->addNeightbour(patches[right].get());
+
+            if(left >=0 && left < width)
+                this->patches[cur]->addNeightbour(patches[left].get());
+
+        }
+    }
+
 }
 
 void Terrain::load_vectices(){
@@ -191,6 +217,46 @@ void Terrain::setup_terrain_lod(GLuint &VAO, GLuint &VBO, GLuint &EBO){
     }    
 }
 
+/*
+    Verifie que deux patches avec des lod différents, ont une un niveau de différence maximum, utile dans le cadres des skirts
+*/
+void Terrain::correct_lod(){
+    bool changed;
+    int temp = 0;
+
+    do
+    {
+        changed = false;
+
+        for (int i =0;i<patches.size();++i)
+        {
+
+            for (int j =0;j<patches[i]->getNeightbour().size();++j)
+            {
+
+                if (patches[i]->getLodLevel() > patches[i]->getNeightbourLodLevel(j) + 1)
+                {
+                    temp = patches[i]->getNeightbourLodLevel(j) + 1;
+                    patches[i]->setLodLevel(temp);
+                    changed = true;
+                }
+
+                if (patches[i]->getNeightbourLodLevel(j) > patches[i]->getLodLevel() + 1)
+                {
+                    temp = patches[i]->getLodLevel() + 1;
+                    patches[i]->getNeightbour()[j]->setLodLevel(temp);
+                    changed = true;
+                }
+            }
+        }
+
+    } while(changed);
+
+}
+
+/*
+    On affiche le terrain en prenant en compte les différents niveau de lod pour chaque patches
+*/
 void Terrain::renderer_lod(const glm::vec3& cameraPos){
     int temp = 0;
     int index = 0;
@@ -200,6 +266,8 @@ void Terrain::renderer_lod(const glm::vec3& cameraPos){
         temp = patches[i]->chooseLod(cameraPos.x,cameraPos.z);
         patches[i]->setLodLevel(temp);
     }
+
+    correct_lod();
 
     for(int i =0;i<patches.size();++i){
         patches[i]->render();

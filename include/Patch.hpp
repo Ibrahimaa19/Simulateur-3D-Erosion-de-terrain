@@ -21,6 +21,8 @@ class Patch{
         GLuint ebo[5];
         GLuint vao[5];
         int lodLevel;
+
+        std::vector<Patch*> neightbour;
     
     public:
 
@@ -30,6 +32,18 @@ class Patch{
             this->xzfactor = xz;
             this->nb_patch_x = nb_p_x;
             this->nb_patch_z = nb_p_z;
+        }
+
+        void addNeightbour(Patch* p){
+            neightbour.push_back(p);
+        }
+
+        std::vector<Patch*> getNeightbour(){
+            return this->neightbour;
+        }
+
+        int getNeightbourLodLevel(int i){
+            return this->neightbour[i]->lodLevel;
         }
 
         unsigned int get_patch_x(){
@@ -80,7 +94,6 @@ class Patch{
                 lod[k].vertices.clear();
                 int step = lodSteps[k];
 
-                // résolution interne (ex: 33 pour step=1)
                 int innerResolution = (32 / step) + 1;
 
                 // résolution étendue (+2 pour skirt)
@@ -99,11 +112,11 @@ class Patch{
                         int clampedX = std::clamp(innerX, 0, innerResolution - 1);
                         int clampedY = std::clamp(innerY, 0, innerResolution - 1);
 
-                        // Position monde correcte (patch de 32 unités)
+                        // Position monde correcte (patch de 32)
                         int worldX = patch_x * 32 + innerX * step;
                         int worldZ = patch_z * 32 + innerY * step;
 
-                        // lecture heightmap
+                        // lecture dans le vecteur heightmap
                         int sampleX = patch_x * 32 + clampedX * step;
                         int sampleZ = patch_z * 32 + clampedY * step;
 
