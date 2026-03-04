@@ -14,18 +14,22 @@ class Patch{
         float xzfactor;
         unsigned int patch_size = 32;
         unsigned int patch_x,patch_z;
+        unsigned int nb_patch_x,nb_patch_z;
         Lod lod[5];
-        int lodSteps[5] = {1,4,8,16,32};
+        int lodSteps[5] = {1,2,4,8,16};
         GLuint vbo[5];  
         GLuint ebo[5];
         GLuint vao[5];
+        int lodLevel;
     
     public:
 
-        void set_patch(unsigned int x,unsigned int z,float xz){
+        void set_patch(unsigned int x,unsigned int z,float xz,unsigned int nb_p_x,unsigned int nb_p_z){
             this->patch_x = x;
             this->patch_z = z;
             this->xzfactor = xz;
+            this->nb_patch_x = nb_p_x;
+            this->nb_patch_z = nb_p_z;
         }
 
         unsigned int get_patch_x(){
@@ -39,7 +43,6 @@ class Patch{
         GLuint get_vbo(int lod){
             return this->vbo[lod];
         }
-
 
 
         void creerBuffersGL() {
@@ -70,29 +73,54 @@ class Patch{
         }
 
         void generate_lod_vertices(std::vector<float>& heights,unsigned int width,unsigned int height){
+            float heightValue = 0.f;
+            const float skirtDepth = 0.01f;
 
             for (int k=0;k<5;++k){
                 lod[k].vertices.clear();
                 int step = lodSteps[k];
-                int resolution = (32 / step) + 1;  // 33, 17, ou 9
+
+                // résolution interne (ex: 33 pour step=1)
+                int innerResolution = (32 / step) + 1;
+
+                // résolution étendue (+2 pour skirt)
+                int resolution = innerResolution + 2;
 
                 lod[k].vertices.reserve(resolution*resolution*3);
                 
                 for (int localY = 0; localY < resolution; localY++) {
                     for (int localX = 0; localX < resolution; localX++) {
-                        // Position globale
-                        int worldX = patch_x * 32 + localX*step;
-                        int worldZ = patch_z * 32 + localY*step;
 
-                        lod[k].vertices.push_back((float)worldX/xzfactor);
+                        // Coordonnées locales internes
+                        int innerX = localX - 1;
+                        int innerY = localY - 1;
 
-                        if (worldX >= 0 && worldX < width && worldZ >= 0 && worldZ < height){
-                            float h = heights[worldZ * width + worldX];
-                            lod[k].vertices.push_back(h);
-                        }else{
-                            lod[k].vertices.push_back(0.f);
+                        // Clamp pour rester sur le bord interne
+                        int clampedX = std::clamp(innerX, 0, innerResolution - 1);
+                        int clampedY = std::clamp(innerY, 0, innerResolution - 1);
+
+                        // Position monde correcte (patch de 32 unités)
+                        int worldX = patch_x * 32 + innerX * step;
+                        int worldZ = patch_z * 32 + innerY * step;
+
+                        // lecture heightmap
+                        int sampleX = patch_x * 32 + clampedX * step;
+                        int sampleZ = patch_z * 32 + clampedY * step;
+
+                        sampleX = std::clamp(sampleX, 0, (int)width - 1);
+                        sampleZ = std::clamp(sampleZ, 0, (int)height - 1);
+
+                        heightValue = heights[sampleZ * width + sampleX];
+
+
+                        if (localX == 0 || localX == resolution - 1 || localY == 0 || localY == resolution - 1){
+
+                            heightValue -= skirtDepth;
                         }
                         
+                
+                        lod[k].vertices.push_back((float)worldX/xzfactor);
+                        lod[k].vertices.push_back(heightValue);
                         lod[k].vertices.push_back(((float)worldZ/xzfactor));
                     }
                 }
@@ -101,125 +129,22 @@ class Patch{
 
         void generate_lod_indices(std::vector<float>& heights,unsigned int width,unsigned int height){
 
-            bool stitchRight = false;
-            bool stitchLeft = false;
-            bool stitchBot = false;
-            bool stitchTop = false;
             for (int k=0;k<5;++k){
                 lod[k].indices.clear();
 
                 int step = lodSteps[k];
-                int resolution = (32 / step) + 1;  // 33, 17, ou 9
+                
+
+                int innerResolution = (32 / step) + 1;
+                int resolution = innerResolution + 2;
+
                 int cellsPerRow = resolution - 1;
 
                 lod[k].indices.reserve(resolution*resolution*6);
 
-                
                 for (int y = 0; y < cellsPerRow; y++) {
                     for (int x = 0; x < cellsPerRow; x++) {
-                        
-                        if (stitchRight && x == cellsPerRow-1){
-                            if (y % 2 == 0)
-                            {
-                                int topLeft     = y * resolution + x;
-                                int bottomLeft  = (y+2) * resolution + x;
-                                int midLeft     = (y+1) * resolution + x;
 
-                                int topRight    = y * resolution + x + 1;
-                                int bottomRight = (y+2) * resolution + x + 1;
-
-                                // Grand triangle 1
-                                lod[k].indices.push_back(topLeft);
-                                lod[k].indices.push_back(midLeft);
-                                lod[k].indices.push_back(topRight);
-
-                                // Grand triangle 2
-                                lod[k].indices.push_back(midLeft);
-                                lod[k].indices.push_back(bottomRight);
-                                lod[k].indices.push_back(topRight);
-
-                                // Grand triangle 3
-                                lod[k].indices.push_back(midLeft);
-                                lod[k].indices.push_back(bottomLeft);
-                                lod[k].indices.push_back(bottomRight);
-                            }
-                            continue;
-                        }
-                        
-                        if(stitchLeft && x ==0){
-                            if (y % 2 == 0 && y + 2 <= cellsPerRow)
-                            {
-                                int topRight     = y * resolution + x + 1;
-                                int midRight     = (y+1) * resolution + x + 1;
-                                int bottomRight  = (y+2) * resolution + x + 1;
-
-                                int topLeft      = y * resolution + x;
-                                int bottomLeft   = (y+2) * resolution + x;
-
-                                lod[k].indices.push_back(topLeft);
-                                lod[k].indices.push_back(midRight);
-                                lod[k].indices.push_back(topRight);
-
-                                lod[k].indices.push_back(topLeft);
-                                lod[k].indices.push_back(bottomLeft);
-                                lod[k].indices.push_back(midRight);
-
-                                lod[k].indices.push_back(midRight);
-                                lod[k].indices.push_back(bottomLeft);
-                                lod[k].indices.push_back(bottomRight);
-                            }
-                            continue;
-                        }
-
-                        if (stitchTop && y == cellsPerRow - 1){
-                            if (x % 2 == 0 && x + 2 <= cellsPerRow)
-                            {
-                                int leftTop     = y * resolution + x;
-                                int midTop      = y * resolution + (x+1);
-                                int rightTop    = y * resolution + (x+2);
-
-                                int leftBottom  = (y+1) * resolution + x;
-                                int rightBottom = (y+1) * resolution + (x+2);
-
-                                lod[k].indices.push_back(leftTop);
-                                lod[k].indices.push_back(leftBottom);
-                                lod[k].indices.push_back(midTop);
-
-                                lod[k].indices.push_back(midTop);
-                                lod[k].indices.push_back(leftBottom);
-                                lod[k].indices.push_back(rightBottom);
-
-                                lod[k].indices.push_back(midTop);
-                                lod[k].indices.push_back(rightBottom);
-                                lod[k].indices.push_back(rightTop);
-                            }
-                            continue;
-                        }
-
-                        if (stitchBot && y==0){
-                            if (x % 2 == 0 && x + 2 <= cellsPerRow)
-                            {
-                                int leftBottom   = y * resolution + x;
-                                int midBottom    = y * resolution + (x+1);
-                                int rightBottom  = y * resolution + (x+2);
-
-                                int leftTop      = (y+1) * resolution + x;
-                                int rightTop     = (y+1) * resolution + (x+2);
-
-                                lod[k].indices.push_back(leftBottom);
-                                lod[k].indices.push_back(midBottom);
-                                lod[k].indices.push_back(leftTop);
-
-                                lod[k].indices.push_back(midBottom);
-                                lod[k].indices.push_back(rightTop);
-                                lod[k].indices.push_back(leftTop);
-
-                                lod[k].indices.push_back(midBottom);
-                                lod[k].indices.push_back(rightBottom);
-                                lod[k].indices.push_back(rightTop);
-                            }
-                        }
-                        
                         int topLeft = y * resolution + x;
                         int topRight = y * resolution + x + 1;
                         int bottomLeft = (y+1) * resolution + x;
@@ -240,16 +165,19 @@ class Patch{
             }
         }
 
-
-
-        void render(float cameraX,float cameraZ){
-            int l = chooseLod(cameraX,cameraZ);
+        void render(){
+            int l = this->lodLevel;
             glBindVertexArray(vao[l]);
             glBindBuffer(GL_ARRAY_BUFFER, vbo[l]);
             glBufferSubData(GL_ARRAY_BUFFER,0,lod[l].vertices.size() * sizeof(float),lod[l].vertices.data());
 
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo[l]);            
+
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo[l]);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER,lod[l].indices.size() * sizeof(unsigned int),lod[l].indices.data(),GL_DYNAMIC_DRAW);
+
             glDrawElements(GL_TRIANGLES, lod[l].indices.size(), GL_UNSIGNED_INT, 0);
+
+            glBindVertexArray(0);
         }
 
         int chooseLod(float cameraPosX,float cameraPosZ){
@@ -269,6 +197,21 @@ class Patch{
             }else{
                 return 2;
             }
+        }
+
+        int getLodLevel(){
+            return this->lodLevel;
+        }
+
+        void setLodLevel(int l){
+            this->lodLevel = l;
+        }
+
+        int getNbPatchX(){
+            return this->nb_patch_x;
+        }
+        int getNbPatchZ(){
+            return this->nb_patch_z;
         }
 
 };

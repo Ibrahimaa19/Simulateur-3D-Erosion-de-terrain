@@ -293,7 +293,7 @@ void TerrainApp::RenderScene()
     
     glBindVertexArray(mVAO);
     mTerrain->renderer_lod(mCamera.GetPosition());
-    std::cout << mCamera.GetPosition().x << "," << mCamera.GetPosition().y << "," << mCamera.GetPosition().z << std::endl;
+    //std::cout << mCamera.GetPosition().x << "," << mCamera.GetPosition().y << "," << mCamera.GetPosition().z << std::endl;
 }
 
 void TerrainApp::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)

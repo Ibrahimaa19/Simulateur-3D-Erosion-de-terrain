@@ -43,7 +43,7 @@ void Terrain::create_patches(){
     for(int i=0;i<nb_patch_x;++i){
         for(int j=0;j<nb_patch_z;++j){
             std::unique_ptr<Patch> p = std::make_unique<Patch>();
-            p->set_patch(i,j,xzfactor);
+            p->set_patch(i,j,xzfactor,nb_patch_x,nb_patch_z);
             this->patches.push_back(std::move(p));
         }
     }
@@ -192,9 +192,19 @@ void Terrain::setup_terrain_lod(GLuint &VAO, GLuint &VBO, GLuint &EBO){
 }
 
 void Terrain::renderer_lod(const glm::vec3& cameraPos){
+    int temp = 0;
+    int index = 0;
+    std::vector<int> toUpdate;
+
     for(int i =0;i<patches.size();++i){
-        patches[i]->render(cameraPos.x,cameraPos.z);
+        temp = patches[i]->chooseLod(cameraPos.x,cameraPos.z);
+        patches[i]->setLodLevel(temp);
     }
+
+    for(int i =0;i<patches.size();++i){
+        patches[i]->render();
+    }
+
 }
 
 
