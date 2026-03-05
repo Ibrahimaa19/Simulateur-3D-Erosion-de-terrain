@@ -103,11 +103,11 @@ void TerrainApp::InitScene()
        perlin->CreatePerlinNoise(512, 512, 0, 100); 
     }
 
-    mTerrain->setup_terrain(mVAO, mVBO, mIBO);
+    //mTerrain->setup_terrain_lod(mVAO, mVBO, mIBO);
 
     mModel = glm::mat4(1.0f);
     mView = mCamera.GetViewMatrix();
-    mProjection = glm::perspective(glm::radians(45.0f), (float)mScreenWidth / (float)mScreenHeight, 0.1f, 5000.0f);
+    mProjection = glm::perspective(glm::radians(45.0f), (float)mScreenWidth / (float)mScreenHeight, 0.1f, 100.0f);
 }
 
 void TerrainApp::GenerateTerrainFromGui()
@@ -185,7 +185,7 @@ void TerrainApp::GenerateTerrainFromGui()
     }
 
     mShader->Use();
-    mTerrain->setup_terrain(mVAO, mVBO, mIBO);
+    mTerrain->setup_terrain_lod(mVAO, mVBO, mIBO);
     mThermalErosion.loadTerrainInfo(mTerrain);
 }
 
@@ -248,7 +248,8 @@ void TerrainApp::Run()
                 stepCounter++;
                 mGui.thermalCurrentStep = stepCounter;
 
-                mTerrain->update_vertices_gpu(mVBO);
+                //mTerrain->update_vertices_gpu(mVBO);
+                mTerrain->update_vertices_gpu_lod();
             }
 
             mGui.cameraPos = glm::vec3(glm::inverse(mView)[3]);
@@ -262,6 +263,25 @@ void TerrainApp::Run()
     }
 }
 
+int TerrainApp::SelectLOD(const glm::vec3&& cameraPos)
+{
+    glm::vec3 milieu_terrain = glm::vec3(mTerrain.get_terrain_width()/2, 0, mTerrain.get_terrain_height()/2);
+
+    int x = glm::clamp((int)cameraPos.x, 0, mTerrain.get_terrain_width());
+    int z = glm::clamp((int)cameraPos.z, 0, mTerrain.get_terrain_height());
+    float y = mTerrain.get_data()[z * mTerrain.get_terrain_width() + x];
+    //float dist = glm::distance(cameraPos, glm::vec3(milieu_terrain.x/mTerrain.get_xz(), 0, milieu_terrain.z/mTerrain.get_xz()));
+
+    glm::vec3 terrain_proche = glm::vec3(x,y,z);
+    float dist = glm::distance(cameraPos, terrain_proche);
+    //std::cout << dist << std::endl;
+
+    for (int lod = 0; lod < 4; lod++) {
+        if (dist < mTerrain.get_lod_distance(lod)) return lod;
+    }
+    return 3; // LOD le plus bas
+}
+
 void TerrainApp::RenderScene()
 {
     mView = mCamera.GetViewMatrix();
@@ -272,7 +292,8 @@ void TerrainApp::RenderScene()
     mShader->SetFloat("gMinHeight", mTerrain->get_min_height());
     
     glBindVertexArray(mVAO);
-    mTerrain->renderer(); 
+    mTerrain->renderer_lod(mCamera.GetPosition());
+    //std::cout << mCamera.GetPosition().x << "," << mCamera.GetPosition().y << "," << mCamera.GetPosition().z << std::endl;
 }
 
 void TerrainApp::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)

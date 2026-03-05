@@ -35,6 +35,8 @@ void MidpointDisplacement::CreateMidpointDisplacement(int size, float minHeight,
     }
     CreateMidpointDisplacementInterne(roughness);
     Normalize();
+
+    create_patches();
 }
 
 void MidpointDisplacement::CreateMidpointDisplacementInterne(float roughness)
