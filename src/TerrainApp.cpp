@@ -107,7 +107,7 @@ void TerrainApp::InitScene()
 
     mModel = glm::mat4(1.0f);
     mView = mCamera.GetViewMatrix();
-    mProjection = glm::perspective(glm::radians(45.0f), (float)mScreenWidth / (float)mScreenHeight, 0.1f, 100.0f);
+    mProjection = glm::perspective(glm::radians(45.0f), (float)mScreenWidth / (float)mScreenHeight, 0.1f, 5000.0f);
 }
 
 void TerrainApp::GenerateTerrainFromGui()
@@ -261,25 +261,6 @@ void TerrainApp::Run()
         glfwSwapBuffers(mWindow);
         glfwPollEvents();
     }
-}
-
-int TerrainApp::SelectLOD(const glm::vec3&& cameraPos)
-{
-    glm::vec3 milieu_terrain = glm::vec3(mTerrain.get_terrain_width()/2, 0, mTerrain.get_terrain_height()/2);
-
-    int x = glm::clamp((int)cameraPos.x, 0, mTerrain.get_terrain_width());
-    int z = glm::clamp((int)cameraPos.z, 0, mTerrain.get_terrain_height());
-    float y = mTerrain.get_data()[z * mTerrain.get_terrain_width() + x];
-    //float dist = glm::distance(cameraPos, glm::vec3(milieu_terrain.x/mTerrain.get_xz(), 0, milieu_terrain.z/mTerrain.get_xz()));
-
-    glm::vec3 terrain_proche = glm::vec3(x,y,z);
-    float dist = glm::distance(cameraPos, terrain_proche);
-    //std::cout << dist << std::endl;
-
-    for (int lod = 0; lod < 4; lod++) {
-        if (dist < mTerrain.get_lod_distance(lod)) return lod;
-    }
-    return 3; // LOD le plus bas
 }
 
 void TerrainApp::RenderScene()
