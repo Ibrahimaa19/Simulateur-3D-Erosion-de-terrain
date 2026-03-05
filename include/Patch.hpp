@@ -38,6 +38,10 @@ class Patch{
             neightbour.push_back(p);
         }
 
+        int getNeightbourNumber(){
+            return neightbour.size();
+        }
+
         std::vector<Patch*> getNeightbour(){
             return this->neightbour;
         }
@@ -205,10 +209,14 @@ class Patch{
 
             if (dist2 < 50.0f * 50.0f){
                 return 0;
-            }else if (dist2 < 150.0f * 150.0f){
+            }else if (dist2 < 100.0f * 100.0f){
                 return 1;
-            }else{
+            }else if (dist2 < 150.0f * 150.0f){
                 return 2;
+            }else if (dist2 < 200.0f * 200.0f){
+                return 3;
+            }else{
+                return 4;
             }
         }
 

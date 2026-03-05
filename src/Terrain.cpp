@@ -50,28 +50,28 @@ void Terrain::create_patches(){
 
     int width = nb_patch_x*nb_patch_z;
 
-    for(int i=0;i<nb_patch_x;++i){
-        for(int j=0;j<nb_patch_z;++j){
-            int top = (i+1)*nb_patch_x + j;
-            int bot = (i-1)*nb_patch_x + j;
-            int right = (i)*nb_patch_x + (j+1);
-            int left = (i+1)*nb_patch_x + (j-1);
-            int cur = (i)*nb_patch_x + j;
+    // for(int i=0;i<nb_patch_x;++i){
+    //     for(int j=0;j<nb_patch_z;++j){
+    //         int top = (i+1)*nb_patch_x + j;
+    //         int bot = (i-1)*nb_patch_x + j;
+    //         int right = (i)*nb_patch_x + (j+1);
+    //         int left = (i+1)*nb_patch_x + (j-1);
+    //         int cur = (i)*nb_patch_x + j;
 
-            if(top >=0 && top < width)
-                this->patches[cur]->addNeightbour(patches[top].get());
+    //         if(top >=0 && top < width)
+    //             this->patches[cur]->addNeightbour(patches[top].get());
 
-            if(bot >=0 && bot < width)
-                this->patches[cur]->addNeightbour(patches[bot].get());
+    //         if(bot >=0 && bot < width)
+    //             this->patches[cur]->addNeightbour(patches[bot].get());
 
-            if(right >=0 && right < width)
-                this->patches[cur]->addNeightbour(patches[right].get());
+    //         if(right >=0 && right < width)
+    //             this->patches[cur]->addNeightbour(patches[right].get());
 
-            if(left >=0 && left < width)
-                this->patches[cur]->addNeightbour(patches[left].get());
+    //         if(left >=0 && left < width)
+    //             this->patches[cur]->addNeightbour(patches[left].get());
 
-        }
-    }
+    //     }
+    // }
 
 }
 
