@@ -58,6 +58,8 @@ set(SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/src/MidpointDisplacement.cpp
     ${PROJECT_SOURCE_DIR}/src/PerlinNoiseTerrain.cpp
     ${PROJECT_SOURCE_DIR}/src/ValidationTest.cpp
+    ${PROJECT_SOURCE_DIR}/src/Frustrum.cpp
+    ${PROJECT_SOURCE_DIR}/src/Patch.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})

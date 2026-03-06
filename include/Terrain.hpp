@@ -15,6 +15,7 @@
 
 
 
+
 class Terrain{ 
 protected:
 
@@ -27,20 +28,17 @@ protected:
     float min_height;
 	int borderSize;
     int cellSpacing;
-	// std::vector<float> vertices[4];
-	// std::vector<unsigned int> indices[4];
 
-    // // Paramètres LOD
-    // int lodSteps[4] = {1, 2, 4, 8}; 
-    // float lodDistances[4] = {2.0f, 4.f, 6.5f, 8.f};
 	std::vector<float> vertices;
 	std::vector<unsigned int> indices;
 
     std::vector<float> vertices_lod[4];
 	std::vector<unsigned int> indices_lod[3];
     int lodSteps[4] = {2,4,6,8};
-    //Patch** patches;
+    
     std::vector<std::unique_ptr<Patch>> patches;
+
+    Frustrum mFrustrum;
 
     /**
      * @brief Met à jours le vecteur vertices, en fonction des valeurs dans data
@@ -98,10 +96,12 @@ public:
      * @brief Dessine les triangles avec les données du terrain
     */
     void renderer();
-    void renderer_lod(const glm::vec3& camera);
+    void renderer_lod(const glm::vec3& cameraPos,glm::mat4& mProjection,glm::mat4& mView);
 
     void create_patches();
     void correct_lod();
+
+    void updateFrustum(glm::mat4& projection, glm::mat4& view);
 
     /**
      * @brief Retourne la height au point (i,j)

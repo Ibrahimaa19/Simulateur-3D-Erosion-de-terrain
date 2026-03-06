@@ -43,35 +43,35 @@ void Terrain::create_patches(){
     for(int i=0;i<nb_patch_x;++i){
         for(int j=0;j<nb_patch_z;++j){
             std::unique_ptr<Patch> p = std::make_unique<Patch>();
-            p->set_patch(i,j,xzfactor,nb_patch_x,nb_patch_z);
+            p->set_patch(i,j,xzfactor,nb_patch_x,nb_patch_z,&mFrustrum);
             this->patches.push_back(std::move(p));
         }
     }
 
     int width = nb_patch_x*nb_patch_z;
 
-    for(int i=0;i<nb_patch_x;++i){
-        for(int j=0;j<nb_patch_z;++j){
-            int top = (i+1)*nb_patch_x + j;
-            int bot = (i-1)*nb_patch_x + j;
-            int right = (i)*nb_patch_x + (j+1);
-            int left = (i+1)*nb_patch_x + (j-1);
-            int cur = (i)*nb_patch_x + j;
+    // for(int i=0;i<nb_patch_x;++i){
+    //     for(int j=0;j<nb_patch_z;++j){
+    //         int top = (i+1)*nb_patch_x + j;
+    //         int bot = (i-1)*nb_patch_x + j;
+    //         int right = (i)*nb_patch_x + (j+1);
+    //         int left = (i+1)*nb_patch_x + (j-1);
+    //         int cur = (i)*nb_patch_x + j;
 
-            if(top >=0 && top < width)
-                this->patches[cur]->addNeightbour(patches[top].get());
+    //         if(top >=0 && top < width)
+    //             this->patches[cur]->addNeightbour(patches[top].get());
 
-            if(bot >=0 && bot < width)
-                this->patches[cur]->addNeightbour(patches[bot].get());
+    //         if(bot >=0 && bot < width)
+    //             this->patches[cur]->addNeightbour(patches[bot].get());
 
-            if(right >=0 && right < width)
-                this->patches[cur]->addNeightbour(patches[right].get());
+    //         if(right >=0 && right < width)
+    //             this->patches[cur]->addNeightbour(patches[right].get());
 
-            if(left >=0 && left < width)
-                this->patches[cur]->addNeightbour(patches[left].get());
+    //         if(left >=0 && left < width)
+    //             this->patches[cur]->addNeightbour(patches[left].get());
 
-        }
-    }
+    //     }
+    // }
 
 }
 
@@ -257,20 +257,23 @@ void Terrain::correct_lod(){
 /*
     On affiche le terrain en prenant en compte les différents niveau de lod pour chaque patches
 */
-void Terrain::renderer_lod(const glm::vec3& cameraPos){
+void Terrain::renderer_lod(const glm::vec3& cameraPos,glm::mat4& mProjection,glm::mat4& mView){
     int temp = 0;
     int index = 0;
     std::vector<int> toUpdate;
+    mFrustrum.updateFrustum(mProjection,mView);
 
     for(int i =0;i<patches.size();++i){
-        temp = patches[i]->chooseLod(cameraPos.x,cameraPos.z);
+        temp = patches[i]->chooseLod(cameraPos);
         patches[i]->setLodLevel(temp);
     }
 
-    correct_lod();
+    //std::cout << cameraPos.x << "," << cameraPos.y << "," << cameraPos.z << std::endl;
+    //correct_lod();
 
     for(int i =0;i<patches.size();++i){
-        patches[i]->render();
+        if(patches[i]->getLodLevel() != -1)
+            patches[i]->render();
     }
 
 }

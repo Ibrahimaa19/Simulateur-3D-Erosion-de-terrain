@@ -273,7 +273,7 @@ void TerrainApp::RenderScene()
     mShader->SetFloat("gMinHeight", mTerrain->get_min_height());
     
     glBindVertexArray(mVAO);
-    mTerrain->renderer_lod(mCamera.GetPosition());
+    mTerrain->renderer_lod(mCamera.GetPosition(),mProjection,mView);
     //std::cout << mCamera.GetPosition().x << "," << mCamera.GetPosition().y << "," << mCamera.GetPosition().z << std::endl;
 }
 
