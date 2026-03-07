@@ -60,6 +60,7 @@ set(SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/src/ValidationTest.cpp
     ${PROJECT_SOURCE_DIR}/src/Frustrum.cpp
     ${PROJECT_SOURCE_DIR}/src/Patch.cpp
+    ${PROJECT_SOURCE_DIR}/src/RendererManager.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})

@@ -18,6 +18,8 @@ void FaultFormationTerrain::CreateFaultFormation(int width, int height, int iter
     this->xzfactor = 1.0f / scale;
     this->borderSize = 0;
 
+    this->mRenderer = (std::make_unique<RendererManager>(this));
+
     this->data.assign(width * height, 0.0f);
 
     CreateFaultFormationInternal(iterations, minHeight, maxHeight, applyFilter, filter);

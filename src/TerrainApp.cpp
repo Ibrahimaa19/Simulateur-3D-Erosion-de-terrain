@@ -1,13 +1,5 @@
 #include "TerrainApp.hpp"
-#include <string.h>
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
-#include <iostream>
-#include <cmath> 
-
-#include "FaultFormationTerrain.hpp"
-#include "MidpointDisplacement.hpp"
-#include "PerlinNoiseTerrain.hpp" 
+#include "RendererManager.hpp"
 
 void TerrainApp::setCameraSpeed(float value){
     mCameraSpeed = value;
@@ -97,12 +89,14 @@ void TerrainApp::InitScene()
     mShader = std::make_unique<Shader>("../shaders/terrain.vs", "../shaders/terrain.fs");
     mShader->Use();
 
-    mTerrain = std::make_unique<PerlinNoiseTerrain>();
+    // mTerrain = std::make_unique<PerlinNoiseTerrain>();
     
-    if (auto perlin = dynamic_cast<PerlinNoiseTerrain*>(mTerrain.get())) {
-       perlin->CreatePerlinNoise(512, 512, 0, 100); 
-    }
+    // if (auto perlin = dynamic_cast<PerlinNoiseTerrain*>(mTerrain.get())) {
+    //    perlin->CreatePerlinNoise(512, 512, 0, 100); 
+    // }
 
+
+    //mTerrain->getRendererManager()->changeTerrain(mTerrain.get());
     //mTerrain->setup_terrain_lod(mVAO, mVBO, mIBO);
 
     mModel = glm::mat4(1.0f);
@@ -131,6 +125,8 @@ void TerrainApp::GenerateTerrainFromGui()
 
         mTerrain->load_terrain(path, 1.0f, 100.0f);
 
+        mTerrain->getRendererManager()->changeTerrain(mTerrain.get());
+
         mCamera.MoveTo(glm::vec3{0.0f, 5.0f, 0.0f});
         mCamera.TurnTo(glm::vec3{mTerrain->get_terrain_width()/2.0f, 0.0f, mTerrain->get_terrain_height()/2.0f});
 
@@ -150,7 +146,12 @@ void TerrainApp::GenerateTerrainFromGui()
                 mGui.faultMinHeight, mGui.faultMaxHeight, 
                 1.0f, mGui.faultUseFilter, mGui.faultFilter
             );
+
+            auto renderer = std::make_unique<RendererManager>(generator.get());
+            generator->setRenderer(std::move(renderer));
+
             mTerrain = std::move(generator);
+
 
         }
         else if (mGui.selectedMethod == GEN_MIDPOINT_DISPLACEMENT) 
@@ -161,6 +162,10 @@ void TerrainApp::GenerateTerrainFromGui()
                 mGui.midpointMinHeight, mGui.midpointMaxHeight, 
                 1.0f, mGui.midpointRoughness
             );
+
+            auto renderer = std::make_unique<RendererManager>(generator.get());
+            generator->setRenderer(std::move(renderer));
+
             mTerrain = std::move(generator);
 
         }
@@ -176,6 +181,10 @@ void TerrainApp::GenerateTerrainFromGui()
                 mGui.perlinPersistence,
                 mGui.perlinLacunarity
             );
+
+            auto renderer = std::make_unique<RendererManager>(generator.get());
+            generator->setRenderer(std::move(renderer));
+
             mTerrain = std::move(generator);
         }
 
@@ -248,7 +257,6 @@ void TerrainApp::Run()
                 stepCounter++;
                 mGui.thermalCurrentStep = stepCounter;
 
-                //mTerrain->update_vertices_gpu(mVBO);
                 mTerrain->update_vertices_gpu_lod();
             }
 
@@ -271,10 +279,10 @@ void TerrainApp::RenderScene()
     mShader->SetMat4("gFinalMatrix", finalMatrix);
     mShader->SetFloat("gMaxHeight", mTerrain->get_max_height());
     mShader->SetFloat("gMinHeight", mTerrain->get_min_height());
-    
+
     glBindVertexArray(mVAO);
-    mTerrain->renderer_lod(mCamera.GetPosition(),mProjection,mView);
-    //std::cout << mCamera.GetPosition().x << "," << mCamera.GetPosition().y << "," << mCamera.GetPosition().z << std::endl;
+
+    mTerrain->getRendererManager()->rendererLod(mCamera.GetPosition(),mProjection,mView);
 }
 
 void TerrainApp::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)

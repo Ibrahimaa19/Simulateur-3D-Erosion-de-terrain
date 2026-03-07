@@ -1,7 +1,8 @@
 #include "Terrain.hpp"
+
 #include "ThermalErosion.hpp"
 #include <fstream>
-
+#include "RendererManager.hpp"
 
 void Terrain::load_terrain (const char* image_path,float yfactor,float xzfactor){
     int t_channels;
@@ -29,6 +30,9 @@ void Terrain::load_terrain (const char* image_path,float yfactor,float xzfactor)
     this->max_height = *std::max_element(data.begin(),data.end());
     this->min_height = *std::min_element(data.begin(),data.end());
 
+    this->mRenderer = (std::make_unique<RendererManager>(this));
+
+
     stbi_image_free(image);
 
     create_patches();
@@ -43,7 +47,7 @@ void Terrain::create_patches(){
     for(int i=0;i<nb_patch_x;++i){
         for(int j=0;j<nb_patch_z;++j){
             std::unique_ptr<Patch> p = std::make_unique<Patch>();
-            p->set_patch(i,j,xzfactor,nb_patch_x,nb_patch_z,&mFrustrum);
+            p->set_patch(i,j,xzfactor,nb_patch_x,nb_patch_z);
             this->patches.push_back(std::move(p));
         }
     }
@@ -170,10 +174,6 @@ void Terrain::set_data(int i, float value){
 std::vector<float>* Terrain::get_data(){
     return &(this->data);
 }
-/*
-std::vector<float> Terrain::get_data(){
-    return this->data;
-}*/
 
 int Terrain::get_indices_size() const{
     return this->indices.size();
@@ -217,70 +217,28 @@ void Terrain::setup_terrain_lod(GLuint &VAO, GLuint &VBO, GLuint &EBO){
     }    
 }
 
-/*
-    Verifie que deux patches avec des lod différents, ont une un niveau de différence maximum, utile dans le cadres des skirts
-*/
-void Terrain::correct_lod(){
-    bool changed;
-    int temp = 0;
-
-    do
-    {
-        changed = false;
-
-        for (int i =0;i<patches.size();++i)
-        {
-
-            for (int j =0;j<patches[i]->getNeightbour().size();++j)
-            {
-
-                if (patches[i]->getLodLevel() > patches[i]->getNeightbourLodLevel(j) + 1)
-                {
-                    temp = patches[i]->getNeightbourLodLevel(j) + 1;
-                    patches[i]->setLodLevel(temp);
-                    changed = true;
-                }
-
-                if (patches[i]->getNeightbourLodLevel(j) > patches[i]->getLodLevel() + 1)
-                {
-                    temp = patches[i]->getLodLevel() + 1;
-                    patches[i]->getNeightbour()[j]->setLodLevel(temp);
-                    changed = true;
-                }
-            }
-        }
-
-    } while(changed);
-
-}
-
-/*
-    On affiche le terrain en prenant en compte les différents niveau de lod pour chaque patches
-*/
-void Terrain::renderer_lod(const glm::vec3& cameraPos,glm::mat4& mProjection,glm::mat4& mView){
-    int temp = 0;
-    int index = 0;
-    std::vector<int> toUpdate;
-    mFrustrum.updateFrustum(mProjection,mView);
-
-    for(int i =0;i<patches.size();++i){
-        temp = patches[i]->chooseLod(cameraPos);
-        patches[i]->setLodLevel(temp);
-    }
-
-    //std::cout << cameraPos.x << "," << cameraPos.y << "," << cameraPos.z << std::endl;
-    //correct_lod();
-
-    for(int i =0;i<patches.size();++i){
-        if(patches[i]->getLodLevel() != -1)
-            patches[i]->render();
-    }
-
-}
-
 
 void Terrain::update_vertices_gpu_lod()
 {
     load_vectices_lod();
     
+}
+
+Frustrum& Terrain::getFrustrum(){
+    return this->mFrustrum;
+}
+
+std::vector<std::unique_ptr<Patch>>& Terrain::getPatches(){
+    return this->patches;
+}
+
+RendererManager* Terrain::getRendererManager(){
+    return mRenderer.get();
+}
+
+void Terrain::setRenderer(std::unique_ptr<RendererManager> renderer) {
+    mRenderer = std::move(renderer);
+    if (mRenderer) {
+        mRenderer->changeTerrain(this);
+    }
 }

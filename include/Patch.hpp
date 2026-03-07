@@ -28,12 +28,10 @@ class Patch{
         int lodLevel;
 
         std::vector<Patch*> neightbour;
-
-        Frustrum* frustrum;
     
     public:
 
-        void set_patch(unsigned int x,unsigned int z,float xz,unsigned int nb_p_x,unsigned int nb_p_z,Frustrum* mFrus);
+        void set_patch(unsigned int x,unsigned int z,float xz,unsigned int nb_p_x,unsigned int nb_p_z);
 
         void addNeightbour(Patch* p);
 
@@ -55,7 +53,7 @@ class Patch{
 
         void render();
 
-        int chooseLod(glm::vec3 cameraPos);
+        int chooseLod(glm::vec3 cameraPos,Frustrum* frustrum);
 
         int getLodLevel();
 

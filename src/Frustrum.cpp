@@ -47,7 +47,17 @@ void Frustrum::updateFrustum(glm::mat4& projection, glm::mat4& view){
                                   mat[2][3] - mat[2][2]);
     plans[5].d = mat[3][3] - mat[3][2];
 
+    for (int i = 0; i < 6; i++) {
+        float length = glm::length(plans[i].normal);
+        if (length > 0.0001f) {
+            plans[i].normal /= length;
+            plans[i].d /= length;
+        }
+    }
+
 }
+
+#include <iostream>
 
 bool Frustrum::patchDansFrustum(const glm::vec3& patchCentre,float radius) {
     Sphere patch(patchCentre,radius);

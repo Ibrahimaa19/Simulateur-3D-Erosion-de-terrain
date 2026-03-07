@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Terrain.hpp"
+#include "RendererManager.hpp"
 #include <vector>
 
 /**

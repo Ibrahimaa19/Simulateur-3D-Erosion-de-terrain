@@ -6,7 +6,9 @@
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 #include <iostream>
-#include <memory> 
+#include <memory>
+#include <string.h>
+#include <cmath> 
 
 #include "Camera.hpp"
 #include "Shader.hpp"

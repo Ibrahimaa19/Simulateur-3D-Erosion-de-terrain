@@ -27,6 +27,8 @@ void MidpointDisplacement::CreateMidpointDisplacement(int size, float minHeight,
     this->borderSize = 0;
 
     this->data.assign(width * height, 0.0f);
+
+    this->mRenderer = (std::make_unique<RendererManager>(this));
     
     if(!isPowerOfTwo(size - 1))
     {

@@ -24,6 +24,8 @@ void PerlinNoiseTerrain::CreatePerlinNoise(int width, int height,
 
     this->data.assign(width * height, 0.0f);
 
+    this->mRenderer = (std::make_unique<RendererManager>(this));
+
     mBaseFrequency = frequency;
     mNumOctaves = octaves;
     mPersistenceCoef = persistence;

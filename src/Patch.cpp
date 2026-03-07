@@ -1,12 +1,11 @@
 #include "Patch.hpp"
 
-void Patch::set_patch(unsigned int x,unsigned int z,float xz,unsigned int nb_p_x,unsigned int nb_p_z,Frustrum* mFrus){
+void Patch::set_patch(unsigned int x,unsigned int z,float xz,unsigned int nb_p_x,unsigned int nb_p_z){
     this->patch_x = x;
     this->patch_z = z;
     this->xzfactor = xz;
     this->nb_patch_x = nb_p_x;
     this->nb_patch_z = nb_p_z;
-    this->frustrum = mFrus;
 }
 
 void Patch::addNeightbour(Patch* p){
@@ -169,21 +168,21 @@ void Patch::render(){
     glBindVertexArray(0);
 }
 
-int Patch::chooseLod(glm::vec3 cameraPos){
+int Patch::chooseLod(glm::vec3 cameraPos,Frustrum* frustrum){
 
     float centreX = (patch_x * PATCH_SIZE + PATCH_SIZE*0.5f)/xzfactor;
     float centreZ = (patch_z * PATCH_SIZE + PATCH_SIZE*0.5f)/xzfactor;
     float hauteurMoyenne = 0.5f;
 
     glm::vec3 centre(centreX, hauteurMoyenne, centreZ);
-    bool inFrustrum = frustrum->patchDansFrustum(centre,PATCH_SIZE*(13.f/xzfactor));
+    bool inFrustrum = frustrum->patchDansFrustum(centre,(PATCH_SIZE*(5.75f))/xzfactor);
 
     if (!inFrustrum)
         return -1;
 
     float distance = glm::distance(cameraPos,centre);
 
-    //std::cout << distance << std::endl;
+    
     if (distance < 500.f){
         return 0;
     }else if (distance < 700.f){

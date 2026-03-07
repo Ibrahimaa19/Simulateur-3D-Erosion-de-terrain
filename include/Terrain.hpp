@@ -13,8 +13,7 @@
 #include "Patch.hpp"
 #include "stb_image.hpp"
 
-
-
+class RendererManager;
 
 class Terrain{ 
 protected:
@@ -31,15 +30,13 @@ protected:
 
 	std::vector<float> vertices;
 	std::vector<unsigned int> indices;
-
-    std::vector<float> vertices_lod[4];
-	std::vector<unsigned int> indices_lod[3];
-    int lodSteps[4] = {2,4,6,8};
     
     std::vector<std::unique_ptr<Patch>> patches;
 
     Frustrum mFrustrum;
+    std::unique_ptr<RendererManager> mRenderer;
 
+    
     /**
      * @brief Met à jours le vecteur vertices, en fonction des valeurs dans data
      * 
@@ -101,7 +98,13 @@ public:
     void create_patches();
     void correct_lod();
 
-    void updateFrustum(glm::mat4& projection, glm::mat4& view);
+
+
+    Frustrum& getFrustrum();
+    std::vector<std::unique_ptr<Patch>>& getPatches();
+    RendererManager* getRendererManager();
+
+    void setRenderer(std::unique_ptr<RendererManager> renderer);
 
     /**
      * @brief Retourne la height au point (i,j)
