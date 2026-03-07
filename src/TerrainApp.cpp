@@ -123,12 +123,12 @@ void TerrainApp::GenerateTerrainFromGui()
         const char* path = "../src/heightmap/iceland_heightmap.png";
         if (mGui.selectedImage == 1) path = "../src/heightmap/heightmap.png";
 
-        mTerrain->load_terrain(path, 1.0f, 100.0f);
+        mTerrain->loadTerrain(path, 1.0f, 100.0f);
 
-        mTerrain->getRendererManager()->changeTerrain(mTerrain.get());
+        mTerrain->getRendererManager()->setTerrain(mTerrain.get());
 
         mCamera.MoveTo(glm::vec3{0.0f, 5.0f, 0.0f});
-        mCamera.TurnTo(glm::vec3{mTerrain->get_terrain_width()/2.0f, 0.0f, mTerrain->get_terrain_height()/2.0f});
+        mCamera.TurnTo(glm::vec3{mTerrain->getTerrainWidth()/2.0f, 0.0f, mTerrain->getTerrainHeight()/2.0f});
 
         setCameraSpeed(0.2);
     }
@@ -189,12 +189,12 @@ void TerrainApp::GenerateTerrainFromGui()
         }
 
         mCamera.MoveTo(glm::vec3{-54.0f, 220.0f, -42.0f});
-        mCamera.TurnTo(glm::vec3{mTerrain->get_terrain_width()/2.0f, 0.0f, mTerrain->get_terrain_height()/2.0f});
+        mCamera.TurnTo(glm::vec3{mTerrain->getTerrainWidth()/2.0f, 0.0f, mTerrain->getTerrainHeight()/2.0f});
         setCameraSpeed(5.);
     }
 
     mShader->Use();
-    mTerrain->setup_terrain_lod(mVAO, mVBO, mIBO);
+    mTerrain->setupTerrainLod(mVAO, mVBO, mIBO);
     mThermalErosion.loadTerrainInfo(mTerrain);
 }
 
@@ -257,7 +257,7 @@ void TerrainApp::Run()
                 stepCounter++;
                 mGui.thermalCurrentStep = stepCounter;
 
-                mTerrain->update_vertices_gpu_lod();
+                mTerrain->updateVerticesGpuLod();
             }
 
             mGui.cameraPos = glm::vec3(glm::inverse(mView)[3]);
@@ -277,12 +277,12 @@ void TerrainApp::RenderScene()
     glm::mat4 finalMatrix = mProjection * mView * mModel;
     
     mShader->SetMat4("gFinalMatrix", finalMatrix);
-    mShader->SetFloat("gMaxHeight", mTerrain->get_max_height());
-    mShader->SetFloat("gMinHeight", mTerrain->get_min_height());
+    mShader->SetFloat("gMaxHeight", mTerrain->getMaxHeight());
+    mShader->SetFloat("gMinHeight", mTerrain->getMinHeight());
 
     glBindVertexArray(mVAO);
 
-    mTerrain->getRendererManager()->rendererLod(mCamera.GetPosition(),mProjection,mView);
+    mTerrain->getRendererManager()->renderLod(mCamera.GetPosition(),mProjection,mView);
 }
 
 void TerrainApp::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)

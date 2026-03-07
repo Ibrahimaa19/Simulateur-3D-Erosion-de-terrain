@@ -1,67 +1,183 @@
 #ifndef PATCH_H
 #define PATCH_H
 
+#include "Frustrum.hpp"
 #include <GL/glew.h>
 #include <algorithm>
-#include <vector>
 #include <iostream>
-#include "Frustrum.hpp"
+#include <vector>
 
-#define PATCH_SIZE 32
+#define PATCH_SIZE 32  /**< Taille d'un patch en nombre de cellules */
 
-struct Lod{
-    std::vector<float> vertices;
-    std::vector<unsigned int> indices;
+/**
+ * @brief Structure représentant un niveau de détail (LOD)
+ * 
+ * Contient les données de géométrie pour un niveau de détail spécifique.
+ * Chaque patch a 5 niveaux de LOD (0 = détail maximal, 4 = détail minimal).
+ */
+struct Lod
+{
+    std::vector<float> vertices;        /** Coordonnées des sommets (x,y,z) */
+    std::vector<unsigned int> indices;   /** Indices pour le rendu triangle */
 };
 
-class Patch{
-    private:
-        float xzfactor;
-        unsigned int patch_size = PATCH_SIZE;
-        unsigned int patch_x,patch_z;
-        unsigned int nb_patch_x,nb_patch_z;
-        Lod lod[5];
-        int lodSteps[5] = {1,2,4,8,16};
-        GLuint vbo[5];  
-        GLuint ebo[5];
-        GLuint vao[5];
-        int lodLevel;
-
-        std::vector<Patch*> neightbour;
+/**
+ * @class Patch
+ * @brief Représente une portion du terrain avec gestion multi-LOD
+ * 
+ * Un patch est une subdivision du terrain de taille fixe (PATCH_SIZE x PATCH_SIZE).
+ * Il gère plusieurs niveaux de détail (LOD) pour optimiser le rendu :
+ * - LOD 0 : résolution maximale (pas = 1)
+ * - LOD 1 : pas = 2
+ * - LOD 2 : pas = 4
+ * - LOD 3 : pas = 8
+ * - LOD 4 : pas = 16 (résolution minimale)
+ * 
+ * Les patches sont également responsables de leurs voisins pour assurer
+ * une transition cohérente entre différents niveaux de LOD.
+ */
+class Patch
+{
+private:
+    float mXzFactor;                       /** Facteur d'échelle sur les axes X et Z */
+    unsigned int mPatchSize = PATCH_SIZE;  /** Taille du patch (constante) */
+    unsigned int mPatchX, mPatchZ;         /** Coordonnées du patch dans la grille */
+    unsigned int mNbPatchX, mNbPatchZ;     /** Nombre total de patches en X et Z */
     
-    public:
+    Lod mLod[5];                            /** Données pour les 5 niveaux de LOD */
+    int mLodSteps[5] = {1, 2, 4, 8, 16};    /** Pas de chaque niveau de LOD */
+    
+    GLuint mVbo[5];  /** Vertex Buffer Objects pour chaque LOD */
+    GLuint mEbo[5];  /** Element Buffer Objects pour chaque LOD */
+    GLuint mVao[5];  /** Vertex Array Objects pour chaque LOD */
+    
+    int mLodLevel;                          /** Niveau de LOD actuellement sélectionné */
+    
+    std::vector<Patch *> mNeighbors;       /** Vecteur des patches voisins */
 
-        void set_patch(unsigned int x,unsigned int z,float xz,unsigned int nb_p_x,unsigned int nb_p_z);
+public:
+    /**
+     * @brief Initialise les paramètres du patch
+     * @param x Coordonnée X du patch dans la grille
+     * @param z Coordonnée Z du patch dans la grille
+     * @param xzFactor Facteur d'échelle XZ
+     * @param nbPatchX Nombre total de patches en X
+     * @param nbPatchZ Nombre total de patches en Z
+     */
+    void setPatch(unsigned int x, unsigned int z, float xzFactor, unsigned int nbPatchX, unsigned int nbPatchZ);
 
-        void addNeightbour(Patch* p);
+    /**
+     * @brief Ajoute un patch voisin
+     * @param neighbor Pointeur vers le patch voisin
+     */
+    void addNeighbor(Patch *neighbor);
 
-        std::vector<Patch*> getNeightbour();
+    /**
+     * @brief Retourne la liste des patches voisins
+     * @return Vecteur de pointeurs vers les patches voisins
+     */
+    std::vector<Patch *> getNeighbors();
 
-        int getNeightbourLodLevel(int i);
+    /**
+     * @brief Retourne le niveau LOD d'un voisin
+     * @param index Index du voisin
+     * @return Niveau LOD du voisin
+     */
+    int getNeighborLodLevel(int index);
 
-        unsigned int get_patch_x();
+    /**
+     * @brief Retourne la coordonnée X du patch
+     * @return Coordonnée X
+     */
+    unsigned int getPatchX();
 
-        unsigned int get_patch_z();
+    /**
+     * @brief Retourne la coordonnée Z du patch
+     * @return Coordonnée Z
+     */
+    unsigned int getPatchZ();
 
-        GLuint get_vbo(int lod);
+    /**
+     * @brief Retourne le VBO pour un niveau LOD donné
+     * @param lodLevel Niveau de LOD
+     * @return Identifiant OpenGL du VBO
+     */
+    GLuint getVbo(int lodLevel);
 
-        void creerBuffersGL();
+    /**
+     * @brief Crée les buffers OpenGL pour tous les niveaux LOD
+     * 
+     * Génère les VAO, VBO et EBO pour chaque niveau de LOD
+     * et initialise les attributs de sommet.
+     */
+    void createBuffersGL();
 
-        void generate_lod_vertices(std::vector<float>& heights,unsigned int width,unsigned int height);
+    /**
+     * @brief Génère les sommets pour tous les niveaux LOD
+     * @param heights Vecteur des hauteurs du terrain
+     * @param width Largeur du terrain
+     * @param height Hauteur du terrain
+     * 
+     * Pour chaque niveau LOD, génère les sommets avec :
+     * - Échantillonnage adapté au pas du LOD
+     * - Ajout de "skirt" (jupe) sur les bords pour masquer les trous
+     */
+    void generateLodVertices(std::vector<float> &heights, unsigned int width, unsigned int height);
 
-        void generate_lod_indices(std::vector<float>& heights,unsigned int width,unsigned int height);
+    /**
+     * @brief Génère les indices pour tous les niveaux LOD
+     * @param heights Vecteur des hauteurs (non utilisé directement)
+     * @param width Largeur du terrain (non utilisé)
+     * @param height Hauteur du terrain (non utilisé)
+     * 
+     * Crée les indices pour former une grille de triangles
+     * pour chaque niveau de LOD.
+     */
+    void generateLodIndices(std::vector<float> &heights, unsigned int width, unsigned int height);
 
-        void render();
+    /**
+     * @brief Effectue le rendu du patch avec son LOD actuel
+     * 
+     * Lie les buffers appropriés et dessine le patch
+     * en utilisant le niveau LOD courant.
+     */
+    void render();
 
-        int chooseLod(glm::vec3 cameraPos,Frustrum* frustrum);
+    /**
+     * @brief Choisit le niveau LOD approprié en fonction de la caméra
+     * @param cameraPos Position de la caméra
+     * @param frustrum Frustum pour le test de visibilité
+     * @return Niveau LOD choisi (0-4) ou -1 si hors frustum
+     * 
+     * Le choix du LOD est basé sur :
+     * 1. Test de visibilité dans le frustum
+     * 2. Distance caméra-patch
+     */
+    int chooseLod(glm::vec3 cameraPos, Frustrum *frustrum);
 
-        int getLodLevel();
+    /**
+     * @brief Retourne le niveau LOD actuel
+     * @return Niveau LOD courant
+     */
+    int getLodLevel();
 
-        void setLodLevel(int l);
+    /**
+     * @brief Définit le niveau LOD actuel
+     * @param level Nouveau niveau LOD
+     */
+    void setLodLevel(int level);
 
-        int getNbPatchX();
-        int getNbPatchZ();
-
+    /**
+     * @brief Retourne le nombre total de patches en X
+     * @return Nombre de patches en X
+     */
+    int getNbPatchX();
+    
+    /**
+     * @brief Retourne le nombre total de patches en Z
+     * @return Nombre de patches en Z
+     */
+    int getNbPatchZ();
 };
 
 #endif

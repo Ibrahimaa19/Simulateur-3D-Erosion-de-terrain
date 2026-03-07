@@ -250,7 +250,7 @@ void Gui::Render(Terrain* terrain) {
                 
                 ImGui::Separator();
                 if (terrain != nullptr) {
-                     ImGui::Text("Taille Terrain: %d x %d", terrain->get_terrain_width(), terrain->get_terrain_height());
+                     ImGui::Text("Taille Terrain: %d x %d", terrain->getTerrainWidth(), terrain->getTerrainHeight());
                 }
                 ImGui::EndTabItem();
             }

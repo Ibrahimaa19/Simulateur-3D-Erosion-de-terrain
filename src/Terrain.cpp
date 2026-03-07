@@ -1,244 +1,140 @@
 #include "Terrain.hpp"
 
+#include "RendererManager.hpp"
 #include "ThermalErosion.hpp"
 #include <fstream>
-#include "RendererManager.hpp"
 
-void Terrain::load_terrain (const char* image_path,float yfactor,float xzfactor){
+void Terrain::loadTerrain(const char *imagePath, float yFactor, float xzFactor)
+{
     int t_channels;
 
-    unsigned char* image = stbi_load(image_path, &this->width, &this->height, &t_channels, 1);
+    unsigned char *image = stbi_load(imagePath, &this->mWidth, &this->mHeight, &t_channels, 1);
 
-    if (image){
-        std::cout << "Loaded heightmap of size " << height << " x " << width << std::endl;
-    }else{
+    if (image)
+    {
+        std::cout << "Loaded heightmap of size " << mHeight << " x " << mWidth << std::endl;
+    }
+    else
+    {
         std::cout << "Failed to load texture" << std::endl;
     }
 
-    this->data.resize(height*width);
+    this->mData.resize(mHeight * mWidth);
 
-    this->borderSize = 10;
-    this->cellSpacing = 1;
-    this->yfactor = yfactor;
-    this->xzfactor = xzfactor;
-    
+    this->mBorderSize = 10;
+    this->mCellSpacing = 1;
+    this->mYFactor = yFactor;
+    this->mXzFactor = xzFactor;
 
-    for (int i = 0; i < width * height; i++) {
-        this->data[i] = image[i] / 255.0f;
+    for (int i = 0; i < mWidth * mHeight; i++)
+    {
+        this->mData[i] = image[i] / 255.0f;
     }
 
-    this->max_height = *std::max_element(data.begin(),data.end());
-    this->min_height = *std::min_element(data.begin(),data.end());
+    this->mMaxHeight = *std::max_element(mData.begin(), mData.end());
+    this->mMinHeight = *std::min_element(mData.begin(), mData.end());
 
     this->mRenderer = (std::make_unique<RendererManager>(this));
 
-
     stbi_image_free(image);
 
-    create_patches();
-
+    createPatches();
 }
 
-void Terrain::create_patches(){
-    int nb_patch_x = std::ceil(width/32);
-    int nb_patch_z = std::ceil(height/32);
+void Terrain::createPatches()
+{
+    int nbPatchX = std::ceil(mWidth / 32);
+    int nbPatchZ = std::ceil(mHeight / 32);
 
-    std::cout << "nb_patch_x : "<< nb_patch_x << " ,nb_patch_z : " << nb_patch_z << std::endl;
-    for(int i=0;i<nb_patch_x;++i){
-        for(int j=0;j<nb_patch_z;++j){
+    std::cout << "nb_patch_x : " << nbPatchX << " ,nb_patch_z : " << nbPatchZ << std::endl;
+    for (int i = 0; i < nbPatchX; ++i)
+    {
+        for (int j = 0; j < nbPatchZ; ++j)
+        {
             std::unique_ptr<Patch> p = std::make_unique<Patch>();
-            p->set_patch(i,j,xzfactor,nb_patch_x,nb_patch_z);
-            this->patches.push_back(std::move(p));
-        }
-    }
-
-    int width = nb_patch_x*nb_patch_z;
-
-    // for(int i=0;i<nb_patch_x;++i){
-    //     for(int j=0;j<nb_patch_z;++j){
-    //         int top = (i+1)*nb_patch_x + j;
-    //         int bot = (i-1)*nb_patch_x + j;
-    //         int right = (i)*nb_patch_x + (j+1);
-    //         int left = (i+1)*nb_patch_x + (j-1);
-    //         int cur = (i)*nb_patch_x + j;
-
-    //         if(top >=0 && top < width)
-    //             this->patches[cur]->addNeightbour(patches[top].get());
-
-    //         if(bot >=0 && bot < width)
-    //             this->patches[cur]->addNeightbour(patches[bot].get());
-
-    //         if(right >=0 && right < width)
-    //             this->patches[cur]->addNeightbour(patches[right].get());
-
-    //         if(left >=0 && left < width)
-    //             this->patches[cur]->addNeightbour(patches[left].get());
-
-    //     }
-    // }
-
-}
-
-void Terrain::load_vectices(){
-    vertices.clear();
-    for (int z = 0; z < height; z++) {
-        for (int x = 0; x < width; x++) {
-            bool isBorder = (x < borderSize || x >= width - borderSize || z < borderSize || z >= height - borderSize); // Si on est dans le bordure, alors isBorder devient true
-            int index = z * width + x;
-            float y = data[index]*yfactor;
-            
-            
-            vertices.push_back((float)x/xzfactor);  
-            if(isBorder){
-                vertices.push_back(0.0f); // en bordure on aplatit
-            }else{
-                vertices.push_back(y);
-            }
-                        
-            vertices.push_back((float)z/xzfactor);        
+            p->setPatch(i, j, mXzFactor, nbPatchX, nbPatchZ);
+            this->mPatches.push_back(std::move(p));
         }
     }
 }
 
-void Terrain::load_incides(){
-    indices.clear();
-    for (int z = 0; z < height - 1; z++) {
-        for (int x = 0; x < width - 1; x++) {
-            
-            int hautG = z * width + x;
-            int hautD = hautG + 1;
-            int basG = (z + 1) * width + x;
-            int basD = basG + 1;
-            
-            // Premier triangle
-            indices.push_back(hautG);
-            indices.push_back(basG);
-            indices.push_back(hautD);
-            
-            // Deuxieme triangle
-            indices.push_back(hautD);
-            indices.push_back(basG);
-            indices.push_back(basD);
-        }
-    }
+bool Terrain::isInside(int i, int j) const
+{
+    return (i >= 0 && i < mHeight && j >= 0 && j < mWidth);
 }
 
-void Terrain::setup_terrain(GLuint &VAO, GLuint &VBO, GLuint &EBO){
-    this->load_incides();
-	this->load_vectices();
-
-    // Créer un VAO
-    glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
-    
-
-    // Remplis de le buffers VBO de données
-	glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, this->vertices.size() * sizeof(float), 
-                this->vertices.data(), GL_DYNAMIC_DRAW);
-    
-
-    // Setup de VAO, comment lire le VBO
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    
-
-    // Remplis de buffer d'indices
-	glGenBuffers(1, &EBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->indices.size() * sizeof(unsigned int),
-                 this->indices.data(), GL_STATIC_DRAW);
-    
-    // Lie le VAO au contexte courant, on va maintenant utiliser ce VAO
-    glBindVertexArray(0);
-    
+void Terrain::setData(int i, float value)
+{
+    this->mData[i] += value;
 }
 
-void Terrain::update_vertices() {
-    load_vectices();
+std::vector<float> *Terrain::getData()
+{
+    return &(this->mData);
 }
 
-void Terrain::renderer(){
-    glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
-}
-
-bool Terrain::inside(int i, int j) const {
-    return (i >= 0 && i < height && j >= 0 && j < width);
-}
-
-void Terrain::set_data(int i, float value){
-    this->data[i] += value;
-}
-
-std::vector<float>* Terrain::get_data(){
-    return &(this->data);
-}
-
-int Terrain::get_indices_size() const{
-    return this->indices.size();
+int Terrain::getIndicesSize() const
+{
+    return this->mIndices.size();
 };
 
-int Terrain::get_vertices_size() const{
-    return this->vertices.size();
-}
-
-void Terrain::update_vertices_gpu(GLuint VBO)
+int Terrain::getVerticesSize() const
 {
-    load_vectices();
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferSubData(GL_ARRAY_BUFFER,
-                    0,
-                    vertices.size() * sizeof(float),
-                    vertices.data());
+    return this->mVertices.size();
 }
 
-
-void Terrain::load_vectices_lod(){
-
-    for(int i =0;i<patches.size();++i){
-        patches[i]->generate_lod_vertices(data,width,height);
+void Terrain::loadVerticesLod()
+{
+    for (int i = 0; i < mPatches.size(); ++i)
+    {
+        mPatches[i]->generateLodVertices(mData, mWidth, mHeight);
     }
 }
 
-void Terrain::load_incides_lod(){
-    for(int i =0;i<patches.size();++i){
-        patches[i]->generate_lod_indices(data,width,height);
+void Terrain::loadIndicesLod()
+{
+    for (int i = 0; i < mPatches.size(); ++i)
+    {
+        mPatches[i]->generateLodIndices(mData, mWidth, mHeight);
     }
 }
 
-void Terrain::setup_terrain_lod(GLuint &VAO, GLuint &VBO, GLuint &EBO){
-    this->load_incides_lod();
-	this->load_vectices_lod();
-
-    for(int i =0;i<patches.size();++i){
-        patches[i]->creerBuffersGL();
-    }    
-}
-
-
-void Terrain::update_vertices_gpu_lod()
+void Terrain::setupTerrainLod(GLuint &VAO, GLuint &VBO, GLuint &EBO)
 {
-    load_vectices_lod();
-    
+    this->loadIndicesLod();
+    this->loadVerticesLod();
+
+    for (int i = 0; i < mPatches.size(); ++i)
+    {
+        mPatches[i]->createBuffersGL();
+    }
 }
 
-Frustrum& Terrain::getFrustrum(){
+void Terrain::updateVerticesGpuLod()
+{
+    loadVerticesLod();
+}
+
+Frustrum &Terrain::getFrustrum()
+{
     return this->mFrustrum;
 }
 
-std::vector<std::unique_ptr<Patch>>& Terrain::getPatches(){
-    return this->patches;
+std::vector<std::unique_ptr<Patch>> &Terrain::getPatches()
+{
+    return this->mPatches;
 }
 
-RendererManager* Terrain::getRendererManager(){
+RendererManager *Terrain::getRendererManager()
+{
     return mRenderer.get();
 }
 
-void Terrain::setRenderer(std::unique_ptr<RendererManager> renderer) {
+void Terrain::setRenderer(std::unique_ptr<RendererManager> renderer)
+{
     mRenderer = std::move(renderer);
-    if (mRenderer) {
-        mRenderer->changeTerrain(this);
+    if (mRenderer)
+    {
+        mRenderer->setTerrain(this);
     }
 }
