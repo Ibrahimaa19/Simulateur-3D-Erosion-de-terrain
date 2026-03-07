@@ -111,7 +111,7 @@ void TerrainApp::GenerateTerrainFromGui()
         mTerrain = std::make_unique<Terrain>(); 
 
         const char* path = "../src/heightmap/iceland_heightmap.png";
-        if (mGui.selectedImage == 1) path = "../src/heightmap/heightmap.png";
+        if (mGui.selectedImage == 1) path = "../src/heightmap/ireland_heightmap.png";
 
         mTerrain->loadTerrain(path, 1.0f, 100.0f);
 

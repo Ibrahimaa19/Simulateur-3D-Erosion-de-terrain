@@ -113,7 +113,7 @@ void Gui::Render(Terrain* terrain) {
 
         if (selectedMethod == GEN_HEIGHTMAP) {
             ImGui::Text("Chargement depuis un fichier image PNG.");
-            const char* imgItems[] = { "iceland_heightmap.png", "heightmap.png" };
+            const char* imgItems[] = { "iceland_heightmap.png", "heightmap.png", "ireland_heightmap.png" };
             ImGui::Combo("Fichier Source", &selectedImage, imgItems, 2);
         }
         else if (selectedMethod == GEN_FAULT_FORMATION) {
