@@ -181,7 +181,7 @@ int Patch::chooseLod(glm::vec3 cameraPos, Frustrum *frustrum)
     float hauteurMoyenne = 0.5f;
 
     glm::vec3 centre(centreX, hauteurMoyenne, centreZ);
-    bool inFrustrum = frustrum->isPatchInFrustum(centre, (PATCH_SIZE * (13.f)) / mXzFactor);
+    bool inFrustrum = frustrum->isPatchInFrustum(centre, (PATCH_SIZE * (17.f)) / mXzFactor);
 
     if (!inFrustrum)
         return -1;

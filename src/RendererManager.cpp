@@ -39,11 +39,19 @@ void RendererManager::renderLod(const glm::vec3 &cameraPos, glm::mat4 &projectio
             patches[i]->setLodLevel(temp);
         }
 
+        int patchRendered = 0;
         for (int i = 0; i < patches.size(); ++i)
         {
             if (patches[i]->getLodLevel() != -1)
+            {
                 patches[i]->render();
+                patchRendered++;
+            }
+                
+            
         }
+
+        std::cout << "patch rendered: " << patchRendered << "/" << patches.size() << std::endl;
     }
     else
     {
