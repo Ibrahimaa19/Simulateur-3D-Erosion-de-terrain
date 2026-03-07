@@ -7,24 +7,24 @@
 #include <iostream>
 #include <vector>
 
-#define PATCH_SIZE 32  /**< Taille d'un patch en nombre de cellules */
+#define PATCH_SIZE 32 /**< Taille d'un patch en nombre de cellules */
 
 /**
  * @brief Structure représentant un niveau de détail (LOD)
- * 
+ *
  * Contient les données de géométrie pour un niveau de détail spécifique.
  * Chaque patch a 5 niveaux de LOD (0 = détail maximal, 4 = détail minimal).
  */
 struct Lod
 {
-    std::vector<float> vertices;        /** Coordonnées des sommets (x,y,z) */
-    std::vector<unsigned int> indices;   /** Indices pour le rendu triangle */
+    std::vector<float> vertices;       /** Coordonnées des sommets (x,y,z) */
+    std::vector<unsigned int> indices; /** Indices pour le rendu triangle */
 };
 
 /**
  * @class Patch
  * @brief Représente une portion du terrain avec gestion multi-LOD
- * 
+ *
  * Un patch est une subdivision du terrain de taille fixe (PATCH_SIZE x PATCH_SIZE).
  * Il gère plusieurs niveaux de détail (LOD) pour optimiser le rendu :
  * - LOD 0 : résolution maximale (pas = 1)
@@ -32,30 +32,30 @@ struct Lod
  * - LOD 2 : pas = 4
  * - LOD 3 : pas = 8
  * - LOD 4 : pas = 16 (résolution minimale)
- * 
+ *
  * Les patches sont également responsables de leurs voisins pour assurer
  * une transition cohérente entre différents niveaux de LOD.
  */
 class Patch
 {
-private:
-    float mXzFactor;                       /** Facteur d'échelle sur les axes X et Z */
-    unsigned int mPatchSize = PATCH_SIZE;  /** Taille du patch (constante) */
-    unsigned int mPatchX, mPatchZ;         /** Coordonnées du patch dans la grille */
-    unsigned int mNbPatchX, mNbPatchZ;     /** Nombre total de patches en X et Z */
-    
-    Lod mLod[5];                            /** Données pour les 5 niveaux de LOD */
-    int mLodSteps[5] = {1, 2, 4, 8, 16};    /** Pas de chaque niveau de LOD */
-    
-    GLuint mVbo[5];  /** Vertex Buffer Objects pour chaque LOD */
-    GLuint mEbo[5];  /** Element Buffer Objects pour chaque LOD */
-    GLuint mVao[5];  /** Vertex Array Objects pour chaque LOD */
-    
-    int mLodLevel;                          /** Niveau de LOD actuellement sélectionné */
-    
-    std::vector<Patch *> mNeighbors;       /** Vecteur des patches voisins */
+  private:
+    float mXzFactor;                      /** Facteur d'échelle sur les axes X et Z */
+    unsigned int mPatchSize = PATCH_SIZE; /** Taille du patch (constante) */
+    unsigned int mPatchX, mPatchZ;        /** Coordonnées du patch dans la grille */
+    unsigned int mNbPatchX, mNbPatchZ;    /** Nombre total de patches en X et Z */
 
-public:
+    Lod mLod[5];                         /** Données pour les 5 niveaux de LOD */
+    int mLodSteps[5] = {1, 2, 4, 8, 16}; /** Pas de chaque niveau de LOD */
+
+    GLuint mVbo[5]; /** Vertex Buffer Objects pour chaque LOD */
+    GLuint mEbo[5]; /** Element Buffer Objects pour chaque LOD */
+    GLuint mVao[5]; /** Vertex Array Objects pour chaque LOD */
+
+    int mLodLevel; /** Niveau de LOD actuellement sélectionné */
+
+    std::vector<Patch *> mNeighbors; /** Vecteur des patches voisins */
+
+  public:
     /**
      * @brief Initialise les paramètres du patch
      * @param x Coordonnée X du patch dans la grille
@@ -106,7 +106,7 @@ public:
 
     /**
      * @brief Crée les buffers OpenGL pour tous les niveaux LOD
-     * 
+     *
      * Génère les VAO, VBO et EBO pour chaque niveau de LOD
      * et initialise les attributs de sommet.
      */
@@ -117,7 +117,7 @@ public:
      * @param heights Vecteur des hauteurs du terrain
      * @param width Largeur du terrain
      * @param height Hauteur du terrain
-     * 
+     *
      * Pour chaque niveau LOD, génère les sommets avec :
      * - Échantillonnage adapté au pas du LOD
      * - Ajout de "skirt" (jupe) sur les bords pour masquer les trous
@@ -129,7 +129,7 @@ public:
      * @param heights Vecteur des hauteurs (non utilisé directement)
      * @param width Largeur du terrain (non utilisé)
      * @param height Hauteur du terrain (non utilisé)
-     * 
+     *
      * Crée les indices pour former une grille de triangles
      * pour chaque niveau de LOD.
      */
@@ -137,7 +137,7 @@ public:
 
     /**
      * @brief Effectue le rendu du patch avec son LOD actuel
-     * 
+     *
      * Lie les buffers appropriés et dessine le patch
      * en utilisant le niveau LOD courant.
      */
@@ -148,7 +148,7 @@ public:
      * @param cameraPos Position de la caméra
      * @param frustrum Frustum pour le test de visibilité
      * @return Niveau LOD choisi (0-4) ou -1 si hors frustum
-     * 
+     *
      * Le choix du LOD est basé sur :
      * 1. Test de visibilité dans le frustum
      * 2. Distance caméra-patch
@@ -172,7 +172,7 @@ public:
      * @return Nombre de patches en X
      */
     int getNbPatchX();
-    
+
     /**
      * @brief Retourne le nombre total de patches en Z
      * @return Nombre de patches en Z

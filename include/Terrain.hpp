@@ -18,34 +18,34 @@ class RendererManager;
 /**
  * @class Terrain
  * @brief Classe de base représentant un terrain avec gestion des hauteurs et LOD
- * 
+ *
  * Gère les données de hauteur, la génération de géométrie, et l'interface
  * avec le système de rendu et les patches pour le LOD.
  */
 class Terrain
 {
-protected:
-    std::vector<float> mData;           /**< Matrice des valeurs de hauteur */
-    int mHeight;                         /**< Hauteur du terrain en nombre de cellules */
-    int mWidth;                          /**< Largeur du terrain en nombre de cellules */
-    float mYFactor;                      /**< Facteur d'échelle sur l'axe Y (hauteur) */
-    float mXzFactor;                      /**< Facteur d'échelle sur les axes X et Z */
-    float mMaxHeight;                     /**< Hauteur maximale du terrain */
-    float mMinHeight;                     /**< Hauteur minimale du terrain */
-    int mBorderSize;                      /**< Taille de la bordure (aplatie) */
-    int mCellSpacing;                     /**< Espacement entre les cellules */
+  protected:
+    std::vector<float> mData; /**< Matrice des valeurs de hauteur */
+    int mHeight;              /**< Hauteur du terrain en nombre de cellules */
+    int mWidth;               /**< Largeur du terrain en nombre de cellules */
+    float mYFactor;           /**< Facteur d'échelle sur l'axe Y (hauteur) */
+    float mXzFactor;          /**< Facteur d'échelle sur les axes X et Z */
+    float mMaxHeight;         /**< Hauteur maximale du terrain */
+    float mMinHeight;         /**< Hauteur minimale du terrain */
+    int mBorderSize;          /**< Taille de la bordure (aplatie) */
+    int mCellSpacing;         /**< Espacement entre les cellules */
 
-    std::vector<float> mVertices;         /**< Vecteur des sommets (x,y,z) */
-    std::vector<unsigned int> mIndices;   /**< Vecteur des indices pour le rendu */
+    std::vector<float> mVertices;       /**< Vecteur des sommets (x,y,z) */
+    std::vector<unsigned int> mIndices; /**< Vecteur des indices pour le rendu */
 
     std::vector<std::unique_ptr<Patch>> mPatches; /**< Patches pour le LOD */
 
-    Frustrum mFrustrum;                    /**< Frustum pour le culling */
+    Frustrum mFrustrum;                         /**< Frustum pour le culling */
     std::unique_ptr<RendererManager> mRenderer; /**< Gestionnaire de rendu */
 
     /**
      * @brief Met à jour les vertices pour tous les niveaux LOD
-     * 
+     *
      * Délègue la génération des vertices à chaque patch via
      * Patch::generateLodVertices().
      */
@@ -53,13 +53,13 @@ protected:
 
     /**
      * @brief Met à jour les indices pour tous les niveaux LOD
-     * 
+     *
      * Délègue la génération des indices à chaque patch via
      * Patch::generateLodIndices().
      */
     void loadIndicesLod();
 
-public:
+  public:
     /**
      * @brief Destructeur virtuel par défaut
      *
@@ -94,7 +94,7 @@ public:
 
     /**
      * @brief Crée les patches pour le système LOD
-     * 
+     *
      * Divise le terrain en patches de taille PATCH_SIZE et initialise
      * leurs paramètres (position, facteur d'échelle).
      */

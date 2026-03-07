@@ -14,7 +14,7 @@
  */
 class RendererManager
 {
-private:
+  private:
     Terrain *mTerrain;    /** Pointeur vers le terrain à afficher */
     Frustrum *mFrustrum;  /** Frustum pour le culling des patches */
     bool mLodIsOn = true; /** État du système LOD (activé/désactivé) */
@@ -28,7 +28,7 @@ private:
      */
     void correctLod();
 
-public:
+  public:
     /**
      * @brief Constructeur du RendererManager
      * @param terrain Pointeur vers le terrain associé

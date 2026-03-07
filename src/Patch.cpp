@@ -49,8 +49,8 @@ void Patch::createBuffersGL()
         // Créer VBO
         glGenBuffers(1, &mVbo[lod]);
         glBindBuffer(GL_ARRAY_BUFFER, mVbo[lod]);
-        glBufferData(GL_ARRAY_BUFFER, this->mLod[lod].vertices.size() * sizeof(float), 
-                     this->mLod[lod].vertices.data(), GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, this->mLod[lod].vertices.size() * sizeof(float), this->mLod[lod].vertices.data(),
+                     GL_DYNAMIC_DRAW);
 
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
         glEnableVertexAttribArray(0);
@@ -163,13 +163,10 @@ void Patch::render()
     int lodLevel = this->mLodLevel;
     glBindVertexArray(mVao[lodLevel]);
     glBindBuffer(GL_ARRAY_BUFFER, mVbo[lodLevel]);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, 
-                    mLod[lodLevel].vertices.size() * sizeof(float), 
-                    mLod[lodLevel].vertices.data());
+    glBufferSubData(GL_ARRAY_BUFFER, 0, mLod[lodLevel].vertices.size() * sizeof(float), mLod[lodLevel].vertices.data());
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mEbo[lodLevel]);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 
-                 mLod[lodLevel].indices.size() * sizeof(unsigned int), 
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mLod[lodLevel].indices.size() * sizeof(unsigned int),
                  mLod[lodLevel].indices.data(), GL_DYNAMIC_DRAW);
 
     glDrawElements(GL_TRIANGLES, mLod[lodLevel].indices.size(), GL_UNSIGNED_INT, 0);

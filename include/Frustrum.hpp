@@ -6,7 +6,7 @@
 /**
  * @struct Plan
  * @brief Représente un plan dans l'espace 3D
- * 
+ *
  * Un plan est défini par son équation : dot(normal, point) + d = 0
  */
 struct Plan
@@ -18,7 +18,7 @@ struct Plan
 /**
  * @struct Sphere
  * @brief Représente une sphère dans l'espace 3D
- * 
+ *
  * Utilisée pour les tests de collision avec le frustum
  */
 struct Sphere
@@ -39,17 +39,17 @@ struct Sphere
 /**
  * @class Frustrum
  * @brief Gère le frustum de vision pour le culling
- * 
+ *
  * Le frustum est défini par 6 plans (gauche, droit, bas, haut, près, loin)
  * qui délimitent le volume visible par la caméra. Il permet de déterminer
  * quels objets sont potentiellement visibles.
  */
 class Frustrum
 {
-private:
+  private:
     Plan mPlans[6]; /**< Tableau des 6 plans du frustum */
 
-public:
+  public:
     /**
      * @brief Constructeur par défaut
      */
@@ -64,7 +64,7 @@ public:
      * @brief Met à jour les plans du frustum à partir des matrices
      * @param projection Matrice de projection
      * @param view Matrice de vue
-     * 
+     *
      * Calcule les 6 plans du frustum à partir de la combinaison
      * des matrices projection et vue.
      */
@@ -75,7 +75,7 @@ public:
      * @param patchCentre Centre de la sphère (patch)
      * @param radius Rayon de la sphère
      * @return true si la sphère est (au moins partiellement) dans le frustum
-     * 
+     *
      * Utilise l'algorithme de test sphère/frustum pour déterminer
      * si un patch est potentiellement visible.
      */

@@ -35,7 +35,6 @@ void Frustrum::updateFrustum(glm::mat4 &projection, glm::mat4 &view)
     // Plan lointain (far)
     mPlans[5].normal = glm::vec3(mat[0][3] - mat[0][2], mat[1][3] - mat[1][2], mat[2][3] - mat[2][2]);
     mPlans[5].d = mat[3][3] - mat[3][2];
-
 }
 
 bool Frustrum::isPatchInFrustum(const glm::vec3 &patchCentre, float radius)
