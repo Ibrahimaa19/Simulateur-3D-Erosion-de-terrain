@@ -89,19 +89,9 @@ void TerrainApp::InitScene()
     mShader = std::make_unique<Shader>("../shaders/terrain.vs", "../shaders/terrain.fs");
     mShader->Use();
 
-    // mTerrain = std::make_unique<PerlinNoiseTerrain>();
-    
-    // if (auto perlin = dynamic_cast<PerlinNoiseTerrain*>(mTerrain.get())) {
-    //    perlin->CreatePerlinNoise(512, 512, 0, 100); 
-    // }
-
-
-    //mTerrain->getRendererManager()->changeTerrain(mTerrain.get());
-    //mTerrain->setup_terrain_lod(mVAO, mVBO, mIBO);
-
     mModel = glm::mat4(1.0f);
     mView = mCamera.GetViewMatrix();
-    mProjection = glm::perspective(glm::radians(45.0f), (float)mScreenWidth / (float)mScreenHeight, 0.1f, 5000.0f);
+    mProjection = glm::perspective(glm::radians(45.0f), (float)mScreenWidth / (float)mScreenHeight, 0.01f, 5000.0f);
 }
 
 void TerrainApp::GenerateTerrainFromGui()
