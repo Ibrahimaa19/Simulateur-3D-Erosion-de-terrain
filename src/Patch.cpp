@@ -41,6 +41,9 @@ GLuint Patch::getVbo(int lodLevel)
 
 void Patch::createBuffersGL()
 {
+    unsigned int idBufPos = 0;
+    unsigned int idBufTex = 1;
+
     for (int lod = 0; lod < 5; lod++)
     {
         glGenVertexArrays(1, &mVao[lod]);
@@ -49,11 +52,17 @@ void Patch::createBuffersGL()
         // Créer VBO
         glGenBuffers(1, &mVbo[lod]);
         glBindBuffer(GL_ARRAY_BUFFER, mVbo[lod]);
-        glBufferData(GL_ARRAY_BUFFER, this->mLod[lod].vertices.size() * sizeof(float), this->mLod[lod].vertices.data(),
-                     GL_DYNAMIC_DRAW);
 
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
-        glEnableVertexAttribArray(0);
+        glEnableVertexAttribArray(idBufPos);
+        glVertexAttribPointer(idBufPos, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)0);
+
+        glBufferData(GL_ARRAY_BUFFER, this->mLod[lod].vertices.size() * sizeof(Vertex), this->mLod[lod].vertices.data(),GL_DYNAMIC_DRAW);
+        
+        unsigned numFloat =3;
+        
+        glEnableVertexAttribArray(idBufTex);
+        glVertexAttribPointer(idBufTex, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)(numFloat*sizeof(float)));
+        
 
         // Créer EBO
         glGenBuffers(1, &mEbo[lod]);
@@ -61,7 +70,7 @@ void Patch::createBuffersGL()
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->mLod[lod].indices.size() * sizeof(unsigned int),
                      this->mLod[lod].indices.data(), GL_DYNAMIC_DRAW);
 
-        glBindVertexArray(0);
+        glBindVertexArray(idBufPos);
     }
 }
 
@@ -69,9 +78,11 @@ void Patch::generateLodVertices(std::vector<float> &heights, unsigned int width,
 {
     float heightValue = 0.f;
     const float skirtDepth = 0.01f;
+    
 
     for (int k = 0; k < 5; ++k)
     {
+
         mLod[k].vertices.clear();
         int step = mLodSteps[k];
 
@@ -80,7 +91,7 @@ void Patch::generateLodVertices(std::vector<float> &heights, unsigned int width,
         // résolution étendue (+2 pour skirt)
         int resolution = innerResolution + 2;
 
-        mLod[k].vertices.reserve(resolution * resolution * 3);
+        mLod[k].vertices.reserve(resolution * resolution);
 
         for (int localY = 0; localY < resolution; localY++)
         {
@@ -112,9 +123,11 @@ void Patch::generateLodVertices(std::vector<float> &heights, unsigned int width,
                     heightValue -= skirtDepth;
                 }
 
-                mLod[k].vertices.push_back((float)worldX / mXzFactor);
-                mLod[k].vertices.push_back(heightValue);
-                mLod[k].vertices.push_back(((float)worldZ / mXzFactor));
+
+                glm::vec3 vecPos(((float)worldX / mXzFactor),heightValue,((float)worldZ / mXzFactor));
+                glm::vec2 vecTex(0.,0.);
+
+                mLod[k].vertices.push_back(Vertex(vecPos,vecTex));
             }
         }
     }
@@ -163,8 +176,9 @@ void Patch::render()
     int lodLevel = this->mLodLevel;
     glBindVertexArray(mVao[lodLevel]);
     glBindBuffer(GL_ARRAY_BUFFER, mVbo[lodLevel]);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, mLod[lodLevel].vertices.size() * sizeof(float), mLod[lodLevel].vertices.data());
+    glBufferSubData(GL_ARRAY_BUFFER, 0, mLod[lodLevel].vertices.size() * sizeof(Vertex), mLod[lodLevel].vertices.data());
 
+    
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mEbo[lodLevel]);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, mLod[lodLevel].indices.size() * sizeof(unsigned int),
                  mLod[lodLevel].indices.data(), GL_DYNAMIC_DRAW);

@@ -9,6 +9,13 @@
 
 #define PATCH_SIZE 32 /**< Taille d'un patch en nombre de cellules */
 
+
+struct Vertex{
+    glm::vec3 position;
+    glm::vec2 texture;
+    Vertex (glm::vec3 pos,glm::vec2 tex) : position(pos), texture(tex){};
+};
+
 /**
  * @brief Structure représentant un niveau de détail (LOD)
  *
@@ -17,7 +24,7 @@
  */
 struct Lod
 {
-    std::vector<float> vertices;       /** Coordonnées des sommets (x,y,z) */
+    std::vector<Vertex> vertices;      /** Coordonnées des sommets (x,y,z) et texture (u,v) */
     std::vector<unsigned int> indices; /** Indices pour le rendu triangle */
 };
 

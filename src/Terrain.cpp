@@ -73,16 +73,6 @@ std::vector<float> *Terrain::getData()
     return &(this->mData);
 }
 
-int Terrain::getIndicesSize() const
-{
-    return this->mIndices.size();
-};
-
-int Terrain::getVerticesSize() const
-{
-    return this->mVertices.size();
-}
-
 void Terrain::loadVerticesLod()
 {
     for (int i = 0; i < mPatches.size(); ++i)

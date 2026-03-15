@@ -35,8 +35,7 @@ class Terrain
     int mBorderSize;          /**< Taille de la bordure (aplatie) */
     int mCellSpacing;         /**< Espacement entre les cellules */
 
-    std::vector<float> mVertices;       /**< Vecteur des sommets (x,y,z) */
-    std::vector<unsigned int> mIndices; /**< Vecteur des indices pour le rendu */
+    std::vector<Vertex> mVertex; /**< Vecteur des sommets (x,y,z,u,v) */
 
     std::vector<std::unique_ptr<Patch>> mPatches; /**< Patches pour le LOD */
 
@@ -224,9 +223,9 @@ class Terrain
      * @brief Retourne le vecteur de sommets (lecture seule)
      * @return Référence constante vers le vecteur de sommets
      */
-    const std::vector<float> &getVertices() const
+    const std::vector<Vertex> &getVertex() const
     {
-        return mVertices;
+        return mVertex;
     }
 
     /**
