@@ -1,186 +1,247 @@
 #ifndef TERRAIN_H
 #define TERRAIN_H
 
+#include <GL/glew.h>
+#include <algorithm>
+#include <fstream>
+#include <glm/glm.hpp>
+#include <iostream>
+#include <memory>
 #include <string.h>
 #include <vector>
-#include <iostream>
-#include <algorithm>
-#include <GL/glew.h>
-#include <fstream>
 
+#include "Patch.hpp"
 #include "stb_image.hpp"
+#include "Texture.hpp"
 
-class Terrain{ 
-protected:
+class RendererManager;
 
-	std::vector<float> data; // matrice des valeurs de chaque pixel
-	int height;
-	int width;
-    float yfactor;
-    float xzfactor; // pour redimensionner l'axe x et z
-    float max_height;
-    float min_height;
-	int borderSize;
-    int cellSpacing;
-	// std::vector<float> vertices[4];
-	// std::vector<unsigned int> indices[4];
+/**
+ * @class Terrain
+ * @brief Classe de base représentant un terrain avec gestion des hauteurs et LOD
+ *
+ * Gère les données de hauteur, la génération de géométrie, et l'interface
+ * avec le système de rendu et les patches pour le LOD.
+ */
+class Terrain
+{
+  protected:
+    std::vector<float> mData; /**< Matrice des valeurs de hauteur */
+    int mHeight;              /**< Hauteur du terrain en nombre de cellules */
+    int mWidth;               /**< Largeur du terrain en nombre de cellules */
+    float mYFactor;           /**< Facteur d'échelle sur l'axe Y (hauteur) */
+    float mXzFactor;          /**< Facteur d'échelle sur les axes X et Z */
+    float mMaxHeight;         /**< Hauteur maximale du terrain */
+    float mMinHeight;         /**< Hauteur minimale du terrain */
+    int mBorderSize;          /**< Taille de la bordure (aplatie) */
+    int mCellSpacing;         /**< Espacement entre les cellules */
 
-    // // Paramètres LOD
-    // int lodSteps[4] = {1, 2, 4, 8}; 
-    // float lodDistances[4] = {2.0f, 4.f, 6.5f, 8.f};
-	std::vector<float> vertices;
-	std::vector<unsigned int> indices;
+    std::vector<Vertex> mVertex; /**< Vecteur des sommets (x,y,z,u,v) */
+
+    std::vector<std::unique_ptr<Patch>> mPatches; /**< Patches pour le LOD */
+
+    Frustrum mFrustrum;                         /**< Frustum pour le culling */
+    std::unique_ptr<RendererManager> mRenderer; /**< Gestionnaire de rendu */
+
+    GLuint mTextureID;
+    Texture* mTexture;
 
     /**
-     * @brief Met à jours le vecteur vertices, en fonction des valeurs dans data
-     * 
-     * Pour chaque point du terrain, on va générer un triplet x,y,z où x et z représenterons une position sur un plan 2D et y l'élévation sur ce point(x,z).
-     * 
-     * Lorsque nous serons sur les bords, nous définirons la hauteur/élévation à 0. 
-     * C'est à dire, si x est compris en [0; borderSize] ou [width-borderSize;width] ou si, z est compris entre [0; borderSize] ou [height-borderSize;height]
+     * @brief Met à jour les vertices pour tous les niveaux LOD
+     *
+     * Délègue la génération des vertices à chaque patch via
+     * Patch::generateLodVertices().
      */
-    void load_vectices();
+    void loadVerticesLod();
 
     /**
-     * @brief Créer un vecteur d'indices représentant les triangles à afficher.
-     * 
-     * Génère les indices des chaques triangles a afficher et les stocke dans le vecteur indices. Chaque carré du plan 2D, sera représenter avec deux triangles.
-     * 
-     * Par exemple, le premier carré de notre heightmap sera celui en haut à gauche, si on suppose que notre terrain est une matrice T de M*N. 
-     * Alors le premier carré sera T(0,0) T(0,1) T(1,0) T(1,1), donc deux triangles seront générer avec comme indice de sommets : [T(0,0);T(1,0);T(0,1)] et [T(1,0);T(0,0);T(1,1)] 
+     * @brief Met à jour les indices pour tous les niveaux LOD
+     *
+     * Délègue la génération des indices à chaque patch via
+     * Patch::generateLodIndices().
      */
-    void load_incides();
+    void loadIndicesLod();
 
-
-public:
+  public:
     /**
-     * @brief Destructeur virtuel par défaut.
-     * 
-     * Nécessaire pour permettre le polymorphisme (dynamic_cast) et assurer
+     * @brief Destructeur virtuel par défaut
+     *
+     * Nécessaire pour permettre le polymorphisme et assurer
      * la destruction correcte des classes filles.
      */
     virtual ~Terrain() = default;
 
     /**
-     * @brief Contructeur de la structure de données Terrain avec l'image passer en paramètre
-     *
-     * @param image_path Un chemin vers une image à lire
-     * @return Une structure Terrain correspondant avec l'image passer en paramètre
+     * @brief Charge un terrain à partir d'une image heightmap
+     * @param imagePath Chemin vers l'image à lire
+     * @param yFactor Facteur d'échelle verticale
+     * @param xzFactor Facteur d'échelle horizontale
      */
-    void load_terrain(const char* image_path,float yfactor,float xzfactor);
+    void loadTerrain(const char *imagePath, float yFactor, float xzFactor);
 
     /**
-     * @brief Met en place les buffers pour le terrain
-     * 
-     * Remplis les buffers passer en argument avec les valeurs correspondant au terrain courant.
-     * 
-     * @param VAO le vertex array object, mode de lecture du VBO
-     * @param VBO le vertex buffer object, buffer contenant tout les sommets
-     * @param EBO le element buffer object, les triangles a afficher
+     * @brief Configure les buffers OpenGL pour le rendu avec LOD
+     * @param vao Vertex Array Object
+     * @param vbo Vertex Buffer Object
+     * @param ebo Element Buffer Object
      */
-    void setup_terrain(GLuint &VAO, GLuint &VBO, GLuint &EBO);
+    void setupTerrainLod(GLuint &vao, GLuint &vbo, GLuint &ebo);
 
     /**
-     * @brief Dessine les triangles avec les données du terrain
-    */
-    void renderer();
-
-    /**
-     * @brief Retourne la height au point (i,j)
-     * @param i l'indice de la ligne
-     * @param j l'indice de la colonne
-    */
-    int get_height(int i, int j) const{
-        return data[j * width + i];
-    };
-
-    /**
-     * @brief Met à jour la height au point (i,j)
-     * @param i l'indice de la ligne
-     * @param j l'indice de la colonne
-     * @param value la valeur a insérer à la position(i,j)
-    */
-    void set_height(int i, int j, float value){
-        data[j * width + i] = value;
-    };
-
-    /**
-     * @brief Retourne la plus grande height
-    */
-    float get_max_height() const{
-        return max_height;
-    };
-
-    /**
-     * @brief Retourne la plus petite height
-    */
-    float get_min_height() const{
-        return min_height;
-    };
-
-    /**
-     * @brief Retourne la height du terrain
-    */
-    int get_terrain_height() const{
-        return this->height;
-    };
-
-    /**
-     * @brief Retourne la width du terrain
-    */
-    int get_terrain_width() const{
-        return this->width;
-    };
-
-    /**
-     * @brief Met à jour le vecteur data du terrain
-     * @param value la valeur a insérer à data[i]
-    */
-    void set_data(int i, float value);
-
-    /**
-     * @brief Retourne le vecteur data du terrain
-    */
-    std::vector<float>* get_data();
-    //std::vector<float> get_data();
-
-    /**
-     * @brief Retourne la size du vecteur indices
-    */
-    int get_indices_size() const;
-
-    /**
-     * @brief Retourne la size du vecteur vertices
-    */
-    int get_vertices_size() const;
-
-    /**
-     * @brief Verifie si on est en dehors du terrain
-    */
-    bool inside(int i, int j) const;
-
-    /**
-     * @brief Met à jour les vertices
-    */
-    void update_vertices();
-    const std::vector<float>& get_vertices() const { return vertices; }
-
-    /**
-     * @brief Met à jour les sommets du terrain sur le GPU.
-     *
-     * Cette fonction met à jour le Vertex Buffer Object (VBO) du terrain
-     * sans recréer les buffers OpenGL. Elle recalcule les positions des sommets
-     * à partir des données de hauteur actuelles et transfère les nouvelles valeurs
-     * vers le GPU à l’aide d’une mise à jour dynamique du buffer.
-     *
-     * Cette méthode est destinée à être appelée lors des étapes de simulation
-     * (érosion thermique ou hydraulique), lorsque la topologie du terrain
-     * reste inchangée et que seules les hauteurs des sommets évoluent.
-     *
-     * @param VBO Identifiant du Vertex Buffer Object OpenGL à mettre à jour.
+     * @brief Effectue le rendu du terrain avec LOD
+     * @param cameraPos Position de la caméra
+     * @param projection Matrice de projection
+     * @param view Matrice de vue
      */
-    void update_vertices_gpu(GLuint VBO);
+    void renderLod(const glm::vec3 &cameraPos, glm::mat4 &projection, glm::mat4 &view);
 
+    /**
+     * @brief Crée les patches pour le système LOD
+     *
+     * Divise le terrain en patches de taille PATCH_SIZE et initialise
+     * leurs paramètres (position, facteur d'échelle).
+     */
+    void createPatches();
+
+    /**
+     * @brief Retourne le frustum du terrain
+     * @return Référence vers le frustum
+     */
+    Frustrum &getFrustrum();
+
+    /**
+     * @brief Retourne la liste des patches
+     * @return Référence vers le vecteur de patches
+     */
+    std::vector<std::unique_ptr<Patch>> &getPatches();
+
+    /**
+     * @brief Retourne le gestionnaire de rendu
+     * @return Pointeur vers le RendererManager
+     */
+    RendererManager *getRendererManager();
+
+    /**
+     * @brief Définit le gestionnaire de rendu
+     * @param renderer Pointeur unique vers le RendererManager
+     */
+    void setRenderer(std::unique_ptr<RendererManager> renderer);
+
+    /**
+     * @brief Retourne la hauteur au point (i,j)
+     * @param i Indice de la colonne
+     * @param j Indice de la ligne
+     * @return Hauteur au point (i,j)
+     */
+    float getHeight(int i, int j) const
+    {
+        return mData[j * mWidth + i];
+    };
+
+    /**
+     * @brief Met à jour la hauteur au point (i,j)
+     * @param i Indice de la colonne
+     * @param j Indice de la ligne
+     * @param value Nouvelle hauteur
+     */
+    void setHeight(int i, int j, float value)
+    {
+        mData[j * mWidth + i] = value;
+    };
+
+    /**
+     * @brief Retourne la hauteur maximale du terrain
+     * @return Hauteur maximale
+     */
+    float getMaxHeight() const
+    {
+        return mMaxHeight;
+    };
+
+    /**
+     * @brief Retourne la hauteur minimale du terrain
+     * @return Hauteur minimale
+     */
+    float getMinHeight() const
+    {
+        return mMinHeight;
+    };
+
+    /**
+     * @brief Retourne la hauteur du terrain (nombre de cellules)
+     * @return Hauteur en nombre de cellules
+     */
+    int getTerrainHeight() const
+    {
+        return mHeight;
+    };
+
+    /**
+     * @brief Retourne la largeur du terrain (nombre de cellules)
+     * @return Largeur en nombre de cellules
+     */
+    int getTerrainWidth() const
+    {
+        return mWidth;
+    };
+
+    /**
+     * @brief Met à jour une valeur dans le vecteur de données
+     * @param i Index dans le vecteur
+     * @param value Nouvelle valeur
+     */
+    void setData(int i, float value);
+
+    /**
+     * @brief Retourne le vecteur de données
+     * @return Pointeur vers le vecteur de hauteurs
+     */
+    std::vector<float> *getData();
+
+    /**
+     * @brief Retourne la taille du vecteur d'indices
+     * @return Nombre d'indices
+     */
+    int getIndicesSize() const;
+
+    /**
+     * @brief Retourne la taille du vecteur de sommets
+     * @return Nombre de sommets
+     */
+    int getVerticesSize() const;
+
+    /**
+     * @brief Vérifie si un point est dans les limites du terrain
+     * @param i Coordonnée X
+     * @param j Coordonnée Z
+     * @return true si le point est dans le terrain
+     */
+    bool isInside(int i, int j) const;
+
+    /**
+     * @brief Met à jour les sommets du terrain
+     */
+    void updateVertices();
+
+    /**
+     * @brief Retourne le vecteur de sommets (lecture seule)
+     * @return Référence constante vers le vecteur de sommets
+     */
+    const std::vector<Vertex> &getVertex() const
+    {
+        return mVertex;
+    }
+
+    /**
+     * @brief Met à jour les sommets LOD sur le GPU
+     */
+    void updateVerticesGpuLod();
+
+    void initTexture();
+
+    GLuint getTextureId();
+
+    Texture* getTexture();
 };
 
 #endif

@@ -14,15 +14,17 @@ void PerlinNoiseTerrain::CreatePerlinNoise(int width, int height,
                                            float persistence,
                                            float lacunarity)
 {
-    this->width = width;
-    this->height = height;
-    this->min_height = minHeight;
-    this->max_height = maxHeight;
-    this->yfactor = 1.0f;
-    this->xzfactor = 1.0f / scale;
-    this->borderSize = 0;
+    this->mWidth = width;
+    this->mHeight = height;
+    this->mMinHeight = minHeight;
+    this->mMaxHeight = maxHeight;
+    this->mYFactor = 1.0f;
+    this->mXzFactor = 1.0f / scale;
+    this->mBorderSize = 0;
 
-    this->data.assign(width * height, 0.0f);
+    this->mData.assign(width * height, 0.0f);
+
+    this->mRenderer = (std::make_unique<RendererManager>(this));
 
     mBaseFrequency = frequency;
     mNumOctaves = octaves;
@@ -32,13 +34,15 @@ void PerlinNoiseTerrain::CreatePerlinNoise(int width, int height,
     InitPermutation();
     CreatePerlinNoiseInternal(minHeight, maxHeight);
     Normalize();
+
+    createPatches();
 }
 
 void PerlinNoiseTerrain::CreatePerlinNoiseInternal(float minH, float maxH)
 {
-    for (int z = 0; z < height; z++)
+    for (int z = 0; z < mHeight; z++)
     {
-        for (int x = 0; x < width; x++)
+        for (int x = 0; x < mWidth; x++)
         {
             float xf = static_cast<float>(x) * mBaseFrequency;
             float yf = static_cast<float>(z) * mBaseFrequency;
@@ -54,7 +58,7 @@ void PerlinNoiseTerrain::CreatePerlinNoiseInternal(float minH, float maxH)
                 freq *= mLacunarityCoef;
             }
 
-            set_height(x, z, noise);
+            setHeight(x, z, noise);
         }
     }
 }
@@ -131,16 +135,16 @@ inline float PerlinNoiseTerrain::Lerp(float a, float b, float t) const
 
 void PerlinNoiseTerrain::Normalize()
 {
-    auto minMax = std::minmax_element(data.begin(), data.end());
+    auto minMax = std::minmax_element(mData.begin(), mData.end());
 
     float min = *minMax.first;
     float max = *minMax.second;
 
     float minMaxDelta = max - min;
-    float minMaxRange = max_height - min_height;
+    float minMaxRange = mMaxHeight - mMinHeight;
 
-    for (auto& element : data)
+    for (auto& element : mData)
     {
-        element = (element - min) / minMaxDelta * minMaxRange + min_height;
+        element = (element - min) / minMaxDelta * minMaxRange + mMinHeight;
     }
 }

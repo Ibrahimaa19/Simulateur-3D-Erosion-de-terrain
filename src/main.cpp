@@ -54,7 +54,7 @@ int main(int argc, char const *argv[])
         {
         case Heightmap::LoadHeightmap:
             terrain = std::make_unique<Terrain>();
-            terrain->load_terrain("../src/heightmap/iceland_heightmap.png", 1.0f, 100.0f);
+            terrain->loadTerrain("../src/heightmap/iceland_heightmap.png", 1.0f, 100.0f);
             break;
         case Heightmap::FaultFormation:
             {
