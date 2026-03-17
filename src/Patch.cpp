@@ -1,12 +1,13 @@
 #include "Patch.hpp"
 
-void Patch::setPatch(unsigned int x, unsigned int z, float xzFactor, unsigned int nbPatchX, unsigned int nbPatchZ)
+void Patch::setPatch(unsigned int x, unsigned int z, float xzFactor, unsigned int nbPatchX, unsigned int nbPatchZ,Texture* texture)
 {
     this->mPatchX = x;
     this->mPatchZ = z;
     this->mXzFactor = xzFactor;
     this->mNbPatchX = nbPatchX;
     this->mNbPatchZ = nbPatchZ;
+    this->mPatchTexture = texture;
 }
 
 void Patch::addNeighbor(Patch *neighbor)
@@ -125,7 +126,10 @@ void Patch::generateLodVertices(std::vector<float> &heights, unsigned int width,
 
 
                 glm::vec3 vecPos(((float)worldX / mXzFactor),heightValue,((float)worldZ / mXzFactor));
-                glm::vec2 vecTex(0.,0.);
+                float u = (float)worldX/ (width*mXzFactor);
+                float v = (float)worldZ/ (height*mXzFactor);
+                
+                glm::vec2 vecTex(u,v);
 
                 mLod[k].vertices.push_back(Vertex(vecPos,vecTex));
             }

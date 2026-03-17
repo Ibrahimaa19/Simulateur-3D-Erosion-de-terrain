@@ -51,7 +51,7 @@ void RendererManager::renderLod(const glm::vec3 &cameraPos, glm::mat4 &projectio
             
         }
 
-        std::cout << "patch rendered: " << patchRendered << "/" << patches.size() << std::endl;
+        //std::cout << "patch rendered: " << patchRendered << "/" << patches.size() << std::endl;
     }
     else
     {

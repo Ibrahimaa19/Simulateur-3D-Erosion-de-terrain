@@ -52,7 +52,7 @@ void Terrain::createPatches()
         for (int j = 0; j < nbPatchZ; ++j)
         {
             std::unique_ptr<Patch> p = std::make_unique<Patch>();
-            p->setPatch(i, j, mXzFactor, nbPatchX, nbPatchZ);
+            p->setPatch(i, j, mXzFactor, nbPatchX, nbPatchZ,mTexture);
             this->mPatches.push_back(std::move(p));
         }
     }
@@ -127,4 +127,32 @@ void Terrain::setRenderer(std::unique_ptr<RendererManager> renderer)
     {
         mRenderer->setTerrain(this);
     }
+}
+
+void Terrain::initTexture()
+{
+    this->mTexture = new Texture();
+    mTexture->generateRegion(mMinHeight,mMaxHeight);
+
+    glBindTexture(GL_TEXTURE_2D, mTextureID);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    mTexture->loadTile("../src/texture/IMGP5525_seamless.jpg",0);
+    mTexture->loadTile("../src/texture/IMGP5487_seamless.jpg",1);
+    mTexture->loadTile("../src/texture/grass.jpg",2);
+    mTexture->loadTile("../src/texture/water.jpg",3);
+}
+
+GLuint Terrain::getTextureId()
+{
+    return this->mTextureID;
+}
+
+Texture* Terrain::getTexture()
+{
+    return this->mTexture;
 }

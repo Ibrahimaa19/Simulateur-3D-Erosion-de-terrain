@@ -1,6 +1,7 @@
 #ifndef PATCH_H
 #define PATCH_H
 
+#include "Texture.hpp"
 #include "Frustrum.hpp"
 #include <GL/glew.h>
 #include <algorithm>
@@ -62,6 +63,8 @@ class Patch
 
     std::vector<Patch *> mNeighbors; /** Vecteur des patches voisins */
 
+    Texture* mPatchTexture;
+
   public:
     /**
      * @brief Initialise les paramètres du patch
@@ -71,7 +74,7 @@ class Patch
      * @param nbPatchX Nombre total de patches en X
      * @param nbPatchZ Nombre total de patches en Z
      */
-    void setPatch(unsigned int x, unsigned int z, float xzFactor, unsigned int nbPatchX, unsigned int nbPatchZ);
+    void setPatch(unsigned int x, unsigned int z, float xzFactor, unsigned int nbPatchX, unsigned int nbPatchZ,Texture* texture);
 
     /**
      * @brief Ajoute un patch voisin

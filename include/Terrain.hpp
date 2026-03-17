@@ -12,6 +12,7 @@
 
 #include "Patch.hpp"
 #include "stb_image.hpp"
+#include "Texture.hpp"
 
 class RendererManager;
 
@@ -41,6 +42,9 @@ class Terrain
 
     Frustrum mFrustrum;                         /**< Frustum pour le culling */
     std::unique_ptr<RendererManager> mRenderer; /**< Gestionnaire de rendu */
+
+    GLuint mTextureID;
+    Texture* mTexture;
 
     /**
      * @brief Met à jour les vertices pour tous les niveaux LOD
@@ -232,6 +236,12 @@ class Terrain
      * @brief Met à jour les sommets LOD sur le GPU
      */
     void updateVerticesGpuLod();
+
+    void initTexture();
+
+    GLuint getTextureId();
+
+    Texture* getTexture();
 };
 
 #endif
