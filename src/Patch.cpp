@@ -125,9 +125,10 @@ void Patch::generateLodVertices(std::vector<float> &heights, unsigned int width,
                 }
 
 
+                float textureScale = 20.f;
                 glm::vec3 vecPos(((float)worldX / mXzFactor),heightValue,((float)worldZ / mXzFactor));
-                float u = (float)worldX/ (width*mXzFactor);
-                float v = (float)worldZ/ (height*mXzFactor);
+                float u = textureScale*(float)worldX/ (width*mXzFactor);
+                float v = textureScale*(float)worldZ/ (height*mXzFactor);
                 
                 glm::vec2 vecTex(u,v);
 

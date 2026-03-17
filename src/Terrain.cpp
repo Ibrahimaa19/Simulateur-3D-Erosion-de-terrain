@@ -4,6 +4,7 @@
 #include "ThermalErosion.hpp"
 #include <fstream>
 
+
 void Terrain::loadTerrain(const char *imagePath, float yFactor, float xzFactor)
 {
     int t_channels;
@@ -28,11 +29,23 @@ void Terrain::loadTerrain(const char *imagePath, float yFactor, float xzFactor)
 
     for (int i = 0; i < mWidth * mHeight; i++)
     {
-        this->mData[i] = image[i] / 255.0f;
+        this->mData[i] = image[i];
     }
 
     this->mMaxHeight = *std::max_element(mData.begin(), mData.end());
     this->mMinHeight = *std::min_element(mData.begin(), mData.end());
+
+
+    // for (int i = 0; i < mWidth * mHeight; i++)
+    // {
+    //     this->mData[i] = image[i]/(mMaxHeight-mMinHeight);
+    // }
+
+
+    // this->mMaxHeight = *std::max_element(mData.begin(), mData.end());
+    // this->mMinHeight = *std::min_element(mData.begin(), mData.end());
+
+    std::cout << "max:" << mMaxHeight << ", min:" << mMinHeight << std::endl;
 
     this->mRenderer = (std::make_unique<RendererManager>(this));
 
@@ -133,13 +146,6 @@ void Terrain::initTexture()
 {
     this->mTexture = new Texture();
     mTexture->generateRegion(mMinHeight,mMaxHeight);
-
-    glBindTexture(GL_TEXTURE_2D, mTextureID);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     mTexture->loadTile("../src/texture/IMGP5525_seamless.jpg",0);
     mTexture->loadTile("../src/texture/IMGP5487_seamless.jpg",1);

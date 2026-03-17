@@ -32,6 +32,7 @@ private:
     Tiles mTiles[4];
     unsigned int mNumTiles = 4;
     std::vector<glm::vec3> mTextureData;
+    GLuint mTextureId[4];
 public:
     Texture();
     ~Texture();
@@ -42,6 +43,7 @@ public:
     void generateTexture(const std::vector<float>& heightData,const int terrainWidth,const int terrainHeight);
 
     void setupTexture(const GLuint idTexture,const unsigned int width,const unsigned int height);
+    GLuint getTextureId(const int index);
 };
 
 #endif

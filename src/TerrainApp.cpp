@@ -89,7 +89,6 @@ void TerrainApp::InitScene()
     mShader = std::make_unique<Shader>("../shaders/terrain.vs", "../shaders/terrain.fs");
 
     mShader->Use();
-    //mShader->SetInt("terrainTexture", 0);
 
     mModel = glm::mat4(1.0f);
     mView = mCamera.GetViewMatrix();
@@ -116,14 +115,14 @@ void TerrainApp::GenerateTerrainFromGui()
         const char* path = "../src/heightmap/iceland_heightmap.png";
         if (mGui.selectedImage == 1) path = "../src/heightmap/ireland_heightmap.png";
 
-        mTerrain->loadTerrain(path, 1.0f, 100.0f);
+        mTerrain->loadTerrain(path, 1.0f, 1.0f);
 
         mTerrain->getRendererManager()->setTerrain(mTerrain.get());
 
         mCamera.MoveTo(glm::vec3{0.0f, 5.0f, 0.0f});
         mCamera.TurnTo(glm::vec3{mTerrain->getTerrainWidth()/2.0f, 0.0f, mTerrain->getTerrainHeight()/2.0f});
 
-        setCameraSpeed(0.2);
+        setCameraSpeed(5.);
     }
     
     else 
@@ -188,13 +187,11 @@ void TerrainApp::GenerateTerrainFromGui()
 
     mTerrain->initTexture();
     mShader->Use();
-    mShader->SetInt("terrainTexture", 0);
 
     mTerrain->setupTerrainLod(mVAO, mVBO, mIBO);
     mThermalErosion.loadTerrainInfo(mTerrain);
 
-    mTerrain->getTexture()->generateTexture(*(mTerrain->getData()),mTerrain->getTerrainWidth(),mTerrain->getTerrainHeight());
-    mTerrain->getTexture()->setupTexture(mTerrain->getTextureId(),mTerrain->getTerrainWidth(),mTerrain->getTerrainHeight());
+
 }
 
 void TerrainApp::Run()
@@ -263,9 +260,6 @@ void TerrainApp::Run()
             if (mShowMenu) {
                 mGui.Render(mTerrain.get()); 
             }
-
-            // mTerrain->getTexture()->generateTexture(*(mTerrain->getData()),mTerrain->getTerrainWidth(),mTerrain->getTerrainHeight());
-            // mTerrain->getTexture()->setupTexture(mTerrain->getTextureId(),mTerrain->getTerrainWidth(),mTerrain->getTerrainHeight());
         }
 
         glfwSwapBuffers(mWindow);
@@ -285,10 +279,20 @@ void TerrainApp::RenderScene()
     glBindVertexArray(mVAO);
     mTerrain->getRendererManager()->renderLod(mCamera.GetPosition(),mProjection,mView);
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, mTerrain->getTextureId());
 
-    //mShader->SetInt("terrainTexture",0);
+    for (int i = 0; i < 4; i++) {
+        glActiveTexture(GL_TEXTURE0 + i);
+        glBindTexture(GL_TEXTURE_2D, mTerrain->getTexture()->getTextureId(i));
+    }
+
+    mShader->SetInt("terrainTexture0", 0);
+    mShader->SetInt("terrainTexture1", 1);
+    mShader->SetInt("terrainTexture2", 2);
+    mShader->SetInt("terrainTexture3", 3);
+
+    std::cout << "=== Uniforms hauteurs ===" << std::endl;
+    std::cout << "MinHeight terrain: " << mTerrain->getMinHeight() << std::endl;
+    std::cout << "MaxHeight terrain: " << mTerrain->getMaxHeight() << std::endl;
 }
 
 void TerrainApp::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
