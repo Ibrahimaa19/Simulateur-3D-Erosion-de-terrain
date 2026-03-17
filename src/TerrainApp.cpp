@@ -112,17 +112,25 @@ void TerrainApp::GenerateTerrainFromGui()
         
         mTerrain = std::make_unique<Terrain>(); 
 
-        const char* path = "../src/heightmap/iceland_heightmap.png";
-        if (mGui.selectedImage == 1) path = "../src/heightmap/ireland_heightmap.png";
+        const char* path = "../src/heightmap/helbert_heightmap.png";
+
+        // https://manticorp.github.io/unrealheightmap
+        if (mGui.selectedImage == 0) 
+            path = "../src/heightmap/canyon_heightmap.png";
+        else if(mGui.selectedImage == 1)
+            path = "../src/heightmap/fuji_heightmap.png";
+        else if(mGui.selectedImage == 2)
+            path = "../src/heightmap/paris_heightmap.png";
+        else if(mGui.selectedImage == 3)
+            path = "../src/heightmap/helbert_heightmap.png";
+        else if(mGui.selectedImage == 4)
+            path = "../src/heightmap/sopka_heightmap.png";
+        else if(mGui.selectedImage == 5)
+            path = "../src/heightmap/grandCayon_heightmap.png";
 
         mTerrain->loadTerrain(path, 1.0f, 1.0f);
 
         mTerrain->getRendererManager()->setTerrain(mTerrain.get());
-
-        mCamera.MoveTo(glm::vec3{0.0f, 5.0f, 0.0f});
-        mCamera.TurnTo(glm::vec3{mTerrain->getTerrainWidth()/2.0f, 0.0f, mTerrain->getTerrainHeight()/2.0f});
-
-        setCameraSpeed(5.);
     }
     
     else 
@@ -178,12 +186,12 @@ void TerrainApp::GenerateTerrainFromGui()
             generator->setRenderer(std::move(renderer));
 
             mTerrain = std::move(generator);
-        }
-
-        mCamera.MoveTo(glm::vec3{-54.0f, 220.0f, -42.0f});
-        mCamera.TurnTo(glm::vec3{mTerrain->getTerrainWidth()/2.0f, 0.0f, mTerrain->getTerrainHeight()/2.0f});
-        setCameraSpeed(5.);
+        } 
     }
+
+    setCameraSpeed(5.);
+    mCamera.MoveTo(glm::vec3{-54.0f, 220.0f, -42.0f});
+    mCamera.TurnTo(glm::vec3{mTerrain->getTerrainWidth()/2.0f, 0.0f, mTerrain->getTerrainHeight()/2.0f});
 
     mTerrain->initTexture();
     mShader->Use();
@@ -289,10 +297,6 @@ void TerrainApp::RenderScene()
     mShader->SetInt("terrainTexture1", 1);
     mShader->SetInt("terrainTexture2", 2);
     mShader->SetInt("terrainTexture3", 3);
-
-    std::cout << "=== Uniforms hauteurs ===" << std::endl;
-    std::cout << "MinHeight terrain: " << mTerrain->getMinHeight() << std::endl;
-    std::cout << "MaxHeight terrain: " << mTerrain->getMaxHeight() << std::endl;
 }
 
 void TerrainApp::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)

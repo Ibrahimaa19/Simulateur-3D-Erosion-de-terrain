@@ -113,8 +113,8 @@ void Gui::Render(Terrain* terrain) {
 
         if (selectedMethod == GEN_HEIGHTMAP) {
             ImGui::Text("Chargement depuis un fichier image PNG.");
-            const char* imgItems[] = { "iceland_heightmap.png", "heightmap.png", "ireland_heightmap.png" };
-            ImGui::Combo("Fichier Source", &selectedImage, imgItems, 2);
+            const char* imgItems[] = { "canyon_heightmap.png", "fuji_heightmap.png", "paris_heightmap.png","helbert_heightmap.png","sopka_heightmap.png","grandCayon_heightmap.png"};
+            ImGui::Combo("Fichier Source", &selectedImage, imgItems, 6);
         }
         else if (selectedMethod == GEN_FAULT_FORMATION) {
             ImGui::Text("Generation procedurale par failles.");

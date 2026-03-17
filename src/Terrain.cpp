@@ -35,18 +35,6 @@ void Terrain::loadTerrain(const char *imagePath, float yFactor, float xzFactor)
     this->mMaxHeight = *std::max_element(mData.begin(), mData.end());
     this->mMinHeight = *std::min_element(mData.begin(), mData.end());
 
-
-    // for (int i = 0; i < mWidth * mHeight; i++)
-    // {
-    //     this->mData[i] = image[i]/(mMaxHeight-mMinHeight);
-    // }
-
-
-    // this->mMaxHeight = *std::max_element(mData.begin(), mData.end());
-    // this->mMinHeight = *std::min_element(mData.begin(), mData.end());
-
-    std::cout << "max:" << mMaxHeight << ", min:" << mMinHeight << std::endl;
-
     this->mRenderer = (std::make_unique<RendererManager>(this));
 
     stbi_image_free(image);
