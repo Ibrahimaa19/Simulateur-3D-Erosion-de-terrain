@@ -18,15 +18,17 @@ MidpointDisplacement::MidpointDisplacement()
 void MidpointDisplacement::CreateMidpointDisplacement(int size, float minHeight, float maxHeight, float scale, float roughness)
 {
     
-    this->width  = size;
-    this->height = size;
-    this->min_height = minHeight;
-    this->max_height = maxHeight;
-    this->yfactor = 1.0f;
-    this->xzfactor = 1.0f / scale;
-    this->borderSize = 0;
+    this->mWidth  = size;
+    this->mHeight = size;
+    this->mMinHeight = minHeight;
+    this->mMaxHeight = maxHeight;
+    this->mYFactor = 1.0f;
+    this->mXzFactor = 1.0f / scale;
+    this->mBorderSize = 0;
 
-    this->data.assign(width * height, 0.0f);
+    this->mData.assign(mWidth * mHeight, 0.0f);
+
+    this->mRenderer = (std::make_unique<RendererManager>(this));
     
     if(!isPowerOfTwo(size - 1))
     {
@@ -36,12 +38,12 @@ void MidpointDisplacement::CreateMidpointDisplacement(int size, float minHeight,
     CreateMidpointDisplacementInterne(roughness);
     Normalize();
 
-    create_patches();
+    createPatches();
 }
 
 void MidpointDisplacement::CreateMidpointDisplacementInterne(float roughness)
 {
-    int rectSize = height - 1;
+    int rectSize = mHeight - 1;
     float curHeight = (float)rectSize / 2.0f;
     float heightReduce = std::pow(2.0f, -roughness);
 
@@ -57,16 +59,16 @@ void MidpointDisplacement::CreateMidpointDisplacementInterne(float roughness)
 
 void MidpointDisplacement::Normalize()
 {
-    auto minMax = std::minmax_element(data.begin(), data.end());
+    auto minMax = std::minmax_element(mData.begin(), mData.end());
     float min = *minMax.first;
     float max = *minMax.second;
 
     float minMaxDelta = max - min;
-    float targetRange = max_height - min_height;
+    float targetRange = mMaxHeight - mMinHeight;
 
-    for(auto& element : data)
+    for(auto& element : mData)
     {
-        element = (element - min) / minMaxDelta * targetRange + min_height;
+        element = (element - min) / minMaxDelta * targetRange + mMinHeight;
     }
 }
 
@@ -74,24 +76,24 @@ void MidpointDisplacement::DiamondStep(int rectSize, float curHeight)
 {
     int halfRectSize = rectSize / 2;
 
-    for (int z = 0; z < height; z += rectSize)
+    for (int z = 0; z < mHeight; z += rectSize)
     {
-        for (int x = 0; x < width; x += rectSize)
+        for (int x = 0; x < mWidth; x += rectSize)
         {
-            int nextZ = (z + rectSize) % height;
-            int nextX = (x + rectSize) % width;
+            int nextZ = (z + rectSize) % mHeight;
+            int nextX = (x + rectSize) % mWidth;
 
-            float bottomLeft  = get_height(z, x);
-            float bottomRight = get_height(z, nextX);
-            float topLeft     = get_height(nextZ, x);
-            float topRight    = get_height(nextZ, nextX);
+            float bottomLeft  = getHeight(z, x);
+            float bottomRight = getHeight(z, nextX);
+            float topLeft     = getHeight(nextZ, x);
+            float topRight    = getHeight(nextZ, nextX);
 
-            int midX = (x + halfRectSize) % width;
-            int midZ = (z + halfRectSize) % height;
+            int midX = (x + halfRectSize) % mWidth;
+            int midZ = (z + halfRectSize) % mHeight;
 
             float average = (bottomLeft + bottomRight + topLeft + topRight) / 4.0f;
 
-            set_height(midX, midZ, average + RandomFloat(-curHeight, curHeight));
+            setHeight(midX, midZ, average + RandomFloat(-curHeight, curHeight));
         }
     }
 }
@@ -100,40 +102,40 @@ void MidpointDisplacement::SquareStep(int rectSize, float curHeight)
 {
     int halfRectSize = rectSize / 2;
 
-    for (int z = 0; z < height; z += halfRectSize)
+    for (int z = 0; z < mHeight; z += halfRectSize)
     {
-        for (int x = (z + halfRectSize) % rectSize; x < width; x += rectSize)
+        for (int x = (z + halfRectSize) % rectSize; x < mWidth; x += rectSize)
         {
             float sum = 0.0f;
             int count = 0;
 
-            if (inside(z - halfRectSize, x))
+            if (isInside(z - halfRectSize, x))
             {
-                sum += get_height(x, z - halfRectSize);
+                sum += getHeight(x, z - halfRectSize);
                 count++;
             }
 
-            if (inside(z + halfRectSize, x))
+            if (isInside(z + halfRectSize, x))
             {
-                sum += get_height(x, z + halfRectSize);
+                sum += getHeight(x, z + halfRectSize);
                 count++;
             }
 
-            if (inside(z, x - halfRectSize))
+            if (isInside(z, x - halfRectSize))
             {
-                sum += get_height(x - halfRectSize, z);
+                sum += getHeight(x - halfRectSize, z);
                 count++;
             }
 
-            if (inside(z, x + halfRectSize))
+            if (isInside(z, x + halfRectSize))
             {
-                sum += get_height(x + halfRectSize, z);
+                sum += getHeight(x + halfRectSize, z);
                 count++;
             }
 
             float average = sum / count;
 
-            set_height(x, z, average + RandomFloat(-curHeight, curHeight));
+            setHeight(x, z, average + RandomFloat(-curHeight, curHeight));
         }
     }
 }

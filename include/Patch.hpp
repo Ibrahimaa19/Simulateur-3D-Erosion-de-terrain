@@ -1,240 +1,193 @@
 #ifndef PATCH_H
 #define PATCH_H
 
-#include <vector>
+#include "Texture.hpp"
+#include "Frustrum.hpp"
+#include <GL/glew.h>
+#include <algorithm>
 #include <iostream>
+#include <vector>
 
-struct Lod{
-    std::vector<float> vertices;
-    std::vector<unsigned int> indices;
+#define PATCH_SIZE 32 /**< Taille d'un patch en nombre de cellules */
+
+
+struct Vertex{
+    glm::vec3 position;
+    glm::vec2 texture;
+    Vertex (glm::vec3 pos,glm::vec2 tex) : position(pos), texture(tex){};
 };
 
-class Patch{
-    private:
-        float xzfactor;
-        unsigned int patch_size = 32;
-        unsigned int patch_x,patch_z;
-        unsigned int nb_patch_x,nb_patch_z;
-        Lod lod[5];
-        int lodSteps[5] = {1,2,4,8,16};
-        GLuint vbo[5];  
-        GLuint ebo[5];
-        GLuint vao[5];
-        int lodLevel;
+/**
+ * @brief Structure représentant un niveau de détail (LOD)
+ *
+ * Contient les données de géométrie pour un niveau de détail spécifique.
+ * Chaque patch a 5 niveaux de LOD (0 = détail maximal, 4 = détail minimal).
+ */
+struct Lod
+{
+    std::vector<Vertex> vertices;      /** Coordonnées des sommets (x,y,z) et texture (u,v) */
+    std::vector<unsigned int> indices; /** Indices pour le rendu triangle */
+};
 
-        std::vector<Patch*> neightbour;
-    
-    public:
+/**
+ * @class Patch
+ * @brief Représente une portion du terrain avec gestion multi-LOD
+ *
+ * Un patch est une subdivision du terrain de taille fixe (PATCH_SIZE x PATCH_SIZE).
+ * Il gère plusieurs niveaux de détail (LOD) pour optimiser le rendu :
+ * - LOD 0 : résolution maximale (pas = 1)
+ * - LOD 1 : pas = 2
+ * - LOD 2 : pas = 4
+ * - LOD 3 : pas = 8
+ * - LOD 4 : pas = 16 (résolution minimale)
+ *
+ * Les patches sont également responsables de leurs voisins pour assurer
+ * une transition cohérente entre différents niveaux de LOD.
+ */
+class Patch
+{
+  private:
+    float mXzFactor;                      /** Facteur d'échelle sur les axes X et Z */
+    unsigned int mPatchSize = PATCH_SIZE; /** Taille du patch (constante) */
+    unsigned int mPatchX, mPatchZ;        /** Coordonnées du patch dans la grille */
+    unsigned int mNbPatchX, mNbPatchZ;    /** Nombre total de patches en X et Z */
 
-        void set_patch(unsigned int x,unsigned int z,float xz,unsigned int nb_p_x,unsigned int nb_p_z){
-            this->patch_x = x;
-            this->patch_z = z;
-            this->xzfactor = xz;
-            this->nb_patch_x = nb_p_x;
-            this->nb_patch_z = nb_p_z;
-        }
+    Lod mLod[5];                         /** Données pour les 5 niveaux de LOD */
+    int mLodSteps[5] = {1, 2, 4, 8, 16}; /** Pas de chaque niveau de LOD */
 
-        void addNeightbour(Patch* p){
-            neightbour.push_back(p);
-        }
+    GLuint mVbo[5]; /** Vertex Buffer Objects pour chaque LOD */
+    GLuint mEbo[5]; /** Element Buffer Objects pour chaque LOD */
+    GLuint mVao[5]; /** Vertex Array Objects pour chaque LOD */
 
-        int getNeightbourNumber(){
-            return neightbour.size();
-        }
+    int mLodLevel; /** Niveau de LOD actuellement sélectionné */
 
-        std::vector<Patch*> getNeightbour(){
-            return this->neightbour;
-        }
+    std::vector<Patch *> mNeighbors; /** Vecteur des patches voisins */
 
-        int getNeightbourLodLevel(int i){
-            return this->neightbour[i]->lodLevel;
-        }
+    Texture* mPatchTexture;
 
-        unsigned int get_patch_x(){
-            return this->patch_x;
-        }
+  public:
+    /**
+     * @brief Initialise les paramètres du patch
+     * @param x Coordonnée X du patch dans la grille
+     * @param z Coordonnée Z du patch dans la grille
+     * @param xzFactor Facteur d'échelle XZ
+     * @param nbPatchX Nombre total de patches en X
+     * @param nbPatchZ Nombre total de patches en Z
+     */
+    void setPatch(unsigned int x, unsigned int z, float xzFactor, unsigned int nbPatchX, unsigned int nbPatchZ,Texture* texture);
 
-        unsigned int get_patch_z(){
-            return this->patch_z;
-        }
+    /**
+     * @brief Ajoute un patch voisin
+     * @param neighbor Pointeur vers le patch voisin
+     */
+    void addNeighbor(Patch *neighbor);
 
-        GLuint get_vbo(int lod){
-            return this->vbo[lod];
-        }
+    /**
+     * @brief Retourne la liste des patches voisins
+     * @return Vecteur de pointeurs vers les patches voisins
+     */
+    std::vector<Patch *> getNeighbors();
 
+    /**
+     * @brief Retourne le niveau LOD d'un voisin
+     * @param index Index du voisin
+     * @return Niveau LOD du voisin
+     */
+    int getNeighborLodLevel(int index);
 
-        void creerBuffersGL() {
+    /**
+     * @brief Retourne la coordonnée X du patch
+     * @return Coordonnée X
+     */
+    unsigned int getPatchX();
 
-            for (int lod = 0; lod < 5; lod++) {
+    /**
+     * @brief Retourne la coordonnée Z du patch
+     * @return Coordonnée Z
+     */
+    unsigned int getPatchZ();
 
-                glGenVertexArrays(1, &vao[lod]);
-                glBindVertexArray(vao[lod]);
+    /**
+     * @brief Retourne le VBO pour un niveau LOD donné
+     * @param lodLevel Niveau de LOD
+     * @return Identifiant OpenGL du VBO
+     */
+    GLuint getVbo(int lodLevel);
 
-                // Créer VBO
-                glGenBuffers(1, &vbo[lod]);
-                glBindBuffer(GL_ARRAY_BUFFER, vbo[lod]);
-                glBufferData(GL_ARRAY_BUFFER,this->lod[lod].vertices.size() * sizeof(float),this->lod[lod].vertices.data(),GL_DYNAMIC_DRAW);
-                
-                glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-                glEnableVertexAttribArray(0);
+    /**
+     * @brief Crée les buffers OpenGL pour tous les niveaux LOD
+     *
+     * Génère les VAO, VBO et EBO pour chaque niveau de LOD
+     * et initialise les attributs de sommet.
+     */
+    void createBuffersGL();
 
-                // Créer EBO
-                glGenBuffers(1, &ebo[lod]);
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo[lod]);
-                glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                this->lod[lod].indices.size() * sizeof(unsigned int),
-                this->lod[lod].indices.data(),
-                GL_DYNAMIC_DRAW);
+    /**
+     * @brief Génère les sommets pour tous les niveaux LOD
+     * @param heights Vecteur des hauteurs du terrain
+     * @param width Largeur du terrain
+     * @param height Hauteur du terrain
+     *
+     * Pour chaque niveau LOD, génère les sommets avec :
+     * - Échantillonnage adapté au pas du LOD
+     * - Ajout de "skirt" (jupe) sur les bords pour masquer les trous
+     */
+    void generateLodVertices(std::vector<float> &heights, unsigned int width, unsigned int height);
 
-                glBindVertexArray(0);
-            }
-        }
+    /**
+     * @brief Génère les indices pour tous les niveaux LOD
+     * @param heights Vecteur des hauteurs (non utilisé directement)
+     * @param width Largeur du terrain (non utilisé)
+     * @param height Hauteur du terrain (non utilisé)
+     *
+     * Crée les indices pour former une grille de triangles
+     * pour chaque niveau de LOD.
+     */
+    void generateLodIndices(std::vector<float> &heights, unsigned int width, unsigned int height);
 
-        void generate_lod_vertices(std::vector<float>& heights,unsigned int width,unsigned int height){
-            float heightValue = 0.f;
-            const float skirtDepth = 0.01f;
+    /**
+     * @brief Effectue le rendu du patch avec son LOD actuel
+     *
+     * Lie les buffers appropriés et dessine le patch
+     * en utilisant le niveau LOD courant.
+     */
+    void render();
 
-            for (int k=0;k<5;++k){
-                lod[k].vertices.clear();
-                int step = lodSteps[k];
+    /**
+     * @brief Choisit le niveau LOD approprié en fonction de la caméra
+     * @param cameraPos Position de la caméra
+     * @param frustrum Frustum pour le test de visibilité
+     * @return Niveau LOD choisi (0-4) ou -1 si hors frustum
+     *
+     * Le choix du LOD est basé sur :
+     * 1. Test de visibilité dans le frustum
+     * 2. Distance caméra-patch
+     */
+    int chooseLod(glm::vec3 cameraPos, Frustrum *frustrum);
 
-                int innerResolution = (32 / step) + 1;
+    /**
+     * @brief Retourne le niveau LOD actuel
+     * @return Niveau LOD courant
+     */
+    int getLodLevel();
 
-                // résolution étendue (+2 pour skirt)
-                int resolution = innerResolution + 2;
+    /**
+     * @brief Définit le niveau LOD actuel
+     * @param level Nouveau niveau LOD
+     */
+    void setLodLevel(int level);
 
-                lod[k].vertices.reserve(resolution*resolution*3);
-                
-                for (int localY = 0; localY < resolution; localY++) {
-                    for (int localX = 0; localX < resolution; localX++) {
+    /**
+     * @brief Retourne le nombre total de patches en X
+     * @return Nombre de patches en X
+     */
+    int getNbPatchX();
 
-                        // Coordonnées locales internes
-                        int innerX = localX - 1;
-                        int innerY = localY - 1;
-
-                        // Clamp pour rester sur le bord interne
-                        int clampedX = std::clamp(innerX, 0, innerResolution - 1);
-                        int clampedY = std::clamp(innerY, 0, innerResolution - 1);
-
-                        // Position monde correcte (patch de 32)
-                        int worldX = patch_x * 32 + innerX * step;
-                        int worldZ = patch_z * 32 + innerY * step;
-
-                        // lecture dans le vecteur heightmap
-                        int sampleX = patch_x * 32 + clampedX * step;
-                        int sampleZ = patch_z * 32 + clampedY * step;
-
-                        sampleX = std::clamp(sampleX, 0, (int)width - 1);
-                        sampleZ = std::clamp(sampleZ, 0, (int)height - 1);
-
-                        heightValue = heights[sampleZ * width + sampleX];
-
-
-                        if (localX == 0 || localX == resolution - 1 || localY == 0 || localY == resolution - 1){
-
-                            heightValue -= skirtDepth;
-                        }
-                        
-                
-                        lod[k].vertices.push_back((float)worldX/xzfactor);
-                        lod[k].vertices.push_back(heightValue);
-                        lod[k].vertices.push_back(((float)worldZ/xzfactor));
-                    }
-                }
-            }
-        }
-
-        void generate_lod_indices(std::vector<float>& heights,unsigned int width,unsigned int height){
-
-            for (int k=0;k<5;++k){
-                lod[k].indices.clear();
-
-                int step = lodSteps[k];
-                
-
-                int innerResolution = (32 / step) + 1;
-                int resolution = innerResolution + 2;
-
-                int cellsPerRow = resolution - 1;
-
-                lod[k].indices.reserve(resolution*resolution*6);
-
-                for (int y = 0; y < cellsPerRow; y++) {
-                    for (int x = 0; x < cellsPerRow; x++) {
-
-                        int topLeft = y * resolution + x;
-                        int topRight = y * resolution + x + 1;
-                        int bottomLeft = (y+1) * resolution + x;
-                        int bottomRight = (y+1) * resolution + x + 1;
-                        
-                        // Triangle 1
-                        lod[k].indices.push_back((topLeft));
-                        lod[k].indices.push_back((bottomLeft));
-                        lod[k].indices.push_back((topRight));
-                        
-                        // Triangle 2
-                        lod[k].indices.push_back((topRight));
-                        lod[k].indices.push_back((bottomLeft));
-                        lod[k].indices.push_back((bottomRight));
-
-                    }
-                }
-            }
-        }
-
-        void render(){
-            int l = this->lodLevel;
-            glBindVertexArray(vao[l]);
-            glBindBuffer(GL_ARRAY_BUFFER, vbo[l]);
-            glBufferSubData(GL_ARRAY_BUFFER,0,lod[l].vertices.size() * sizeof(float),lod[l].vertices.data());
-
-
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo[l]);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER,lod[l].indices.size() * sizeof(unsigned int),lod[l].indices.data(),GL_DYNAMIC_DRAW);
-
-            glDrawElements(GL_TRIANGLES, lod[l].indices.size(), GL_UNSIGNED_INT, 0);
-
-            glBindVertexArray(0);
-        }
-
-        int chooseLod(float cameraPosX,float cameraPosZ){
-
-            int centerX = patch_x * 32 + 16;
-            int centerZ = patch_z * 32 + 16;
-
-            float dx = cameraPosX - centerX;
-            float dz = cameraPosZ - centerZ;
-
-            float dist2 = dx*dx + dz*dz;
-
-            if (dist2 < 50.0f * 50.0f){
-                return 0;
-            }else if (dist2 < 100.0f * 100.0f){
-                return 1;
-            }else if (dist2 < 150.0f * 150.0f){
-                return 2;
-            }else if (dist2 < 200.0f * 200.0f){
-                return 3;
-            }else{
-                return 4;
-            }
-        }
-
-        int getLodLevel(){
-            return this->lodLevel;
-        }
-
-        void setLodLevel(int l){
-            this->lodLevel = l;
-        }
-
-        int getNbPatchX(){
-            return this->nb_patch_x;
-        }
-        int getNbPatchZ(){
-            return this->nb_patch_z;
-        }
-
+    /**
+     * @brief Retourne le nombre total de patches en Z
+     * @return Nombre de patches en Z
+     */
+    int getNbPatchZ();
 };
 
 #endif

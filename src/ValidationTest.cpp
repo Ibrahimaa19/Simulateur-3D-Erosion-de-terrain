@@ -40,7 +40,7 @@ void ValidationTest::run_all_tests(std::unique_ptr<Terrain>& terrain, const std:
     erosion.setTalusAngle(25.f);
     erosion.setTransferRate(0.1f);
 
-    initialData = *(terrain->get_data());
+    initialData = *(terrain->getData());
     
     int cellsModified[steps];
 
