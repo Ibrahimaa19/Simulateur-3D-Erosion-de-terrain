@@ -21,10 +21,6 @@ void Texture::loadTile(const char* filename,const uint16_t numTile)
     Tiles* tile = &this->mTiles[numTile];
     
     tile->mTextureImage = stbi_load(filename, &width, &height, &t_channels, 0);
-
-
-    std::cout << "Erreur STBI: " << stbi_failure_reason() << std::endl;
-    //std::cout << tile->mTextureImage << std::endl;
     
     tile->channels = t_channels;
     tile->mWidth = width;
@@ -37,6 +33,7 @@ void Texture::loadTile(const char* filename,const uint16_t numTile)
     else
     {
         std::cout << "Failed to load texture." << std::endl;
+        std::cout << "Erreur STBI: " << stbi_failure_reason() << std::endl;
     }
 
 
