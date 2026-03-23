@@ -3,7 +3,7 @@
 #include "RendererManager.hpp"
 #include "ThermalErosion.hpp"
 #include <fstream>
-
+#include <omp.h>
 
 void Terrain::loadTerrain(const char *imagePath, float yFactor, float xzFactor)
 {
@@ -151,20 +151,39 @@ void Terrain::updateVerticesGpuLod(const std::vector<int>& dirtyPatchIndices)
     std::vector<int> sortedDirty = dirtyPatchIndices;
     std::sort(sortedDirty.begin(), sortedDirty.end());
 
-    for (int idx : sortedDirty)
+    const int count = static_cast<int>(sortedDirty.size());
+
+    #pragma omp parallel for schedule(static)
+    for (int k = 0; k < count; ++k)
     {
+        int idx = sortedDirty[k];
         if (idx >= 0 && idx < static_cast<int>(mPatches.size()))
         {
             mPatches[idx]->generateLodVertices(mData, mWidth, mHeight);
+        }
+    }
+
+    for (int k = 0; k < count; ++k)
+    {
+        int idx = sortedDirty[k];
+        if (idx >= 0 && idx < static_cast<int>(mPatches.size()))
+        {
             mPatches[idx]->uploadLodToGpu();
         }
     }
 }
 void Terrain::updateVerticesGpuLod()
 {
-    for (int i = 0; i < mPatches.size(); ++i)
+    const int count = static_cast<int>(mPatches.size());
+
+    #pragma omp parallel for schedule(static)
+    for (int i = 0; i < count; ++i)
     {
         mPatches[i]->generateLodVertices(mData, mWidth, mHeight);
+    }
+
+    for (int i = 0; i < count; ++i)
+    {
         mPatches[i]->uploadLodToGpu();
     }
 }

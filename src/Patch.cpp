@@ -77,62 +77,65 @@ void Patch::createBuffersGL()
 
 void Patch::generateLodVertices(std::vector<float> &heights, unsigned int width, unsigned int height)
 {
-    float heightValue = 0.f;
     const float skirtDepth = 0.01f;
-    
+    const float textureScale = 20.0f;
+
+    const int basePatchX = static_cast<int>(mPatchX) * PATCH_SIZE;
+    const int basePatchZ = static_cast<int>(mPatchZ) * PATCH_SIZE;
+
+    const float invXzFactor = 1.0f / mXzFactor;
+    const float invTexWidth = textureScale / (static_cast<float>(width) * mXzFactor);
+    const float invTexHeight = textureScale / (static_cast<float>(height) * mXzFactor);
 
     for (int k = 0; k < 5; ++k)
     {
+        const int step = mLodSteps[k];
+        const int innerResolution = (PATCH_SIZE / step) + 1;
+        const int resolution = innerResolution + 2;
+        const int totalVertices = resolution * resolution;
 
-        mLod[k].vertices.clear();
-        int step = mLodSteps[k];
+        auto &vertices = mLod[k].vertices;
+        vertices.resize(totalVertices);
 
-        int innerResolution = (PATCH_SIZE / step) + 1;
+        int outIndex = 0;
 
-        // résolution étendue (+2 pour skirt)
-        int resolution = innerResolution + 2;
-
-        mLod[k].vertices.reserve(resolution * resolution);
-
-        for (int localY = 0; localY < resolution; localY++)
+        for (int localY = 0; localY < resolution; ++localY)
         {
-            for (int localX = 0; localX < resolution; localX++)
+            const int innerY = localY - 1;
+            const int clampedY = std::clamp(innerY, 0, innerResolution - 1);
+
+            const int worldZ = basePatchZ + innerY * step;
+            int sampleZ = basePatchZ + clampedY * step;
+            sampleZ = std::clamp(sampleZ, 0, static_cast<int>(height) - 1);
+
+            const bool borderY = (localY == 0 || localY == resolution - 1);
+
+            for (int localX = 0; localX < resolution; ++localX, ++outIndex)
             {
-                // Coordonnées locales internes
-                int innerX = localX - 1;
-                int innerY = localY - 1;
+                const int innerX = localX - 1;
+                const int clampedX = std::clamp(innerX, 0, innerResolution - 1);
 
-                // Clamp pour rester sur le bord interne
-                int clampedX = std::clamp(innerX, 0, innerResolution - 1);
-                int clampedY = std::clamp(innerY, 0, innerResolution - 1);
+                const int worldX = basePatchX + innerX * step;
+                int sampleX = basePatchX + clampedX * step;
+                sampleX = std::clamp(sampleX, 0, static_cast<int>(width) - 1);
 
-                // Position monde correcte (patch de 32)
-                int worldX = mPatchX * PATCH_SIZE + innerX * step;
-                int worldZ = mPatchZ * PATCH_SIZE + innerY * step;
+                float heightValue = heights[sampleZ * static_cast<int>(width) + sampleX];
 
-                // lecture dans le vecteur heightmap
-                int sampleX = mPatchX * PATCH_SIZE + clampedX * step;
-                int sampleZ = mPatchZ * PATCH_SIZE + clampedY * step;
-
-                sampleX = std::clamp(sampleX, 0, (int)width - 1);
-                sampleZ = std::clamp(sampleZ, 0, (int)height - 1);
-
-                heightValue = heights[sampleZ * width + sampleX];
-
-                if (localX == 0 || localX == resolution - 1 || localY == 0 || localY == resolution - 1)
+                if (borderY || localX == 0 || localX == resolution - 1)
                 {
                     heightValue -= skirtDepth;
                 }
 
+                vertices[outIndex].position = glm::vec3(
+                    static_cast<float>(worldX) * invXzFactor,
+                    heightValue,
+                    static_cast<float>(worldZ) * invXzFactor
+                );
 
-                float textureScale = 20.f;
-                glm::vec3 vecPos(((float)worldX / mXzFactor),heightValue,((float)worldZ / mXzFactor));
-                float u = textureScale*(float)worldX/ (width*mXzFactor);
-                float v = textureScale*(float)worldZ/ (height*mXzFactor);
-                
-                glm::vec2 vecTex(u,v);
-
-                mLod[k].vertices.push_back(Vertex(vecPos,vecTex));
+                vertices[outIndex].texture = glm::vec2(
+                    static_cast<float>(worldX) * invTexWidth,
+                    static_cast<float>(worldZ) * invTexHeight
+                );
             }
         }
     }

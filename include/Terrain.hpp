@@ -232,10 +232,6 @@ class Terrain
         return mVertex;
     }
 
-    /**
-     * @brief Met à jour les sommets LOD sur le GPU
-     */
-    void updateVerticesGpuLod();
 
     /**
      * @brief Initialise les textures du terrain.
@@ -256,10 +252,19 @@ class Terrain
      */
     Texture* getTexture();
     /**
-     * @brief Met à jour uniquement les patches modifiés après érosion.
+     * @brief Met à jour les sommets LOD sur le GPU pour tous les patches.
      *
-     * Cette méthode régénère les sommets LOD et recharge les buffers GPU
-     * uniquement pour les patches listés dans @p dirtyPatchIndices.
+     * Cette méthode régénère d'abord les sommets côté CPU, puis recharge
+     * les buffers GPU de chaque patch.
+     */
+    void updateVerticesGpuLod();
+
+    /**
+     * @brief Met à jour uniquement les patches modifiés.
+     *
+     * La mise à jour est faite en deux phases :
+     * 1. régénération CPU des sommets des patches sales
+     * 2. recharge GPU des buffers correspondants
      *
      * @param dirtyPatchIndices Indices des patches à mettre à jour
      */

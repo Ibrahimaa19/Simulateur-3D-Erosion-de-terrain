@@ -22,6 +22,7 @@ struct Vertex{
     glm::vec3 position; /**< Position du sommet dans l'espace */
     glm::vec2 texture;  /**< Coordonnées de texture (u, v) */
 
+    Vertex() = default;
     /**
      * @brief Construit un sommet à partir de sa position et de ses coordonnées de texture.
      * @param pos Position 3D

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14) 
+cmake_minimum_required(VERSION 3.14)
 project(erosion)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -8,7 +8,11 @@ find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
+find_package(OpenMP REQUIRED)
 
+# Flags d'optimisation
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O3 -march=native")
 
 include(FetchContent)
 
@@ -31,23 +35,21 @@ add_library(imgui_lib STATIC
     ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
 )
 
-target_include_directories(imgui_lib PUBLIC 
-    ${imgui_SOURCE_DIR} 
+target_include_directories(imgui_lib PUBLIC
+    ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
 )
 
-target_link_libraries(imgui_lib PUBLIC 
-    glfw 
-    GLEW::GLEW 
+target_link_libraries(imgui_lib PUBLIC
+    glfw
+    GLEW::GLEW
     OpenGL::GL
 )
-
-
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
 set(SOURCE_FILES
-    ${PROJECT_SOURCE_DIR}/src/main.cpp 
+    ${PROJECT_SOURCE_DIR}/src/main.cpp
     ${PROJECT_SOURCE_DIR}/src/Camera.cpp
     ${PROJECT_SOURCE_DIR}/src/Shader.cpp
     ${PROJECT_SOURCE_DIR}/src/Terrain.cpp
@@ -68,18 +70,11 @@ add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
-        imgui_lib      
+        imgui_lib
         OpenGL::GL
         GLEW::GLEW
         glfw
-)
-
-target_link_libraries(${PROJECT_NAME}
-    PRIVATE
-        OpenGL::GL
-        GLEW::GLEW
-        glfw
-        
+        OpenMP::OpenMP_CXX
 )
 
 target_include_directories(${PROJECT_NAME}
@@ -93,9 +88,6 @@ target_include_directories(${PROJECT_NAME}
 
 add_definitions(-DGLEW_STATIC)
 
-
-include(FetchContent)
-
 FetchContent_Declare(
     googletest
     URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
@@ -103,4 +95,4 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(googletest)
 enable_testing()
-add_subdirectory(tests)  
+add_subdirectory(tests)
