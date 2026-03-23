@@ -98,108 +98,8 @@ void TerrainApp::InitScene()
 
 void TerrainApp::GenerateTerrainFromGui()
 {
-    std::string nomMethode = "Inconnue";
-    if (mGui.selectedMethod == GEN_HEIGHTMAP) nomMethode = "Image (Heightmap)";
-    else if (mGui.selectedMethod == GEN_FAULT_FORMATION) nomMethode = "Faille (Fault Formation)";
-    else if (mGui.selectedMethod == GEN_MIDPOINT_DISPLACEMENT) nomMethode = "Deplacement (Midpoint)";
-    else if (mGui.selectedMethod == GEN_PERLIN_NOISE) nomMethode = "Perlin Noise";
-
-    std::cout << "Generation via GUI... Methode: " << nomMethode << std::endl;
-
-    if (mGui.selectedMethod == GEN_HEIGHTMAP) 
-    {
-        mShader = std::make_unique<Shader>("../shaders/terrain.vs", "../shaders/terrain.fs");
-        
-        mTerrain = std::make_unique<Terrain>(); 
-
-        const char* path = "../src/heightmap/helbert_heightmap.png";
-
-        // https://manticorp.github.io/unrealheightmap
-        if (mGui.selectedImage == 0) 
-            path = "../src/heightmap/canyon_heightmap.png";
-        else if(mGui.selectedImage == 1)
-            path = "../src/heightmap/fuji_heightmap.png";
-        else if(mGui.selectedImage == 2)
-            path = "../src/heightmap/paris_heightmap.png";
-        else if(mGui.selectedImage == 3)
-            path = "../src/heightmap/helbert_heightmap.png";
-        else if(mGui.selectedImage == 4)
-            path = "../src/heightmap/sopka_heightmap.png";
-        else if(mGui.selectedImage == 5)
-            path = "../src/heightmap/grandCayon_heightmap.png";
-
-        mTerrain->loadTerrain(path, 1.0f, 1.0f);
-
-        mTerrain->getRendererManager()->setTerrain(mTerrain.get());
-    }
-    
-    else 
-    {
-        mShader = std::make_unique<Shader>("../shaders/terrain.vs", "../shaders/terrain.fs");
-
-        if (mGui.selectedMethod == GEN_FAULT_FORMATION) 
-        {
-            auto generator = std::make_unique<FaultFormationTerrain>();
-            generator->CreateFaultFormation(
-                mGui.faultWidth, mGui.faultHeight, 
-                mGui.faultIterations, 
-                mGui.faultMinHeight, mGui.faultMaxHeight, 
-                1.0f, mGui.faultUseFilter, mGui.faultFilter
-            );
-
-            auto renderer = std::make_unique<RendererManager>(generator.get());
-            generator->setRenderer(std::move(renderer));
-
-            mTerrain = std::move(generator);
-
-
-        }
-        else if (mGui.selectedMethod == GEN_MIDPOINT_DISPLACEMENT) 
-        {
-            auto generator = std::make_unique<MidpointDisplacement>();
-            generator->CreateMidpointDisplacement(
-                mGui.midpointSize, 
-                mGui.midpointMinHeight, mGui.midpointMaxHeight, 
-                1.0f, mGui.midpointRoughness
-            );
-
-            auto renderer = std::make_unique<RendererManager>(generator.get());
-            generator->setRenderer(std::move(renderer));
-
-            mTerrain = std::move(generator);
-
-        }
-        else if (mGui.selectedMethod == GEN_PERLIN_NOISE)
-        {
-            auto generator = std::make_unique<PerlinNoiseTerrain>();
-            generator->CreatePerlinNoise(
-                mGui.perlinWidth, mGui.perlinHeight,
-                mGui.perlinMinHeight, mGui.perlinMaxHeight,
-                1.0f, 
-                mGui.perlinFrequency,
-                mGui.perlinOctaves,
-                mGui.perlinPersistence,
-                mGui.perlinLacunarity
-            );
-
-            auto renderer = std::make_unique<RendererManager>(generator.get());
-            generator->setRenderer(std::move(renderer));
-
-            mTerrain = std::move(generator);
-        } 
-    }
-
-    setCameraSpeed(5.);
-    mCamera.MoveTo(glm::vec3{-54.0f, 220.0f, -42.0f});
-    mCamera.TurnTo(glm::vec3{mTerrain->getTerrainWidth()/2.0f, 0.0f, mTerrain->getTerrainHeight()/2.0f});
-
-    mTerrain->initTexture();
-    mShader->Use();
-
-    mTerrain->setupTerrainLod(mVAO, mVBO, mIBO);
-    mThermalErosion.loadTerrainInfo(mTerrain);
-
-
+    mTerrain = BuildTerrainFromGuiSelection();
+    FinalizeTerrainAfterBuild();
 }
 
 void TerrainApp::Run()
@@ -212,13 +112,16 @@ void TerrainApp::Run()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         if (mGui.startGeneration) {
-            GenerateTerrainFromGui();
+            StartTerrainGenerationAsync();
             mGui.startGeneration = false;
             mShowMenu = true;
-            
+
+            mGui.showWelcomeScreen = false;
+            mGui.showConfigScreen = false;
+
             stepCounter = 0;
             mGui.thermalCurrentStep = 0;
-            mGui.thermalCellsModified = 0; 
+            mGui.thermalCellsModified = 0;
             mGui.thermalRunning = false;
             thermalEnabled = false;
 
@@ -231,7 +134,7 @@ void TerrainApp::Run()
             mGui.thermalRunning = false;
             stepCounter = 0;
             mGui.thermalCurrentStep = 0;
-            mGui.thermalCellsModified = 0; 
+            mGui.thermalCellsModified = 0;
             glfwSetInputMode(mWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         }
 
@@ -244,29 +147,46 @@ void TerrainApp::Run()
             mGui.Render(nullptr);
         }
         else {
+            UpdateTerrainGeneration();
             RenderScene();
 
             mThermalErosion.setTalusAngle(mGui.talusAngle);
             mThermalErosion.setTransferRate(mGui.thermalK);
 
-            if (mGui.thermalRunning) thermalEnabled = true;
-            else thermalEnabled = false;
+            thermalEnabled = mGui.thermalRunning;
 
-            if (thermalEnabled)
+            if (thermalEnabled && mTerrain)
             {
-                int nbChanges = mThermalErosion.step();
-                mGui.thermalCellsModified = nbChanges; 
-                // ------------------------------------------------------------
-                
-                stepCounter++;
-                mGui.thermalCurrentStep = stepCounter;
+                int nbChanges = mThermalErosion.stepChunk(8000);
+                mGui.thermalCellsModified += nbChanges;
 
-                mTerrain->updateVerticesGpuLod();
+                bool didVisualCommit = false;
+
+                if (mThermalErosion.needsVisualUpdate()) {
+                    mThermalErosion.commitWorkingData();
+                    mTerrain->updateVerticesGpuLod(mThermalErosion.getDirtyPatchIndices());
+                    didVisualCommit = true;
+                }
+
+                if (mThermalErosion.isIterationFinished()) {
+                    stepCounter++;
+                    mGui.thermalCurrentStep = stepCounter;
+
+                    if (!didVisualCommit) {
+                        mTerrain->updateVerticesGpuLod(mThermalErosion.getDirtyPatchIndices());
+                    }
+
+                    mThermalErosion.clearDirtyPatchIndices();
+                    mGui.thermalCellsModified = 0;
+                }
+                else if (didVisualCommit) {
+                    mThermalErosion.clearDirtyPatchIndices();
+                }
             }
 
             mGui.cameraPos = glm::vec3(glm::inverse(mView)[3]);
             if (mShowMenu) {
-                mGui.Render(mTerrain.get()); 
+                mGui.Render(mTerrain ? mTerrain.get() : nullptr);
             }
         }
 
@@ -274,19 +194,17 @@ void TerrainApp::Run()
         glfwPollEvents();
     }
 }
-
 void TerrainApp::RenderScene()
 {
+    if (!mShader || !mTerrain || !mTerrain->getRendererManager() || !mTerrain->getTexture())
+        return;
+
     mView = mCamera.GetViewMatrix();
     glm::mat4 finalMatrix = mProjection * mView * mModel;
-    
+
     mShader->SetMat4("gFinalMatrix", finalMatrix);
     mShader->SetFloat("gMaxHeight", mTerrain->getMaxHeight());
     mShader->SetFloat("gMinHeight", mTerrain->getMinHeight());
-
-    glBindVertexArray(mVAO);
-    mTerrain->getRendererManager()->renderLod(mCamera.GetPosition(),mProjection,mView);
-
 
     for (int i = 0; i < 4; i++) {
         glActiveTexture(GL_TEXTURE0 + i);
@@ -297,6 +215,9 @@ void TerrainApp::RenderScene()
     mShader->SetInt("terrainTexture1", 1);
     mShader->SetInt("terrainTexture2", 2);
     mShader->SetInt("terrainTexture3", 3);
+
+    glBindVertexArray(mVAO);
+    mTerrain->getRendererManager()->renderLod(mCamera.GetPosition(), mProjection, mView);
 }
 
 void TerrainApp::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -406,3 +327,164 @@ void TerrainApp::FramebufferCallback(GLFWwindow* window, int width, int height)
     app->mLastX = width / 2.0f;
     app->mLastY = height / 2.0f;
 };
+
+std::unique_ptr<Terrain> TerrainApp::BuildTerrainFromGuiSelection() {
+    std::string nomMethode = "Inconnue";
+
+    if (mGui.selectedMethod == GEN_HEIGHTMAP)
+        nomMethode = "Image (Heightmap)";
+    else if (mGui.selectedMethod == GEN_FAULT_FORMATION)
+        nomMethode = "Faille (Fault Formation)";
+    else if (mGui.selectedMethod == GEN_MIDPOINT_DISPLACEMENT)
+        nomMethode = "Deplacement (Midpoint)";
+    else if (mGui.selectedMethod == GEN_PERLIN_NOISE)
+        nomMethode = "Perlin Noise";
+
+    std::cout << "Generation via GUI... Methode: " << nomMethode << std::endl;
+
+    if (mGui.selectedMethod == GEN_HEIGHTMAP) 
+    {
+        auto terrain = std::make_unique<Terrain>();
+
+        const char* path = "../src/heightmap/helbert_heightmap.png";
+
+        if (mGui.selectedImage == 0)
+            path = "../src/heightmap/canyon_heightmap.png";
+        else if (mGui.selectedImage == 1)
+            path = "../src/heightmap/fuji_heightmap.png";
+        else if (mGui.selectedImage == 2)
+            path = "../src/heightmap/paris_heightmap.png";
+        else if (mGui.selectedImage == 3)
+            path = "../src/heightmap/helbert_heightmap.png";
+        else if (mGui.selectedImage == 4)
+            path = "../src/heightmap/sopka_heightmap.png";
+        else if (mGui.selectedImage == 5)
+            path = "../src/heightmap/grandCayon_heightmap.png";
+
+        terrain->loadTerrain(path, 1.0f, 1.0f);
+        terrain->getRendererManager()->setTerrain(terrain.get());
+
+        return terrain;
+    }
+    else 
+    {
+        if (mGui.selectedMethod == GEN_FAULT_FORMATION) 
+        {
+            auto generator = std::make_unique<FaultFormationTerrain>();
+
+            generator->CreateFaultFormation(
+                mGui.faultWidth,
+                mGui.faultHeight,
+                mGui.faultIterations,
+                mGui.faultMinHeight,
+                mGui.faultMaxHeight,
+                1.0f,
+                mGui.faultUseFilter,
+                mGui.faultFilter
+            );
+
+            auto renderer = std::make_unique<RendererManager>(generator.get());
+            generator->setRenderer(std::move(renderer));
+            return generator;
+        }
+        else if (mGui.selectedMethod == GEN_MIDPOINT_DISPLACEMENT) 
+        {
+            auto generator = std::make_unique<MidpointDisplacement>();
+
+            generator->CreateMidpointDisplacement(
+                mGui.midpointSize,
+                mGui.midpointMinHeight,
+                mGui.midpointMaxHeight,
+                1.0f,
+                mGui.midpointRoughness
+            );
+
+            auto renderer = std::make_unique<RendererManager>(generator.get());
+            generator->setRenderer(std::move(renderer));
+            return generator;
+        }
+        else if (mGui.selectedMethod == GEN_PERLIN_NOISE)
+        {
+            auto generator = std::make_unique<PerlinNoiseTerrain>();
+
+            generator->CreatePerlinNoise(
+                mGui.perlinWidth,
+                mGui.perlinHeight,
+                mGui.perlinMinHeight,
+                mGui.perlinMaxHeight,
+                1.0f,
+                mGui.perlinFrequency,
+                mGui.perlinOctaves,
+                mGui.perlinPersistence,
+                mGui.perlinLacunarity
+            );
+
+            auto renderer = std::make_unique<RendererManager>(generator.get());
+            generator->setRenderer(std::move(renderer));
+            return generator;
+        }
+    }
+
+    return nullptr;
+}
+
+void TerrainApp::FinalizeTerrainAfterBuild()
+{
+    mShader = std::make_unique<Shader>("../shaders/terrain.vs", "../shaders/terrain.fs");
+    mShader->Use();
+
+    if (!mTerrain)
+        return;
+
+    setCameraSpeed(5.0f);
+    mCamera.MoveTo(glm::vec3{-54.0f, 220.0f, -42.0f});
+    mCamera.TurnTo(glm::vec3{
+        mTerrain->getTerrainWidth() / 2.0f,
+        0.0f,
+        mTerrain->getTerrainHeight() / 2.0f
+    });
+
+    mTerrain->initTexture();
+    mTerrain->setupTerrainLod(mVAO, mVBO, mIBO);
+    mThermalErosion.loadTerrainInfo(mTerrain);
+}
+
+void TerrainApp::StartTerrainGenerationAsync() {
+    if (mIsGenerating)
+        return;
+
+    mIsGenerating = true;
+    mPendingFinalize = false;
+
+    mGenerationFuture = std::async(std::launch::async, [this]() {
+        auto generatedTerrain = BuildTerrainFromGuiSelection();
+
+        {
+            std::lock_guard<std::mutex> lock(mGenerationMutex);
+            mPendingTerrain = std::move(generatedTerrain);
+        }
+
+        mIsGenerating = false;
+        mPendingFinalize = true;
+    });
+}
+
+void TerrainApp::UpdateTerrainGeneration() {
+    if (!mPendingFinalize || mIsGenerating)
+        return;
+
+    if (mGenerationFuture.valid()) {
+        mGenerationFuture.get();
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(mGenerationMutex);
+        mTerrain = std::move(mPendingTerrain);
+    }
+
+    if (mTerrain) {
+        FinalizeTerrainAfterBuild();
+    }
+
+    mPendingFinalize = false;
+}

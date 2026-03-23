@@ -36,15 +36,15 @@ class Terrain
     int mBorderSize;          /**< Taille de la bordure (aplatie) */
     int mCellSpacing;         /**< Espacement entre les cellules */
 
-    std::vector<Vertex> mVertex; /**< Vecteur des sommets (x,y,z,u,v) */
+    std::vector<Vertex> mVertex; /**< Sommets complets du terrain (position + texture) */
 
     std::vector<std::unique_ptr<Patch>> mPatches; /**< Patches pour le LOD */
 
     Frustrum mFrustrum;                         /**< Frustum pour le culling */
     std::unique_ptr<RendererManager> mRenderer; /**< Gestionnaire de rendu */
 
-    GLuint mTextureID;
-    Texture* mTexture;
+    GLuint mTextureID;   /**< Identifiant OpenGL de texture */
+    Texture* mTexture;   /**< Ensemble de textures utilisées pour le terrain */
 
     /**
      * @brief Met à jour les vertices pour tous les niveaux LOD
@@ -237,11 +237,33 @@ class Terrain
      */
     void updateVerticesGpuLod();
 
+    /**
+     * @brief Initialise les textures du terrain.
+     *
+     * Charge et prépare les textures utilisées pour le rendu multi-texture.
+     */
     void initTexture();
 
+    /**
+     * @brief Retourne l'identifiant OpenGL de texture principal.
+     * @return Identifiant OpenGL de texture
+     */
     GLuint getTextureId();
 
+    /**
+     * @brief Retourne le gestionnaire de textures du terrain.
+     * @return Pointeur vers l'objet Texture
+     */
     Texture* getTexture();
+    /**
+     * @brief Met à jour uniquement les patches modifiés après érosion.
+     *
+     * Cette méthode régénère les sommets LOD et recharge les buffers GPU
+     * uniquement pour les patches listés dans @p dirtyPatchIndices.
+     *
+     * @param dirtyPatchIndices Indices des patches à mettre à jour
+     */
+    void updateVerticesGpuLod(const std::vector<int>& dirtyPatchIndices);
 };
 
 #endif

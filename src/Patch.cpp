@@ -71,7 +71,7 @@ void Patch::createBuffersGL()
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->mLod[lod].indices.size() * sizeof(unsigned int),
                      this->mLod[lod].indices.data(), GL_DYNAMIC_DRAW);
 
-        glBindVertexArray(idBufPos);
+        glBindVertexArray(0);
     }
 }
 
@@ -180,16 +180,7 @@ void Patch::render()
 {
     int lodLevel = this->mLodLevel;
     glBindVertexArray(mVao[lodLevel]);
-    glBindBuffer(GL_ARRAY_BUFFER, mVbo[lodLevel]);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, mLod[lodLevel].vertices.size() * sizeof(Vertex), mLod[lodLevel].vertices.data());
-
-    
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mEbo[lodLevel]);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mLod[lodLevel].indices.size() * sizeof(unsigned int),
-                 mLod[lodLevel].indices.data(), GL_DYNAMIC_DRAW);
-
     glDrawElements(GL_TRIANGLES, mLod[lodLevel].indices.size(), GL_UNSIGNED_INT, 0);
-
     glBindVertexArray(0);
 }
 
@@ -247,4 +238,35 @@ int Patch::getNbPatchX()
 int Patch::getNbPatchZ()
 {
     return this->mNbPatchZ;
+}
+
+void Patch::uploadSingleLodToGpu(int lodLevel)
+{
+    glBindVertexArray(mVao[lodLevel]);
+
+    glBindBuffer(GL_ARRAY_BUFFER, mVbo[lodLevel]);
+    glBufferSubData(
+        GL_ARRAY_BUFFER,
+        0,
+        mLod[lodLevel].vertices.size() * sizeof(Vertex),
+        mLod[lodLevel].vertices.data()
+    );
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mEbo[lodLevel]);
+    glBufferSubData(
+        GL_ELEMENT_ARRAY_BUFFER,
+        0,
+        mLod[lodLevel].indices.size() * sizeof(unsigned int),
+        mLod[lodLevel].indices.data()
+    );
+
+    glBindVertexArray(0);
+}
+
+void Patch::uploadLodToGpu()
+{
+    for (int lod = 0; lod < 5; ++lod)
+    {
+        uploadSingleLodToGpu(lod);
+    }
 }

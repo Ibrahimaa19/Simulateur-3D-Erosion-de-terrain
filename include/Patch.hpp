@@ -11,10 +11,23 @@
 #define PATCH_SIZE 32 /**< Taille d'un patch en nombre de cellules */
 
 
+/**
+ * @brief Représente un sommet complet du terrain.
+ *
+ * Contient :
+ * - la position 3D du sommet
+ * - les coordonnées de texture associées
+ */
 struct Vertex{
-    glm::vec3 position;
-    glm::vec2 texture;
-    Vertex (glm::vec3 pos,glm::vec2 tex) : position(pos), texture(tex){};
+    glm::vec3 position; /**< Position du sommet dans l'espace */
+    glm::vec2 texture;  /**< Coordonnées de texture (u, v) */
+
+    /**
+     * @brief Construit un sommet à partir de sa position et de ses coordonnées de texture.
+     * @param pos Position 3D
+     * @param tex Coordonnées de texture
+     */
+    Vertex(glm::vec3 pos, glm::vec2 tex) : position(pos), texture(tex) {};
 };
 
 /**
@@ -63,7 +76,7 @@ class Patch
 
     std::vector<Patch *> mNeighbors; /** Vecteur des patches voisins */
 
-    Texture* mPatchTexture;
+    Texture* mPatchTexture; /**< Texture associée au patch */
 
   public:
     /**
@@ -188,6 +201,24 @@ class Patch
      * @return Nombre de patches en Z
      */
     int getNbPatchZ();
+
+    /**
+     * @brief Met à jour sur le GPU les buffers d'un niveau de LOD donné.
+     *
+     * Recharge les sommets et les indices du niveau de détail indiqué
+     * dans les buffers OpenGL déjà créés.
+     *
+     * @param lodLevel Niveau de détail à mettre à jour
+     */
+    void uploadSingleLodToGpu(int lodLevel);
+
+    /**
+     * @brief Met à jour sur le GPU tous les niveaux de LOD du patch.
+     *
+     * Cette méthode est utilisée après une modification des hauteurs
+     * du terrain pour resynchroniser les buffers CPU et GPU.
+     */
+    void uploadLodToGpu();
 };
 
 #endif

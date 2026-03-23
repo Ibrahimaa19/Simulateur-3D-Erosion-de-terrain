@@ -101,11 +101,6 @@ void Terrain::setupTerrainLod(GLuint &VAO, GLuint &VBO, GLuint &EBO)
     }
 }
 
-void Terrain::updateVerticesGpuLod()
-{
-    loadVerticesLod();
-}
-
 Frustrum &Terrain::getFrustrum()
 {
     return this->mFrustrum;
@@ -149,4 +144,27 @@ GLuint Terrain::getTextureId()
 Texture* Terrain::getTexture()
 {
     return this->mTexture;
+}
+
+void Terrain::updateVerticesGpuLod(const std::vector<int>& dirtyPatchIndices)
+{
+    std::vector<int> sortedDirty = dirtyPatchIndices;
+    std::sort(sortedDirty.begin(), sortedDirty.end());
+
+    for (int idx : sortedDirty)
+    {
+        if (idx >= 0 && idx < static_cast<int>(mPatches.size()))
+        {
+            mPatches[idx]->generateLodVertices(mData, mWidth, mHeight);
+            mPatches[idx]->uploadLodToGpu();
+        }
+    }
+}
+void Terrain::updateVerticesGpuLod()
+{
+    for (int i = 0; i < mPatches.size(); ++i)
+    {
+        mPatches[i]->generateLodVertices(mData, mWidth, mHeight);
+        mPatches[i]->uploadLodToGpu();
+    }
 }
