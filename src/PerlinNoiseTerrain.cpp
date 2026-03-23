@@ -40,25 +40,36 @@ void PerlinNoiseTerrain::CreatePerlinNoise(int width, int height,
 
 void PerlinNoiseTerrain::CreatePerlinNoiseInternal(float minH, float maxH)
 {
-    for (int z = 0; z < mHeight; z++)
+    float* data = mData.data();
+    const int width = mWidth;
+    const int height = mHeight;
+    const float baseFrequency = mBaseFrequency;
+    const int numOctaves = mNumOctaves;
+    const float persistence = mPersistenceCoef;
+    const float lacunarity = mLacunarityCoef;
+
+    #pragma omp parallel for schedule(static)
+    for (int z = 0; z < height; ++z)
     {
-        for (int x = 0; x < mWidth; x++)
+        const int rowOffset = z * width;
+        const float yf = static_cast<float>(z) * baseFrequency;
+
+        for (int x = 0; x < width; ++x)
         {
-            float xf = static_cast<float>(x) * mBaseFrequency;
-            float yf = static_cast<float>(z) * mBaseFrequency;
+            const float xf = static_cast<float>(x) * baseFrequency;
 
             float noise = 0.0f;
             float amplitude = 1.0f;
             float freq = 1.0f;
 
-            for (int o = 0; o < mNumOctaves; o++)
+            for (int o = 0; o < numOctaves; ++o)
             {
                 noise += amplitude * Noise2D(xf * freq, yf * freq);
-                amplitude *= mPersistenceCoef;
-                freq *= mLacunarityCoef;
+                amplitude *= persistence;
+                freq *= lacunarity;
             }
 
-            setHeight(x, z, noise);
+            data[rowOffset + x] = noise;
         }
     }
 }
@@ -81,11 +92,17 @@ void PerlinNoiseTerrain::InitPermutation()
 
 float PerlinNoiseTerrain::Noise2D(float x, float y) const
 {
-    int X = static_cast<int>(std::floor(x)) & 255;
-    int Y = static_cast<int>(std::floor(y)) & 255;
+    const int x0 = static_cast<int>(std::floor(x));
+    const int y0 = static_cast<int>(std::floor(y));
 
-    float xf = x - std::floor(x);
-    float yf = y - std::floor(y);
+    const int X = x0 & 255;
+    const int Y = y0 & 255;
+
+    const float xf = x - static_cast<float>(x0);
+    const float yf = y - static_cast<float>(y0);
+
+    const int pX = mPermutation[X];
+    const int pX1 = mPermutation[X + 1];
 
     auto dot = [&](int hash, float dx, float dy)
     {
@@ -94,33 +111,36 @@ float PerlinNoiseTerrain::Noise2D(float x, float y) const
         return gx * dx + gy * dy;
     };
 
-    float tl = dot(mPermutation[mPermutation[X] + Y],     xf,       yf);
-    float tr = dot(mPermutation[mPermutation[X+1] + Y],   xf-1.0f,  yf);
-    float bl = dot(mPermutation[mPermutation[X] + Y+1],   xf,       yf-1.0f);
-    float br = dot(mPermutation[mPermutation[X+1] + Y+1], xf-1.0f,  yf-1.0f);
+    const float tl = dot(mPermutation[pX + Y],     xf,      yf);
+    const float tr = dot(mPermutation[pX1 + Y],    xf - 1,  yf);
+    const float bl = dot(mPermutation[pX + Y + 1], xf,      yf - 1);
+    const float br = dot(mPermutation[pX1 + Y + 1],xf - 1,  yf - 1);
 
-    float u = Fade(xf);
-    float v = Fade(yf);
+    const float u = Fade(xf);
+    const float v = Fade(yf);
 
-    float lerp1 = Lerp(tl, tr, u);
-    float lerp2 = Lerp(bl, br, u);
+    const float lerp1 = Lerp(tl, tr, u);
+    const float lerp2 = Lerp(bl, br, u);
 
     return Lerp(lerp1, lerp2, v);
 }
 
 void PerlinNoiseTerrain::Gradient(int hash, float& gx, float& gy) const
 {
-    switch (hash & 7)
-    {
-    case 0: gx = 1; gy = 1; break;
-    case 1: gx = -1; gy = 1; break;
-    case 2: gx = 1; gy = -1; break;
-    case 3: gx = -1; gy = -1; break;
-    case 4: gx = 1; gy = 0; break;
-    case 5: gx = -1; gy = 0; break;
-    case 6: gx = 0; gy = 1; break;
-    case 7: gx = 0; gy = -1; break;
-    }
+    static const float gradients[8][2] = {
+        { 1.0f,  1.0f},
+        {-1.0f,  1.0f},
+        { 1.0f, -1.0f},
+        {-1.0f, -1.0f},
+        { 1.0f,  0.0f},
+        {-1.0f,  0.0f},
+        { 0.0f,  1.0f},
+        { 0.0f, -1.0f}
+    };
+
+    const int idx = hash & 7;
+    gx = gradients[idx][0];
+    gy = gradients[idx][1];
 }
 
 inline float PerlinNoiseTerrain::Fade(float t) const
@@ -137,14 +157,22 @@ void PerlinNoiseTerrain::Normalize()
 {
     auto minMax = std::minmax_element(mData.begin(), mData.end());
 
-    float min = *minMax.first;
-    float max = *minMax.second;
+    const float minVal = *minMax.first;
+    const float maxVal = *minMax.second;
+    const float minMaxDelta = maxVal - minVal;
+    const float minMaxRange = mMaxHeight - mMinHeight;
 
-    float minMaxDelta = max - min;
-    float minMaxRange = mMaxHeight - mMinHeight;
-
-    for (auto& element : mData)
+    if (minMaxDelta == 0.0f)
     {
-        element = (element - min) / minMaxDelta * minMaxRange + mMinHeight;
+        std::fill(mData.begin(), mData.end(), mMinHeight);
+        return;
+    }
+
+    const float scale = minMaxRange / minMaxDelta;
+
+    #pragma omp parallel for schedule(static)
+    for (int i = 0; i < static_cast<int>(mData.size()); ++i)
+    {
+        mData[i] = (mData[i] - minVal) * scale + mMinHeight;
     }
 }
