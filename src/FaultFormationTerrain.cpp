@@ -3,6 +3,7 @@
 #include <utility>
 #include <cstdlib>
 #include <cstdio>
+#include <omp.h>
 
 FaultFormationTerrain::FaultFormationTerrain()
 {
@@ -36,29 +37,37 @@ bool FaultFormationTerrain::TerrainPoint::IsEqual(TerrainPoint& p) const
 
 void FaultFormationTerrain::CreateFaultFormationInternal(int iterations, float minHeight, float maxHeight, bool applyFilter, float filter)
 {
-    float deltaHeight = maxHeight - minHeight;
+    const float deltaHeight = maxHeight - minHeight;
+    float* data = mData.data();
+    const int width = mWidth;
+    const int height = mHeight;
 
     for (int curIter = 0; curIter < iterations; ++curIter)
     {
-        float iterationRatio = (float)curIter / (float)iterations;
-        float h = maxHeight - iterationRatio * deltaHeight;
+        const float iterationRatio = static_cast<float>(curIter) / static_cast<float>(iterations);
+        const float h = maxHeight - iterationRatio * deltaHeight;
 
         TerrainPoint p1, p2;
         GenRandomTerrainPoints(p1, p2);
 
-        int dirX = p2.x - p1.x;
-        int dirZ = p2.z - p1.z;
+        const int dirX = p2.x - p1.x;
+        const int dirZ = p2.z - p1.z;
+        const int p1x = p1.x;
+        const int p1z = p1.z;
 
-        for (int z = 0; z < mHeight; ++z)
+        #pragma omp parallel for schedule(static)
+        for (int z = 0; z < height; ++z)
         {
-            for (int x = 0; x < mWidth; ++x)
+            const int rowOffset = z * width;
+            const int zMinusP1z = z - p1z;
+
+            for (int x = 0; x < width; ++x)
             {
-                int crossProduct = dirX * (z - p1.z) - dirZ * (x - p1.x);
+                const int crossProduct = dirX * zMinusP1z - dirZ * (x - p1x);
 
                 if (crossProduct > 0)
                 {
-                    float val = getHeight(x, z) + h;
-                    setHeight(x, z, val);
+                    data[rowOffset + x] += h;
                 }
             }
         }
@@ -93,14 +102,23 @@ void FaultFormationTerrain::Normalize()
 {
     auto minMax = std::minmax_element(mData.begin(), mData.end());
 
-    float min = *minMax.first;
-    float max = *minMax.second;
+    const float minVal = *minMax.first;
+    const float maxVal = *minMax.second;
+    const float minMaxDelta = maxVal - minVal;
+    const float minMaxRange = mMaxHeight - mMinHeight;
 
-    float minMaxDelta = max - min;
-    float minMaxRange = mMaxHeight - mMinHeight;
-    for(auto& element: mData)
+    if (minMaxDelta == 0.0f)
     {
-        element = (element - min)/minMaxDelta * minMaxRange + mMinHeight;
+        std::fill(mData.begin(), mData.end(), mMinHeight);
+        return;
+    }
+
+    const float scale = minMaxRange / minMaxDelta;
+
+    #pragma omp parallel for schedule(static)
+    for (int i = 0; i < static_cast<int>(mData.size()); ++i)
+    {
+        mData[i] = (mData[i] - minVal) * scale + mMinHeight;
     }
 }
 
