@@ -1,26 +1,27 @@
 #include "ThermalErosion.hpp"
 
+const ThermalErosion::NeighborOffset ThermalErosion::kNeighbors8[8] = {
+    {-1,  0},
+    { 1,  0},
+    { 0, -1},
+    { 0,  1},
+    {-1, -1},
+    {-1,  1},
+    { 1, -1},
+    { 1,  1}
+};
+
+const ThermalErosion::NeighborOffset ThermalErosion::kNeighbors4[4] = {
+    {-1,  0},
+    { 1,  0},
+    { 0, -1},
+    { 0,  1}
+};
+
 ThermalErosion::ThermalErosion()
 {
     useEightNeighbors();
 }
-const ThermalErosion::NeighborOffset ThermalErosion::kNeighbors8[8] = {
-    {-1,  0}, // up
-    { 1,  0}, // down
-    { 0, -1}, // left
-    { 0,  1}, // right
-    {-1, -1}, // upLeft
-    {-1,  1}, // upRight
-    { 1, -1}, // downLeft
-    { 1,  1}  // downRight
-};
-
-const ThermalErosion::NeighborOffset ThermalErosion::kNeighbors4[4] = {
-    {-1,  0}, // up
-    { 1,  0}, // down
-    { 0, -1}, // left
-    { 0,  1}  // right
-};
 
 void ThermalErosion::useEightNeighbors()
 {
@@ -132,6 +133,73 @@ bool ThermalErosion::erodeCell(int i, int j, const float* src, float* dst)
     return true;
 }
 
+int ThermalErosion::applyErosionRange(const float* src,
+                                      float* dst,
+                                      int startIndex,
+                                      int endIndex)
+{
+    int changes = 0;
+
+    for (int localIndex = startIndex; localIndex < endIndex; ++localIndex)
+    {
+        int i, j;
+        localIndexToCoords(localIndex, i, j);
+
+        if (erodeCell(i, j, src, dst)) {
+            ++changes;
+        }
+    }
+
+    return changes;
+}
+
+int ThermalErosion::applyBlockedErosionRange(const float* src,
+                                             float* dst,
+                                             int startIndex,
+                                             int endIndex)
+{
+    const int W = m_width;
+    const int H = m_height;
+    const int innerWidth = W - 2;
+    const int innerHeight = H - 2;
+
+    int changes = 0;
+
+    for (int blockI = 0; blockI < innerHeight; blockI += BLOCK_SIZE)
+    {
+        const int blockHeight = std::min(BLOCK_SIZE, innerHeight - blockI);
+
+        for (int blockJ = 0; blockJ < innerWidth; blockJ += BLOCK_SIZE)
+        {
+            const int blockWidth = std::min(BLOCK_SIZE, innerWidth - blockJ);
+
+            for (int di = 0; di < blockHeight; ++di)
+            {
+                const int innerI = blockI + di;
+
+                for (int dj = 0; dj < blockWidth; ++dj)
+                {
+                    const int innerJ = blockJ + dj;
+                    const int localIndex = innerI * innerWidth + innerJ;
+
+                    if (localIndex < startIndex || localIndex >= endIndex) {
+                        continue;
+                    }
+
+                    const int i = innerI + 1;
+                    const int j = innerJ + 1;
+
+                    if (erodeCell(i, j, src, dst)) {
+                        ++changes;
+                    }
+                }
+            }
+        }
+    }
+
+    return changes;
+}
+
 void ThermalErosion::resetProgress()
 {
     m_workingData.clear();
@@ -187,10 +255,6 @@ int ThermalErosion::stepChunk(int maxCells)
         return 0;
     }
 
-    if (mActiveNeighbors == nullptr || mNeighborCount == 0) {
-        useEightNeighbors();
-    }
-
     const int totalInnerCells = (H - 2) * (W - 2);
 
     if (m_workingData.empty() || static_cast<int>(m_workingData.size()) != W * H) {
@@ -202,7 +266,6 @@ int ThermalErosion::stepChunk(int maxCells)
     float* dst = m_workingData.data();
 
     mIterationFinished = false;
-    int changes = 0;
 
     const int startIndex = mCurrentIndex;
     const int endIndex = std::min(mCurrentIndex + maxCells, totalInnerCells);
@@ -212,50 +275,7 @@ int ThermalErosion::stepChunk(int maxCells)
         mNeedsVisualUpdate = true;
     }
 
-    int processed = 0;
-
-    const int innerWidth  = W - 2;
-    const int innerHeight = H - 2;
-
-    const int totalCells = innerWidth * innerHeight;
-
-    int currentLinear = startIndex;
-
-    while (currentLinear < endIndex)
-    {
-        // Convertit en coordonnée globale
-        int i, j;
-        localIndexToCoords(currentLinear, i, j);
-
-        // Début du bloc
-        const int blockStartI = ((i - 1) / BLOCK_SIZE) * BLOCK_SIZE + 1;
-        const int blockStartJ = ((j - 1) / BLOCK_SIZE) * BLOCK_SIZE + 1;
-
-        const int blockEndI = std::min(blockStartI + BLOCK_SIZE, H - 1);
-        const int blockEndJ = std::min(blockStartJ + BLOCK_SIZE, W - 1);
-
-        // Parcours du bloc
-        for (int bi = blockStartI; bi < blockEndI; ++bi)
-        {
-            for (int bj = blockStartJ; bj < blockEndJ; ++bj)
-            {
-                // reconstruire localIndex équivalent
-                int localIdx = (bi - 1) * innerWidth + (bj - 1);
-
-                if (localIdx < startIndex || localIdx >= endIndex)
-                    continue;
-
-                if (erodeCell(bi, bj, src, dst)) {
-                    ++changes;
-                }
-
-                ++processed;
-            }
-        }
-
-        // passer au bloc suivant
-        currentLinear = (blockEndI - 1) * innerWidth + (blockEndJ - 1);
-    }
+    const int changes = applyBlockedErosionRange(src, dst, startIndex, endIndex);
 
     mCurrentIndex = endIndex;
 
@@ -267,6 +287,72 @@ int ThermalErosion::stepChunk(int maxCells)
         mCellsProcessedSinceLastCommit = 0;
         mNeedsVisualUpdate = false;
     }
+
+    return changes;
+}
+
+int ThermalErosion::stepPureTwoPhase()
+{
+    if (!m_data) {
+        std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
+        return 0;
+    }
+
+    if (m_width < 3 || m_height < 3) {
+        return 0;
+    }
+
+    clearDirtyPatchIndices();
+
+    const int totalInnerCells = (m_height - 2) * (m_width - 2);
+
+    std::vector<float> srcSnapshot = *m_data;
+    std::vector<float> dst = srcSnapshot;
+
+    const int changes = applyErosionRange(srcSnapshot.data(),
+                                          dst.data(),
+                                          0,
+                                          totalInnerCells);
+
+    *m_data = std::move(dst);
+
+    mIterationFinished = true;
+    mNeedsVisualUpdate = false;
+    mCellsProcessedSinceLastCommit = 0;
+    mCurrentIndex = 0;
+
+    return changes;
+}
+
+int ThermalErosion::stepBlockedPureTwoPhase()
+{
+    if (!m_data) {
+        std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
+        return 0;
+    }
+
+    if (m_width < 3 || m_height < 3) {
+        return 0;
+    }
+
+    clearDirtyPatchIndices();
+
+    const int totalInnerCells = (m_height - 2) * (m_width - 2);
+
+    std::vector<float> srcSnapshot = *m_data;
+    std::vector<float> dst = srcSnapshot;
+
+    const int changes = applyBlockedErosionRange(srcSnapshot.data(),
+                                                 dst.data(),
+                                                 0,
+                                                 totalInnerCells);
+
+    *m_data = std::move(dst);
+
+    mIterationFinished = true;
+    mNeedsVisualUpdate = false;
+    mCellsProcessedSinceLastCommit = 0;
+    mCurrentIndex = 0;
 
     return changes;
 }
