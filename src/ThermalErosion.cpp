@@ -212,14 +212,49 @@ int ThermalErosion::stepChunk(int maxCells)
         mNeedsVisualUpdate = true;
     }
 
-    for (int localIndex = startIndex; localIndex < endIndex; ++localIndex)
-    {
-        int i, j;
-        localIndexToCoords(localIndex, i, j);
+    int processed = 0;
 
-        if (erodeCell(i, j, src, dst)) {
-            ++changes;
+    const int innerWidth  = W - 2;
+    const int innerHeight = H - 2;
+
+    const int totalCells = innerWidth * innerHeight;
+
+    int currentLinear = startIndex;
+
+    while (currentLinear < endIndex)
+    {
+        // Convertit en coordonnée globale
+        int i, j;
+        localIndexToCoords(currentLinear, i, j);
+
+        // Début du bloc
+        const int blockStartI = ((i - 1) / BLOCK_SIZE) * BLOCK_SIZE + 1;
+        const int blockStartJ = ((j - 1) / BLOCK_SIZE) * BLOCK_SIZE + 1;
+
+        const int blockEndI = std::min(blockStartI + BLOCK_SIZE, H - 1);
+        const int blockEndJ = std::min(blockStartJ + BLOCK_SIZE, W - 1);
+
+        // Parcours du bloc
+        for (int bi = blockStartI; bi < blockEndI; ++bi)
+        {
+            for (int bj = blockStartJ; bj < blockEndJ; ++bj)
+            {
+                // reconstruire localIndex équivalent
+                int localIdx = (bi - 1) * innerWidth + (bj - 1);
+
+                if (localIdx < startIndex || localIdx >= endIndex)
+                    continue;
+
+                if (erodeCell(bi, bj, src, dst)) {
+                    ++changes;
+                }
+
+                ++processed;
+            }
         }
+
+        // passer au bloc suivant
+        currentLinear = (blockEndI - 1) * innerWidth + (blockEndJ - 1);
     }
 
     mCurrentIndex = endIndex;

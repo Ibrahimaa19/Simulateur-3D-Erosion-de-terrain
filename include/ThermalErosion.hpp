@@ -154,6 +154,8 @@ private:
     static const NeighborOffset kNeighbors8[8];
     static const NeighborOffset kNeighbors4[4];
 
+    static constexpr int BLOCK_SIZE = 32;
+
 private:
     float get_height(int i, int j) const {
         return (*m_data)[i * m_width + j];
