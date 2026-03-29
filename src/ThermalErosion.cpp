@@ -1,5 +1,136 @@
 #include "ThermalErosion.hpp"
 
+int ThermalErosion::toIndex(int i, int j) const
+{
+    return i * m_width + j;
+}
+
+void ThermalErosion::localIndexToCoords(int localIndex, int& i, int& j) const
+{
+    i = 1 + localIndex / (m_width - 2);
+    j = 1 + localIndex % (m_width - 2);
+}
+
+int ThermalErosion::patchIndexFromCell(int i, int j) const
+{
+    const int patchX = j / PATCH_SIZE;
+    const int patchZ = i / PATCH_SIZE;
+    return patchX * mNbPatchZ + patchZ;
+}
+
+void ThermalErosion::markPatchDirtyFromCell(int i, int j)
+{
+    const int patchIndex = patchIndexFromCell(i, j);
+
+    if (!mPatchMarked[patchIndex]) {
+        mPatchMarked[patchIndex] = true;
+        mDirtyPatchIndices.push_back(patchIndex);
+    }
+}
+
+void ThermalErosion::addMaterialToNeighbor(float* dst,
+                                           int neighborIndex,
+                                           float moveAmount,
+                                           int neighborI,
+                                           int neighborJ)
+{
+    dst[neighborIndex] += moveAmount;
+    markPatchDirtyFromCell(neighborI, neighborJ);
+}
+
+bool ThermalErosion::erodeCell(int i, int j, const float* src, float* dst)
+{
+    const int W = m_width;
+
+    const int center    = toIndex(i, j);
+    const int up        = toIndex(i - 1, j);
+    const int down      = toIndex(i + 1, j);
+    const int left      = toIndex(i, j - 1);
+    const int right     = toIndex(i, j + 1);
+    const int upLeft    = toIndex(i - 1, j - 1);
+    const int upRight   = toIndex(i - 1, j + 1);
+    const int downLeft  = toIndex(i + 1, j - 1);
+    const int downRight = toIndex(i + 1, j + 1);
+
+    const float currentHeight = src[center];
+
+    const float diffUp        = currentHeight - src[up];
+    const float diffDown      = currentHeight - src[down];
+    const float diffLeft      = currentHeight - src[left];
+    const float diffRight     = currentHeight - src[right];
+    const float diffUpLeft    = currentHeight - src[upLeft];
+    const float diffUpRight   = currentHeight - src[upRight];
+    const float diffDownLeft  = currentHeight - src[downLeft];
+    const float diffDownRight = currentHeight - src[downRight];
+
+    float totalDiff = 0.0f;
+    int validNeighbors = 0;
+
+    if (diffUp > talusAngle)        { totalDiff += diffUp;        ++validNeighbors; }
+    if (diffDown > talusAngle)      { totalDiff += diffDown;      ++validNeighbors; }
+    if (diffLeft > talusAngle)      { totalDiff += diffLeft;      ++validNeighbors; }
+    if (diffRight > talusAngle)     { totalDiff += diffRight;     ++validNeighbors; }
+    if (diffUpLeft > talusAngle)    { totalDiff += diffUpLeft;    ++validNeighbors; }
+    if (diffUpRight > talusAngle)   { totalDiff += diffUpRight;   ++validNeighbors; }
+    if (diffDownLeft > talusAngle)  { totalDiff += diffDownLeft;  ++validNeighbors; }
+    if (diffDownRight > talusAngle) { totalDiff += diffDownRight; ++validNeighbors; }
+
+    if (totalDiff <= 0.0f || validNeighbors <= 0) {
+        return false;
+    }
+
+    markPatchDirtyFromCell(i, j);
+
+    float materialToMove = transferRate * (totalDiff / validNeighbors);
+    materialToMove = std::min(materialToMove, currentHeight * transferRate);
+
+    dst[center] -= materialToMove;
+
+    const float invTotalDiff = 1.0f / totalDiff;
+
+    if (diffUp > talusAngle) {
+        const float moveAmount = materialToMove * (diffUp * invTotalDiff);
+        addMaterialToNeighbor(dst, up, moveAmount, i - 1, j);
+    }
+
+    if (diffDown > talusAngle) {
+        const float moveAmount = materialToMove * (diffDown * invTotalDiff);
+        addMaterialToNeighbor(dst, down, moveAmount, i + 1, j);
+    }
+
+    if (diffLeft > talusAngle) {
+        const float moveAmount = materialToMove * (diffLeft * invTotalDiff);
+        addMaterialToNeighbor(dst, left, moveAmount, i, j - 1);
+    }
+
+    if (diffRight > talusAngle) {
+        const float moveAmount = materialToMove * (diffRight * invTotalDiff);
+        addMaterialToNeighbor(dst, right, moveAmount, i, j + 1);
+    }
+
+    if (diffUpLeft > talusAngle) {
+        const float moveAmount = materialToMove * (diffUpLeft * invTotalDiff);
+        addMaterialToNeighbor(dst, upLeft, moveAmount, i - 1, j - 1);
+    }
+
+    if (diffUpRight > talusAngle) {
+        const float moveAmount = materialToMove * (diffUpRight * invTotalDiff);
+        addMaterialToNeighbor(dst, upRight, moveAmount, i - 1, j + 1);
+    }
+
+    if (diffDownLeft > talusAngle) {
+        const float moveAmount = materialToMove * (diffDownLeft * invTotalDiff);
+        addMaterialToNeighbor(dst, downLeft, moveAmount, i + 1, j - 1);
+    }
+
+    if (diffDownRight > talusAngle) {
+        const float moveAmount = materialToMove * (diffDownRight * invTotalDiff);
+        addMaterialToNeighbor(dst, downRight, moveAmount, i + 1, j + 1);
+    }
+
+    return true;
+}
+
 void ThermalErosion::resetProgress()
 {
     m_workingData.clear();
@@ -46,15 +177,6 @@ int ThermalErosion::stepChunk(int maxCells)
     const int W = m_width;
     const int H = m_height;
 
-    if (!m_data) {
-        std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
-        return 0;
-    }
-
-    if (W < 3 || H < 3 || maxCells <= 0) {
-        return 0;
-    }
-
     const int totalInnerCells = (H - 2) * (W - 2);
 
     if (m_workingData.empty() || static_cast<int>(m_workingData.size()) != W * H) {
@@ -78,164 +200,10 @@ int ThermalErosion::stepChunk(int maxCells)
 
     for (int localIndex = startIndex; localIndex < endIndex; ++localIndex)
     {
-        int i = 1 + localIndex / (W - 2);
-        int j = 1 + localIndex % (W - 2);
+        int i, j;
+        localIndexToCoords(localIndex, i, j);
 
-        const int center = i * W + j;
-        const int up = center - W;
-        const int down = center + W;
-        const int left = center - 1;
-        const int right = center + 1;
-        const int upLeft = up - 1;
-        const int upRight = up + 1;
-        const int downLeft = down - 1;
-        const int downRight = down + 1;
-
-        const float currentHeight = src[center];
-
-        const float diffUp        = currentHeight - src[up];
-        const float diffDown      = currentHeight - src[down];
-        const float diffLeft      = currentHeight - src[left];
-        const float diffRight     = currentHeight - src[right];
-        const float diffUpLeft    = currentHeight - src[upLeft];
-        const float diffUpRight   = currentHeight - src[upRight];
-        const float diffDownLeft  = currentHeight - src[downLeft];
-        const float diffDownRight = currentHeight - src[downRight];
-
-        float totalDiff = 0.0f;
-        int validNeighbors = 0;
-
-        if (diffUp > talusAngle)        { totalDiff += diffUp;        ++validNeighbors; }
-        if (diffDown > talusAngle)      { totalDiff += diffDown;      ++validNeighbors; }
-        if (diffLeft > talusAngle)      { totalDiff += diffLeft;      ++validNeighbors; }
-        if (diffRight > talusAngle)     { totalDiff += diffRight;     ++validNeighbors; }
-        if (diffUpLeft > talusAngle)    { totalDiff += diffUpLeft;    ++validNeighbors; }
-        if (diffUpRight > talusAngle)   { totalDiff += diffUpRight;   ++validNeighbors; }
-        if (diffDownLeft > talusAngle)  { totalDiff += diffDownLeft;  ++validNeighbors; }
-        if (diffDownRight > talusAngle) { totalDiff += diffDownRight; ++validNeighbors; }
-
-        if (totalDiff > 0.0f && validNeighbors > 0)
-        {
-            const int centerPatchX = j / PATCH_SIZE;
-            const int centerPatchZ = i / PATCH_SIZE;
-            const int centerPatchIndex = centerPatchX * mNbPatchZ + centerPatchZ;
-
-            if (!mPatchMarked[centerPatchIndex]) {
-                mPatchMarked[centerPatchIndex] = true;
-                mDirtyPatchIndices.push_back(centerPatchIndex);
-            }
-
-            float materialToMove = transferRate * (totalDiff / validNeighbors);
-            materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-            dst[center] -= materialToMove;
-
-            const float invTotalDiff = 1.0f / totalDiff;
-
-            if (diffUp > talusAngle) {
-                float moveAmount = materialToMove * (diffUp * invTotalDiff);
-                dst[up] += moveAmount;
-
-                int patchX = j / PATCH_SIZE;
-                int patchZ = (i - 1) / PATCH_SIZE;
-                int patchIndex = patchX * mNbPatchZ + patchZ;
-                if (!mPatchMarked[patchIndex]) {
-                    mPatchMarked[patchIndex] = true;
-                    mDirtyPatchIndices.push_back(patchIndex);
-                }
-            }
-
-            if (diffDown > talusAngle) {
-                float moveAmount = materialToMove * (diffDown * invTotalDiff);
-                dst[down] += moveAmount;
-
-                int patchX = j / PATCH_SIZE;
-                int patchZ = (i + 1) / PATCH_SIZE;
-                int patchIndex = patchX * mNbPatchZ + patchZ;
-                if (!mPatchMarked[patchIndex]) {
-                    mPatchMarked[patchIndex] = true;
-                    mDirtyPatchIndices.push_back(patchIndex);
-                }
-            }
-
-            if (diffLeft > talusAngle) {
-                float moveAmount = materialToMove * (diffLeft * invTotalDiff);
-                dst[left] += moveAmount;
-
-                int patchX = (j - 1) / PATCH_SIZE;
-                int patchZ = i / PATCH_SIZE;
-                int patchIndex = patchX * mNbPatchZ + patchZ;
-                if (!mPatchMarked[patchIndex]) {
-                    mPatchMarked[patchIndex] = true;
-                    mDirtyPatchIndices.push_back(patchIndex);
-                }
-            }
-
-            if (diffRight > talusAngle) {
-                float moveAmount = materialToMove * (diffRight * invTotalDiff);
-                dst[right] += moveAmount;
-
-                int patchX = (j + 1) / PATCH_SIZE;
-                int patchZ = i / PATCH_SIZE;
-                int patchIndex = patchX * mNbPatchZ + patchZ;
-                if (!mPatchMarked[patchIndex]) {
-                    mPatchMarked[patchIndex] = true;
-                    mDirtyPatchIndices.push_back(patchIndex);
-                }
-            }
-
-            if (diffUpLeft > talusAngle) {
-                float moveAmount = materialToMove * (diffUpLeft * invTotalDiff);
-                dst[upLeft] += moveAmount;
-
-                int patchX = (j - 1) / PATCH_SIZE;
-                int patchZ = (i - 1) / PATCH_SIZE;
-                int patchIndex = patchX * mNbPatchZ + patchZ;
-                if (!mPatchMarked[patchIndex]) {
-                    mPatchMarked[patchIndex] = true;
-                    mDirtyPatchIndices.push_back(patchIndex);
-                }
-            }
-
-            if (diffUpRight > talusAngle) {
-                float moveAmount = materialToMove * (diffUpRight * invTotalDiff);
-                dst[upRight] += moveAmount;
-
-                int patchX = (j + 1) / PATCH_SIZE;
-                int patchZ = (i - 1) / PATCH_SIZE;
-                int patchIndex = patchX * mNbPatchZ + patchZ;
-                if (!mPatchMarked[patchIndex]) {
-                    mPatchMarked[patchIndex] = true;
-                    mDirtyPatchIndices.push_back(patchIndex);
-                }
-            }
-
-            if (diffDownLeft > talusAngle) {
-                float moveAmount = materialToMove * (diffDownLeft * invTotalDiff);
-                dst[downLeft] += moveAmount;
-
-                int patchX = (j - 1) / PATCH_SIZE;
-                int patchZ = (i + 1) / PATCH_SIZE;
-                int patchIndex = patchX * mNbPatchZ + patchZ;
-                if (!mPatchMarked[patchIndex]) {
-                    mPatchMarked[patchIndex] = true;
-                    mDirtyPatchIndices.push_back(patchIndex);
-                }
-            }
-
-            if (diffDownRight > talusAngle) {
-                float moveAmount = materialToMove * (diffDownRight * invTotalDiff);
-                dst[downRight] += moveAmount;
-
-                int patchX = (j + 1) / PATCH_SIZE;
-                int patchZ = (i + 1) / PATCH_SIZE;
-                int patchIndex = patchX * mNbPatchZ + patchZ;
-                if (!mPatchMarked[patchIndex]) {
-                    mPatchMarked[patchIndex] = true;
-                    mDirtyPatchIndices.push_back(patchIndex);
-                }
-            }
-
+        if (erodeCell(i, j, src, dst)) {
             ++changes;
         }
     }

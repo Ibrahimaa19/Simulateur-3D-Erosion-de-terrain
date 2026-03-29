@@ -5,6 +5,7 @@
 #include <cmath>
 #include <vector>
 #include <iostream>
+#include <algorithm>
 
 /**
  * @class ThermalErosion
@@ -13,11 +14,6 @@
 class ThermalErosion
 {
 public:
-    /**
-     * @brief Charge les informations nécessaires depuis un terrain.
-     *
-     * @param terrain Pointeur vers le terrain à éroder
-     */
     void loadTerrainInfo(std::unique_ptr<Terrain>& terrain) {
         m_data   = terrain->getData();
         m_height = terrain->getTerrainHeight();
@@ -31,75 +27,25 @@ public:
         resetProgress();
     }
 
-    /**
-     * @brief Définit l’angle de talus critique.
-     *
-     * @param angle Angle en degrés
-     */
     void setTalusAngle(float angle) {
         const float PI = 3.14159265f;
         talusAngle = std::tan(angle * PI / 180.0f);
     }
 
-    /**
-     * @brief Définit le taux de transfert de matière.
-     *
-     * @param c Coefficient de transfert
-     */
     void setTransferRate(float c) { transferRate = c; }
 
-    /**
-     * @brief Exécute une itération complète d'érosion thermique.
-     *
-     * Réinitialise la progression incrémentale et traite l'ensemble
-     * des cellules internes du terrain.
-     *
-     * @return Nombre de cellules modifiées durant l'itération
-     */
     int step();
-
-    /**
-     * @brief Exécute une portion de l'itération d'érosion thermique.
-     *
-     * Le traitement est découpé en morceaux pour éviter de bloquer
-     * le rendu interactif de l'application.
-     *
-     * @param maxCells Nombre maximum de cellules à traiter pendant cet appel
-     * @return Nombre de cellules modifiées pendant ce morceau
-     */
     int stepChunk(int maxCells);
 
-    /**
-     * @brief Réinitialise l'état interne de progression de l'érosion.
-     *
-     * Vide les buffers temporaires, remet à zéro les indices de parcours
-     * et réinitialise l'état des patches modifiés.
-     */
     void resetProgress();
 
-    /**
-     * @brief Indique si une itération complète est terminée.
-     */
     bool isIterationFinished() const { return mIterationFinished; }
-
-    /**
-     * @brief Indique si un rafraîchissement visuel intermédiaire est souhaité.
-     */
     bool needsVisualUpdate() const;
 
-    /**
-     * @brief Copie le buffer de travail dans les données terrain visibles.
-     */
     void commitWorkingData();
 
-    /**
-     * @brief Retourne la liste des patches modifiés.
-     */
     const std::vector<int>& getDirtyPatchIndices() const { return mDirtyPatchIndices; }
 
-    /**
-     * @brief Vide l’ensemble des patches modifiés.
-     */
     void clearDirtyPatchIndices()
     {
         for (int idx : mDirtyPatchIndices)
@@ -109,14 +55,11 @@ public:
     }
 
 private:
-    /** pointeur vers les hauteurs du terrain */
     std::vector<float>* m_data = nullptr;
 
-    /** dimensions du terrain */
     int m_height = 0;
     int m_width = 0;
 
-    /** paramètres d’érosion */
     float talusAngle = 0.f;
     float transferRate = 0.f;
 
@@ -134,6 +77,7 @@ private:
     int mNbPatchX = 0; /**< Nombre de patches en X */
     int mNbPatchZ = 0; /**< Nombre de patches en Z */
 
+private:
     float get_height(int i, int j) const {
         return (*m_data)[i * m_width + j];
     }
@@ -141,4 +85,18 @@ private:
     float get_talus() const {
         return talusAngle;
     }
+
+    inline int toIndex(int i, int j) const;
+    inline void localIndexToCoords(int localIndex, int& i, int& j) const;
+
+    inline int patchIndexFromCell(int i, int j) const;
+    void markPatchDirtyFromCell(int i, int j);
+
+    void addMaterialToNeighbor(float* dst,
+                               int neighborIndex,
+                               float moveAmount,
+                               int neighborI,
+                               int neighborJ);
+
+    bool erodeCell(int i, int j, const float* src, float* dst);
 };
