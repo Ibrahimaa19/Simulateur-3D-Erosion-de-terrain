@@ -1,5 +1,39 @@
 #include "ThermalErosion.hpp"
 
+ThermalErosion::ThermalErosion()
+{
+    useEightNeighbors();
+}
+const ThermalErosion::NeighborOffset ThermalErosion::kNeighbors8[8] = {
+    {-1,  0}, // up
+    { 1,  0}, // down
+    { 0, -1}, // left
+    { 0,  1}, // right
+    {-1, -1}, // upLeft
+    {-1,  1}, // upRight
+    { 1, -1}, // downLeft
+    { 1,  1}  // downRight
+};
+
+const ThermalErosion::NeighborOffset ThermalErosion::kNeighbors4[4] = {
+    {-1,  0}, // up
+    { 1,  0}, // down
+    { 0, -1}, // left
+    { 0,  1}  // right
+};
+
+void ThermalErosion::useEightNeighbors()
+{
+    mActiveNeighbors = kNeighbors8;
+    mNeighborCount = 8;
+}
+
+void ThermalErosion::useFourNeighbors()
+{
+    mActiveNeighbors = kNeighbors4;
+    mNeighborCount = 4;
+}
+
 int ThermalErosion::toIndex(int i, int j) const
 {
     return i * m_width + j;
@@ -40,40 +74,35 @@ void ThermalErosion::addMaterialToNeighbor(float* dst,
 
 bool ThermalErosion::erodeCell(int i, int j, const float* src, float* dst)
 {
-    const int W = m_width;
-
-    const int center    = toIndex(i, j);
-    const int up        = toIndex(i - 1, j);
-    const int down      = toIndex(i + 1, j);
-    const int left      = toIndex(i, j - 1);
-    const int right     = toIndex(i, j + 1);
-    const int upLeft    = toIndex(i - 1, j - 1);
-    const int upRight   = toIndex(i - 1, j + 1);
-    const int downLeft  = toIndex(i + 1, j - 1);
-    const int downRight = toIndex(i + 1, j + 1);
-
+    const int center = toIndex(i, j);
     const float currentHeight = src[center];
-
-    const float diffUp        = currentHeight - src[up];
-    const float diffDown      = currentHeight - src[down];
-    const float diffLeft      = currentHeight - src[left];
-    const float diffRight     = currentHeight - src[right];
-    const float diffUpLeft    = currentHeight - src[upLeft];
-    const float diffUpRight   = currentHeight - src[upRight];
-    const float diffDownLeft  = currentHeight - src[downLeft];
-    const float diffDownRight = currentHeight - src[downRight];
 
     float totalDiff = 0.0f;
     int validNeighbors = 0;
 
-    if (diffUp > talusAngle)        { totalDiff += diffUp;        ++validNeighbors; }
-    if (diffDown > talusAngle)      { totalDiff += diffDown;      ++validNeighbors; }
-    if (diffLeft > talusAngle)      { totalDiff += diffLeft;      ++validNeighbors; }
-    if (diffRight > talusAngle)     { totalDiff += diffRight;     ++validNeighbors; }
-    if (diffUpLeft > talusAngle)    { totalDiff += diffUpLeft;    ++validNeighbors; }
-    if (diffUpRight > talusAngle)   { totalDiff += diffUpRight;   ++validNeighbors; }
-    if (diffDownLeft > talusAngle)  { totalDiff += diffDownLeft;  ++validNeighbors; }
-    if (diffDownRight > talusAngle) { totalDiff += diffDownRight; ++validNeighbors; }
+    float diffs[8] = {0.0f};
+    int neighborIndices[8] = {0};
+    int neighborI[8] = {0};
+    int neighborJ[8] = {0};
+
+    for (int k = 0; k < mNeighborCount; ++k)
+    {
+        const int ni = i + mActiveNeighbors[k].di;
+        const int nj = j + mActiveNeighbors[k].dj;
+        const int nIndex = toIndex(ni, nj);
+
+        const float diff = currentHeight - src[nIndex];
+
+        diffs[k] = diff;
+        neighborIndices[k] = nIndex;
+        neighborI[k] = ni;
+        neighborJ[k] = nj;
+
+        if (diff > talusAngle) {
+            totalDiff += diff;
+            ++validNeighbors;
+        }
+    }
 
     if (totalDiff <= 0.0f || validNeighbors <= 0) {
         return false;
@@ -88,44 +117,16 @@ bool ThermalErosion::erodeCell(int i, int j, const float* src, float* dst)
 
     const float invTotalDiff = 1.0f / totalDiff;
 
-    if (diffUp > talusAngle) {
-        const float moveAmount = materialToMove * (diffUp * invTotalDiff);
-        addMaterialToNeighbor(dst, up, moveAmount, i - 1, j);
-    }
-
-    if (diffDown > talusAngle) {
-        const float moveAmount = materialToMove * (diffDown * invTotalDiff);
-        addMaterialToNeighbor(dst, down, moveAmount, i + 1, j);
-    }
-
-    if (diffLeft > talusAngle) {
-        const float moveAmount = materialToMove * (diffLeft * invTotalDiff);
-        addMaterialToNeighbor(dst, left, moveAmount, i, j - 1);
-    }
-
-    if (diffRight > talusAngle) {
-        const float moveAmount = materialToMove * (diffRight * invTotalDiff);
-        addMaterialToNeighbor(dst, right, moveAmount, i, j + 1);
-    }
-
-    if (diffUpLeft > talusAngle) {
-        const float moveAmount = materialToMove * (diffUpLeft * invTotalDiff);
-        addMaterialToNeighbor(dst, upLeft, moveAmount, i - 1, j - 1);
-    }
-
-    if (diffUpRight > talusAngle) {
-        const float moveAmount = materialToMove * (diffUpRight * invTotalDiff);
-        addMaterialToNeighbor(dst, upRight, moveAmount, i - 1, j + 1);
-    }
-
-    if (diffDownLeft > talusAngle) {
-        const float moveAmount = materialToMove * (diffDownLeft * invTotalDiff);
-        addMaterialToNeighbor(dst, downLeft, moveAmount, i + 1, j - 1);
-    }
-
-    if (diffDownRight > talusAngle) {
-        const float moveAmount = materialToMove * (diffDownRight * invTotalDiff);
-        addMaterialToNeighbor(dst, downRight, moveAmount, i + 1, j + 1);
+    for (int k = 0; k < mNeighborCount; ++k)
+    {
+        if (diffs[k] > talusAngle) {
+            const float moveAmount = materialToMove * (diffs[k] * invTotalDiff);
+            addMaterialToNeighbor(dst,
+                                  neighborIndices[k],
+                                  moveAmount,
+                                  neighborI[k],
+                                  neighborJ[k]);
+        }
     }
 
     return true;
@@ -176,6 +177,19 @@ int ThermalErosion::stepChunk(int maxCells)
 {
     const int W = m_width;
     const int H = m_height;
+
+    if (!m_data) {
+        std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
+        return 0;
+    }
+
+    if (W < 3 || H < 3 || maxCells <= 0) {
+        return 0;
+    }
+
+    if (mActiveNeighbors == nullptr || mNeighborCount == 0) {
+        useEightNeighbors();
+    }
 
     const int totalInnerCells = (H - 2) * (W - 2);
 
