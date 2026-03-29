@@ -1,4 +1,5 @@
 #include "ThermalErosion.hpp"
+#include <omp.h>
 
 const ThermalErosion::NeighborOffset ThermalErosion::kNeighbors8[8] = {
     {-1,  0},
@@ -132,6 +133,70 @@ bool ThermalErosion::erodeCell(int i, int j, const float* src, float* dst)
 
     return true;
 }
+bool ThermalErosion::erodeCellToDeltaSerial(int i,
+                                            int j,
+                                            const float* src,
+                                            float* delta)
+{
+    const int center = toIndex(i, j);
+    const float currentHeight = src[center];
+
+    float totalDiff = 0.0f;
+    int validNeighbors = 0;
+
+    float diffs[8] = {0.0f};
+    int neighborIndices[8] = {0};
+    int neighborI[8] = {0};
+    int neighborJ[8] = {0};
+
+    for (int k = 0; k < mNeighborCount; ++k)
+    {
+        const int ni = i + mActiveNeighbors[k].di;
+        const int nj = j + mActiveNeighbors[k].dj;
+        const int nIndex = toIndex(ni, nj);
+
+        const float diff = currentHeight - src[nIndex];
+
+        diffs[k] = diff;
+        neighborIndices[k] = nIndex;
+        neighborI[k] = ni;
+        neighborJ[k] = nj;
+
+        if (diff > talusAngle) {
+            totalDiff += diff;
+            ++validNeighbors;
+        }
+    }
+
+    if (totalDiff <= 0.0f || validNeighbors <= 0) {
+        return false;
+    }
+
+    float materialToMove = transferRate * (totalDiff / validNeighbors);
+    materialToMove = std::min(materialToMove, currentHeight * transferRate);
+
+    delta[center] -= materialToMove;
+
+    const float invTotalDiff = 1.0f / totalDiff;
+
+    for (int k = 0; k < mNeighborCount; ++k)
+    {
+        if (diffs[k] > talusAngle) {
+            const float moveAmount = materialToMove * (diffs[k] * invTotalDiff);
+            delta[neighborIndices[k]] += moveAmount;
+        }
+    }
+
+    markPatchDirtyFromCell(i, j);
+    for (int k = 0; k < mNeighborCount; ++k)
+    {
+        if (diffs[k] > talusAngle) {
+            markPatchDirtyFromCell(neighborI[k], neighborJ[k]);
+        }
+    }
+
+    return true;
+}
 
 int ThermalErosion::applyErosionRange(const float* src,
                                       float* dst,
@@ -199,7 +264,105 @@ int ThermalErosion::applyBlockedErosionRange(const float* src,
 
     return changes;
 }
+int ThermalErosion::applyBlockedParallelErosionToDelta(const float* src,
+                                                       float* delta)
+{
+    const int W = m_width;
+    const int H = m_height;
+    const int innerWidth = W - 2;
+    const int innerHeight = H - 2;
 
+    int changes = 0;
+
+    #pragma omp parallel for collapse(2) schedule(static) reduction(+:changes)
+    for (int blockI = 0; blockI < innerHeight; blockI += BLOCK_SIZE)
+    {
+        for (int blockJ = 0; blockJ < innerWidth; blockJ += BLOCK_SIZE)
+        {
+            const int blockHeight = std::min(BLOCK_SIZE, innerHeight - blockI);
+            const int blockWidth  = std::min(BLOCK_SIZE, innerWidth - blockJ);
+
+            for (int di = 0; di < blockHeight; ++di)
+            {
+                const int innerI = blockI + di;
+                const int i = innerI + 1;
+
+                for (int dj = 0; dj < blockWidth; ++dj)
+                {
+                    const int innerJ = blockJ + dj;
+                    const int j = innerJ + 1;
+
+                    const int center = toIndex(i, j);
+                    const float currentHeight = src[center];
+
+                    float totalDiff = 0.0f;
+                    int validNeighbors = 0;
+
+                    float diffs[8] = {0.0f};
+                    int neighborIndices[8] = {0};
+                    int neighborI[8] = {0};
+                    int neighborJ[8] = {0};
+
+                    for (int k = 0; k < mNeighborCount; ++k)
+                    {
+                        const int ni = i + mActiveNeighbors[k].di;
+                        const int nj = j + mActiveNeighbors[k].dj;
+                        const int nIndex = toIndex(ni, nj);
+
+                        const float diff = currentHeight - src[nIndex];
+
+                        diffs[k] = diff;
+                        neighborIndices[k] = nIndex;
+                        neighborI[k] = ni;
+                        neighborJ[k] = nj;
+
+                        if (diff > talusAngle) {
+                            totalDiff += diff;
+                            ++validNeighbors;
+                        }
+                    }
+
+                    if (totalDiff <= 0.0f || validNeighbors <= 0) {
+                        continue;
+                    }
+
+                    float materialToMove = transferRate * (totalDiff / validNeighbors);
+                    materialToMove = std::min(materialToMove, currentHeight * transferRate);
+
+                    #pragma omp atomic update
+                    delta[center] -= materialToMove;
+
+                    const float invTotalDiff = 1.0f / totalDiff;
+
+                    for (int k = 0; k < mNeighborCount; ++k)
+                    {
+                        if (diffs[k] > talusAngle) {
+                            const float moveAmount = materialToMove * (diffs[k] * invTotalDiff);
+
+                            #pragma omp atomic update
+                            delta[neighborIndices[k]] += moveAmount;
+                        }
+                    }
+
+                    #pragma omp critical
+                    {
+                        markPatchDirtyFromCell(i, j);
+                        for (int k = 0; k < mNeighborCount; ++k)
+                        {
+                            if (diffs[k] > talusAngle) {
+                                markPatchDirtyFromCell(neighborI[k], neighborJ[k]);
+                            }
+                        }
+                    }
+
+                    ++changes;
+                }
+            }
+        }
+    }
+
+    return changes;
+}
 void ThermalErosion::resetProgress()
 {
     m_workingData.clear();
@@ -346,6 +509,39 @@ int ThermalErosion::stepBlockedPureTwoPhase()
                                                  dst.data(),
                                                  0,
                                                  totalInnerCells);
+
+    *m_data = std::move(dst);
+
+    mIterationFinished = true;
+    mNeedsVisualUpdate = false;
+    mCellsProcessedSinceLastCommit = 0;
+    mCurrentIndex = 0;
+
+    return changes;
+}
+int ThermalErosion::stepBlockedParallelPureTwoPhase()
+{
+    if (!m_data) {
+        std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
+        return 0;
+    }
+
+    if (m_width < 3 || m_height < 3) {
+        return 0;
+    }
+
+    clearDirtyPatchIndices();
+
+    std::vector<float> srcSnapshot = *m_data;
+    std::vector<float> delta(srcSnapshot.size(), 0.0f);
+    std::vector<float> dst = srcSnapshot;
+
+    const int changes = applyBlockedParallelErosionToDelta(srcSnapshot.data(),
+                                                           delta.data());
+
+    for (std::size_t idx = 0; idx < dst.size(); ++idx) {
+        dst[idx] += delta[idx];
+    }
 
     *m_data = std::move(dst);
 

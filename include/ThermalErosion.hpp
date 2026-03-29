@@ -46,6 +46,7 @@ public:
 
     int stepPureTwoPhase();
     int stepBlockedPureTwoPhase();
+    int stepBlockedParallelPureTwoPhase();
 
     void resetProgress();
 
@@ -118,4 +119,12 @@ private:
                                  float* dst,
                                  int startIndex,
                                  int endIndex);
+
+    bool erodeCellToDeltaSerial(int i,
+                                int j,
+                                const float* src,
+                                float* delta);
+
+    int applyBlockedParallelErosionToDelta(const float* src,
+                                           float* delta);
 };
