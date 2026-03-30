@@ -10,6 +10,8 @@ find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
 find_package(OpenMP REQUIRED)
 
+find_package(MPI REQUIRED)
+
 # Flags d'optimisation
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O3 -march=native")
@@ -75,6 +77,7 @@ target_link_libraries(${PROJECT_NAME}
         GLEW::GLEW
         glfw
         OpenMP::OpenMP_CXX
+        ${MPI_CXX_LIBRARIES}
 )
 
 target_include_directories(${PROJECT_NAME}
@@ -84,6 +87,7 @@ target_include_directories(${PROJECT_NAME}
         ${GLEW_INCLUDE_DIRS}
         ${GLFW_INCLUDE_DIRS}
         ${GLM_INCLUDE_DIRS}
+        ${MPI_CXX_INCLUDE_DIRS}
 )
 
 add_definitions(-DGLEW_STATIC)
