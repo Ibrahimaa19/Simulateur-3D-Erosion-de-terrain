@@ -1,11 +1,13 @@
 #include "ValidationTest.hpp"
+
 #include <algorithm>
-#include <iomanip>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <numeric>
 #include <vector>
 
 std::vector<float> ValidationTest::initialData;
@@ -55,6 +57,17 @@ std::string ValidationTest::variant_to_string(ThermalVariant variant)
     return "unknown";
 }
 
+std::string ValidationTest::neighborhood_to_string(NeighborhoodMode mode)
+{
+    switch (mode) {
+        case NeighborhoodMode::FourNeighbors:
+            return "4neighbors";
+        case NeighborhoodMode::EightNeighbors:
+            return "8neighbors";
+    }
+    return "unknownNeighbors";
+}
+
 int ValidationTest::run_one_step(ThermalErosion& erosion, ThermalVariant variant)
 {
     switch (variant) {
@@ -71,112 +84,270 @@ int ValidationTest::run_one_step(ThermalErosion& erosion, ThermalVariant variant
     return 0;
 }
 
+ValidationTest::SummaryStats
+ValidationTest::compute_summary_stats(const std::vector<double>& values)
+{
+    SummaryStats stats;
+
+    if (values.empty()) {
+        return stats;
+    }
+
+    stats.n = static_cast<int>(values.size());
+
+    std::vector<double> sorted = values;
+    std::sort(sorted.begin(), sorted.end());
+
+    stats.min = sorted.front();
+    stats.max = sorted.back();
+
+    const double sum = std::accumulate(sorted.begin(), sorted.end(), 0.0);
+    stats.mean = sum / static_cast<double>(sorted.size());
+
+    if (sorted.size() % 2 == 0) {
+        const std::size_t mid = sorted.size() / 2;
+        stats.median = 0.5 * (sorted[mid - 1] + sorted[mid]);
+    } else {
+        stats.median = sorted[sorted.size() / 2];
+    }
+
+    double variance = 0.0;
+    if (sorted.size() > 1) {
+        for (double x : sorted) {
+            const double d = x - stats.mean;
+            variance += d * d;
+        }
+        variance /= static_cast<double>(sorted.size() - 1);
+        stats.stddev = std::sqrt(variance);
+    } else {
+        stats.stddev = 0.0;
+    }
+
+    const double margin = 1.96 * stats.stddev / std::sqrt(static_cast<double>(stats.n));
+    stats.ci95Low = stats.mean - margin;
+    stats.ci95High = stats.mean + margin;
+
+    return stats;
+}
+
+void ValidationTest::write_raw_runs_csv(const std::string& filepath,
+                                        const std::vector<RunMetrics>& runs)
+{
+    std::ofstream out(filepath);
+    out << "run_id,total_time_ms,avg_time_per_step_ms,final_mass_error,last_cells_modified\n";
+
+    for (std::size_t i = 0; i < runs.size(); ++i) {
+        out << (i + 1) << ","
+            << runs[i].totalTimeMs << ","
+            << runs[i].avgTimePerStepMs << ","
+            << runs[i].finalMassError << ","
+            << runs[i].lastCellsModified << "\n";
+    }
+}
+
+void ValidationTest::write_summary_csv(const std::string& filepath,
+                                       const SummaryStats& totalStats,
+                                       const SummaryStats& avgStepStats,
+                                       const SummaryStats& massErrorStats,
+                                       const SummaryStats& lastCellsStats)
+{
+    std::ofstream out(filepath);
+    out << "metric,n,mean,median,stddev,min,max,ci95_low,ci95_high\n";
+
+    out << "total_time_ms,"
+        << totalStats.n << ","
+        << totalStats.mean << ","
+        << totalStats.median << ","
+        << totalStats.stddev << ","
+        << totalStats.min << ","
+        << totalStats.max << ","
+        << totalStats.ci95Low << ","
+        << totalStats.ci95High << "\n";
+
+    out << "avg_time_per_step_ms,"
+        << avgStepStats.n << ","
+        << avgStepStats.mean << ","
+        << avgStepStats.median << ","
+        << avgStepStats.stddev << ","
+        << avgStepStats.min << ","
+        << avgStepStats.max << ","
+        << avgStepStats.ci95Low << ","
+        << avgStepStats.ci95High << "\n";
+
+    out << "final_mass_error,"
+        << massErrorStats.n << ","
+        << massErrorStats.mean << ","
+        << massErrorStats.median << ","
+        << massErrorStats.stddev << ","
+        << massErrorStats.min << ","
+        << massErrorStats.max << ","
+        << massErrorStats.ci95Low << ","
+        << massErrorStats.ci95High << "\n";
+
+    out << "last_cells_modified,"
+        << lastCellsStats.n << ","
+        << lastCellsStats.mean << ","
+        << lastCellsStats.median << ","
+        << lastCellsStats.stddev << ","
+        << lastCellsStats.min << ","
+        << lastCellsStats.max << ","
+        << lastCellsStats.ci95Low << ","
+        << lastCellsStats.ci95High << "\n";
+}
+
 void ValidationTest::run_variant_tests(std::unique_ptr<Terrain>& terrain,
-                              const std::vector<float>& referenceData,
-                              const std::string& terrainType,
-                              int steps,
-                              ThermalVariant variant,
-                              NeighborhoodMode neighborhood)
+                                       const std::vector<float>& referenceData,
+                                       const std::string& terrainType,
+                                       int steps,
+                                       ThermalVariant variant,
+                                       NeighborhoodMode neighborhood)
 {
     namespace fs = std::filesystem;
 
     const std::string variantName = variant_to_string(variant);
+    const std::string neighborhoodName = neighborhood_to_string(neighborhood);
+
     fs::path baseDir = fs::path("./resultat")
-                 / terrainType
-                 / neighborhood_to_string(neighborhood)
-                 / variantName;
+                     / terrainType
+                     / neighborhoodName
+                     / variantName;
     fs::create_directories(baseDir);
 
-    *terrain->getData() = referenceData;
-    initialData = *terrain->getData();
+    constexpr int warmupRuns = 2;
+    constexpr int measuredRuns = 5;
 
-    ThermalErosion erosion;
-    erosion.loadTerrainInfo(terrain);
-    erosion.setTalusAngle(25.f);
-    erosion.setTransferRate(0.1f);
-    if (neighborhood == NeighborhoodMode::FourNeighbors) {
-        erosion.useFourNeighbors();
-    } else {
-        erosion.useEightNeighbors();
-    }
-    std::vector<int> cellsModified(steps, 0);
+    std::vector<RunMetrics> measured;
+    measured.reserve(measuredRuns);
 
-    fs::path errorEvolutionFile = baseDir / "error_evolution.csv";
-    std::ofstream errorEvolutionOut(errorEvolutionFile);
-    errorEvolutionOut << "step,error\n";
+    float referenceErrorStep1 = 0.0f;
+    int referenceCellsStep1 = 0;
+    int validationPassed = 0;
 
-    using clock = std::chrono::high_resolution_clock;
-    auto t0 = clock::now();
+    fs::path errorEvolutionFile = baseDir / "error_evolution_last_run.csv";
 
-    float errorStep1 = 0.0f;
-
-    for (int i = 0; i < steps; ++i)
+    for (int run = 0; run < warmupRuns + measuredRuns; ++run)
     {
-        cellsModified[i] = run_one_step(erosion, variant);
+        const bool isWarmup = (run < warmupRuns);
 
-        float currentError = test_mass_conservation(*terrain->getData());
+        *terrain->getData() = referenceData;
+        initialData = *terrain->getData();
 
-        if (i == 0) {
-            errorStep1 = currentError;
+        ThermalErosion erosion;
+        erosion.loadTerrainInfo(terrain);
+        erosion.setTalusAngle(25.f);
+        erosion.setTransferRate(0.1f);
+
+        if (neighborhood == NeighborhoodMode::FourNeighbors) {
+            erosion.useFourNeighbors();
+        } else {
+            erosion.useEightNeighbors();
         }
 
-        if (i % 100 == 0 || i == steps - 1) {
-            errorEvolutionOut << (i + 1) << "," << currentError << "\n";
+        std::vector<int> cellsModified(steps, 0);
+        std::ofstream errorEvolutionOut;
+
+        if (!isWarmup && run == warmupRuns + measuredRuns - 1) {
+            errorEvolutionOut.open(errorEvolutionFile);
+            errorEvolutionOut << "step,error\n";
+        }
+
+        using clock = std::chrono::high_resolution_clock;
+        auto t0 = clock::now();
+
+        float errorStep1 = 0.0f;
+
+        for (int i = 0; i < steps; ++i)
+        {
+            cellsModified[i] = run_one_step(erosion, variant);
+
+            const float currentError = test_mass_conservation(*terrain->getData());
+
+            if (i == 0) {
+                errorStep1 = currentError;
+            }
+
+            if (errorEvolutionOut.is_open() && (i % 100 == 0 || i == steps - 1)) {
+                errorEvolutionOut << (i + 1) << "," << currentError << "\n";
+            }
+        }
+
+        auto t1 = clock::now();
+        const double totalMs =
+            std::chrono::duration<double, std::milli>(t1 - t0).count();
+
+        const float finalError = test_mass_conservation(*terrain->getData());
+
+        if (!isWarmup) {
+            RunMetrics m;
+            m.totalTimeMs = totalMs;
+            m.avgTimePerStepMs = totalMs / static_cast<double>(steps);
+            m.finalMassError = finalError;
+            m.lastCellsModified = cellsModified.back();
+            measured.push_back(m);
+
+            if (measured.size() == 1) {
+                referenceErrorStep1 = errorStep1;
+                referenceCellsStep1 = cellsModified.front();
+
+                validationPassed = 0;
+                if (finalError < TOLERANCE)
+                    ++validationPassed;
+                if (test_height_limits(*terrain->getData()))
+                    ++validationPassed;
+            }
         }
     }
 
-    auto t1 = clock::now();
-    const double totalMs =
-        std::chrono::duration<double, std::milli>(t1 - t0).count();
+    std::vector<double> totalTimes;
+    std::vector<double> avgStepTimes;
+    std::vector<double> finalMassErrors;
+    std::vector<double> lastCells;
 
-    errorEvolutionOut.close();
+    totalTimes.reserve(measured.size());
+    avgStepTimes.reserve(measured.size());
+    finalMassErrors.reserve(measured.size());
+    lastCells.reserve(measured.size());
 
-    fs::path cellFile = baseDir / ("cellModified_" + std::to_string(steps) + ".csv");
-    std::ofstream cellOut(cellFile);
-    cellOut << "step,cells_modified\n";
-
-    for (int i = 0; i < steps; ++i) {
-        cellOut << (i + 1) << "," << cellsModified[i] << "\n";
+    for (const RunMetrics& m : measured) {
+        totalTimes.push_back(m.totalTimeMs);
+        avgStepTimes.push_back(m.avgTimePerStepMs);
+        finalMassErrors.push_back(static_cast<double>(m.finalMassError));
+        lastCells.push_back(static_cast<double>(m.lastCellsModified));
     }
 
-    cellOut.close();
+    const SummaryStats totalStats = compute_summary_stats(totalTimes);
+    const SummaryStats avgStepStats = compute_summary_stats(avgStepTimes);
+    const SummaryStats massErrorStats = compute_summary_stats(finalMassErrors);
+    const SummaryStats lastCellsStats = compute_summary_stats(lastCells);
 
-    float errorFinal = test_mass_conservation(*terrain->getData());
-
-    fs::path errorFile = baseDir / ("errorTimeStep_" + std::to_string(steps) + ".csv");
-    std::ofstream errorOut(errorFile);
-    errorOut << "final_error\n";
-    errorOut << errorFinal << "\n";
-    errorOut.close();
-
-    fs::path perfFile = baseDir / ("performance_" + std::to_string(steps) + ".csv");
-    std::ofstream perfOut(perfFile);
-    perfOut << "steps,total_time_ms,avg_time_per_step_ms\n";
-    perfOut << steps << "," << totalMs << "," << (totalMs / steps) << "\n";
-    perfOut.close();
-
-    int passed = 0;
-    const int total = 2;
-
-    if (errorFinal < TOLERANCE)
-        ++passed;
-
-    if (test_height_limits(*terrain->getData()))
-        ++passed;
+    write_raw_runs_csv((baseDir / "raw_runs.csv").string(), measured);
+    write_summary_csv((baseDir / "summary_stats.csv").string(),
+                      totalStats,
+                      avgStepStats,
+                      massErrorStats,
+                      lastCellsStats);
 
     std::cout << "========================================\n";
     std::cout << "VARIANTE : " << variantName << "\n";
     std::cout << "Terrain  : " << terrainType << "\n";
-    std::cout << "Voisinage: " << neighborhood_to_string(neighborhood) << "\n";
+    std::cout << "Voisinage: " << neighborhoodName << "\n";
     std::cout << "Steps    : " << steps << "\n";
-    std::cout << "Tests    : Passed " << passed << " / " << total << "\n";
-    std::cout << "Temps total (ms)          : " << totalMs << "\n";
-    std::cout << "Temps moyen / step (ms)   : " << (totalMs / steps) << "\n";
-    std::cout << "Conservation error step 1 : " << errorStep1 << "\n";
-    std::cout << "Conservation error final  : " << errorFinal << "\n";
-    std::cout << "Cellules modifiees step 1 : " << cellsModified.front() << "\n";
-    std::cout << "Cellules modifiees fin    : " << cellsModified.back() << "\n";
-    std::cout << "Dossier sortie            : " << baseDir << "\n";
+    std::cout << "Warm-up  : " << warmupRuns << "\n";
+    std::cout << "Runs     : " << measuredRuns << "\n";
+    std::cout << "Tests    : Passed " << validationPassed << " / 2\n";
+    std::cout << "Mean total time (ms)       : " << totalStats.mean << "\n";
+    std::cout << "Median total time (ms)     : " << totalStats.median << "\n";
+    std::cout << "Stddev total time (ms)     : " << totalStats.stddev << "\n";
+    std::cout << "Min total time (ms)        : " << totalStats.min << "\n";
+    std::cout << "Max total time (ms)        : " << totalStats.max << "\n";
+    std::cout << "95% CI total time (ms)     : [" << totalStats.ci95Low
+              << ", " << totalStats.ci95High << "]\n";
+    std::cout << "Mean time / step (ms)      : " << avgStepStats.mean << "\n";
+    std::cout << "Mean final mass error      : " << massErrorStats.mean << "\n";
+    std::cout << "Conservation error step 1  : " << referenceErrorStep1 << "\n";
+    std::cout << "Cells modified step 1      : " << referenceCellsStep1 << "\n";
+    std::cout << "Mean last cells modified   : " << lastCellsStats.mean << "\n";
+    std::cout << "Dossier sortie             : " << baseDir << "\n";
     std::cout << "========================================\n";
 }
 
@@ -212,14 +383,4 @@ void ValidationTest::run_all_tests(std::unique_ptr<Terrain>& terrain,
                               neighborhood);
         }
     }
-}
-std::string ValidationTest::neighborhood_to_string(NeighborhoodMode mode)
-{
-    switch (mode) {
-        case NeighborhoodMode::FourNeighbors:
-            return "4neighbors";
-        case NeighborhoodMode::EightNeighbors:
-            return "8neighbors";
-    }
-    return "unknownNeighbors";
 }

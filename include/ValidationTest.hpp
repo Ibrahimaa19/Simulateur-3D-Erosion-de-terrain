@@ -19,6 +19,27 @@ public:
         FourNeighbors,
         EightNeighbors
     };
+
+    struct RunMetrics
+    {
+        double totalTimeMs = 0.0;
+        double avgTimePerStepMs = 0.0;
+        float finalMassError = 0.0f;
+        int lastCellsModified = 0;
+    };
+
+    struct SummaryStats
+    {
+        int n = 0;
+        double mean = 0.0;
+        double median = 0.0;
+        double stddev = 0.0;
+        double min = 0.0;
+        double max = 0.0;
+        double ci95Low = 0.0;
+        double ci95High = 0.0;
+    };
+
     static std::vector<float> initialData;
     static constexpr float TOLERANCE = 1e-4f;
 
@@ -33,13 +54,23 @@ public:
 private:
     static int run_one_step(ThermalErosion& erosion, ThermalVariant variant);
     static std::string variant_to_string(ThermalVariant variant);
-
     static std::string neighborhood_to_string(NeighborhoodMode mode);
 
+    static SummaryStats compute_summary_stats(const std::vector<double>& values);
+
+    static void write_raw_runs_csv(const std::string& filepath,
+                                   const std::vector<RunMetrics>& runs);
+
+    static void write_summary_csv(const std::string& filepath,
+                                  const SummaryStats& totalStats,
+                                  const SummaryStats& avgStepStats,
+                                  const SummaryStats& massErrorStats,
+                                  const SummaryStats& lastCellsStats);
+
     static void run_variant_tests(std::unique_ptr<Terrain>& terrain,
-                              const std::vector<float>& referenceData,
-                              const std::string& terrainType,
-                              int steps,
-                              ThermalVariant variant,
-                              NeighborhoodMode neighborhood);
+                                  const std::vector<float>& referenceData,
+                                  const std::string& terrainType,
+                                  int steps,
+                                  ThermalVariant variant,
+                                  NeighborhoodMode neighborhood);
 };
