@@ -9,10 +9,12 @@
 class ValidationTest
 {
 public:
-    enum class ThermalVariant {
+        enum class ThermalVariant {
         PureTwoPhase,
         BlockedPureTwoPhase,
-        BlockedParallelPureTwoPhase
+        BlockedParallelPureTwoPhase,
+        CheckerboardPureTwoPhase,
+        BlockedCheckerboardPureTwoPhase
     };
 
     enum class NeighborhoodMode {

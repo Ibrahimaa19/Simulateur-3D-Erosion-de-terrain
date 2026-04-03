@@ -47,7 +47,8 @@ public:
     int stepPureTwoPhase();
     int stepBlockedPureTwoPhase();
     int stepBlockedParallelPureTwoPhase();
-
+    int stepCheckerboardPureTwoPhase();
+    int stepBlockedCheckerboardPureTwoPhase();
     void resetProgress();
 
     bool isIterationFinished() const { return mIterationFinished; }
@@ -131,4 +132,11 @@ private:
         const float* src,
         std::vector<std::vector<float>>& threadDeltas,
         std::vector<std::vector<unsigned char>>& threadPatchMarked);
+        int applyCheckerboardErosionRange(const float* src,
+                                      float* dst,
+                                      int color);
+
+    int applyBlockedCheckerboardErosionRange(const float* src,
+                                             float* dst,
+                                             int color);
 };

@@ -53,6 +53,10 @@ std::string ValidationTest::variant_to_string(ThermalVariant variant)
             return "blockedPureTwoPhase";
         case ThermalVariant::BlockedParallelPureTwoPhase:
             return "blockedParallelPureTwoPhase";
+        case ThermalVariant::CheckerboardPureTwoPhase:
+            return "checkerboardPureTwoPhase";
+        case ThermalVariant::BlockedCheckerboardPureTwoPhase:
+            return "blockedCheckerboardPureTwoPhase";
     }
     return "unknown";
 }
@@ -79,6 +83,10 @@ int ValidationTest::run_one_step(ThermalErosion& erosion, ThermalVariant variant
 
         case ThermalVariant::BlockedParallelPureTwoPhase:
             return erosion.stepBlockedParallelPureTwoPhase();
+        case ThermalVariant::CheckerboardPureTwoPhase:
+            return erosion.stepCheckerboardPureTwoPhase();
+        case ThermalVariant::BlockedCheckerboardPureTwoPhase:
+            return erosion.stepBlockedCheckerboardPureTwoPhase();
     }
 
     return 0;
@@ -362,25 +370,27 @@ void ValidationTest::run_all_tests(std::unique_ptr<Terrain>& terrain,
 
     const std::vector<float> referenceData = *terrain->getData();
 
-    const NeighborhoodMode neighborhoods[] = {
-        NeighborhoodMode::EightNeighbors,
-        NeighborhoodMode::FourNeighbors
-    };
-
-    const ThermalVariant variants[] = {
+    const ThermalVariant baseVariants[] = {
         ThermalVariant::PureTwoPhase,
         ThermalVariant::BlockedPureTwoPhase,
         ThermalVariant::BlockedParallelPureTwoPhase
     };
 
-    for (NeighborhoodMode neighborhood : neighborhoods) {
-        for (ThermalVariant variant : variants) {
-            run_variant_tests(terrain,
-                              referenceData,
-                              terrainType,
-                              steps,
-                              variant,
-                              neighborhood);
-        }
+    for (ThermalVariant variant : baseVariants) {
+        run_variant_tests(terrain, referenceData, terrainType, steps,
+                          variant, NeighborhoodMode::EightNeighbors);
+    }
+
+    const ThermalVariant fourNeighborVariants[] = {
+        ThermalVariant::PureTwoPhase,
+        ThermalVariant::BlockedPureTwoPhase,
+        ThermalVariant::BlockedParallelPureTwoPhase,
+        ThermalVariant::CheckerboardPureTwoPhase,
+        ThermalVariant::BlockedCheckerboardPureTwoPhase
+    };
+
+    for (ThermalVariant variant : fourNeighborVariants) {
+        run_variant_tests(terrain, referenceData, terrainType, steps,
+                          variant, NeighborhoodMode::FourNeighbors);
     }
 }

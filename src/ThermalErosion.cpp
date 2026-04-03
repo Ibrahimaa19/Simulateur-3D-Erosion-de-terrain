@@ -365,6 +365,137 @@ int ThermalErosion::applyBlockedParallelErosionToDelta(const float* src,
 
     return changes;
 }
+int ThermalErosion::applyCheckerboardErosionRange(const float* src,
+                                                  float* dst,
+                                                  int color)
+{
+    int changes = 0;
+
+    for (int i = 1; i < m_height - 1; ++i)
+    {
+        for (int j = 1; j < m_width - 1; ++j)
+        {
+            if (((i + j) & 1) != color) {
+                continue;
+            }
+
+            if (erodeCell(i, j, src, dst)) {
+                ++changes;
+            }
+        }
+    }
+
+    return changes;
+}
+int ThermalErosion::applyBlockedCheckerboardErosionRange(const float* src,
+                                                         float* dst,
+                                                         int color)
+{
+    const int W = m_width;
+    const int H = m_height;
+    const int innerWidth = W - 2;
+    const int innerHeight = H - 2;
+
+    int changes = 0;
+
+    for (int blockI = 0; blockI < innerHeight; blockI += BLOCK_SIZE)
+    {
+        const int blockHeight = std::min(BLOCK_SIZE, innerHeight - blockI);
+
+        for (int blockJ = 0; blockJ < innerWidth; blockJ += BLOCK_SIZE)
+        {
+            const int blockWidth = std::min(BLOCK_SIZE, innerWidth - blockJ);
+
+            for (int di = 0; di < blockHeight; ++di)
+            {
+                const int innerI = blockI + di;
+                const int i = innerI + 1;
+
+                for (int dj = 0; dj < blockWidth; ++dj)
+                {
+                    const int innerJ = blockJ + dj;
+                    const int j = innerJ + 1;
+
+                    if (((i + j) & 1) != color) {
+                        continue;
+                    }
+
+                    if (erodeCell(i, j, src, dst)) {
+                        ++changes;
+                    }
+                }
+            }
+        }
+    }
+
+    return changes;
+}
+int ThermalErosion::stepCheckerboardPureTwoPhase()
+{
+    if (!m_data) {
+        std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
+        return 0;
+    }
+
+    if (m_width < 3 || m_height < 3) {
+        return 0;
+    }
+
+    if (mNeighborCount != 4) {
+        std::cerr << "Warning: checkerboard scheduling is intended for four-neighbor mode.\n";
+    }
+
+    clearDirtyPatchIndices();
+
+    std::vector<float> srcSnapshot = *m_data;
+    std::vector<float> dst = srcSnapshot;
+
+    int changes = 0;
+    changes += applyCheckerboardErosionRange(srcSnapshot.data(), dst.data(), 0);
+    changes += applyCheckerboardErosionRange(srcSnapshot.data(), dst.data(), 1);
+
+    *m_data = std::move(dst);
+
+    mIterationFinished = true;
+    mNeedsVisualUpdate = false;
+    mCellsProcessedSinceLastCommit = 0;
+    mCurrentIndex = 0;
+
+    return changes;
+}
+int ThermalErosion::stepBlockedCheckerboardPureTwoPhase()
+{
+    if (!m_data) {
+        std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
+        return 0;
+    }
+
+    if (m_width < 3 || m_height < 3) {
+        return 0;
+    }
+
+    if (mNeighborCount != 4) {
+        std::cerr << "Warning: checkerboard scheduling is intended for four-neighbor mode.\n";
+    }
+
+    clearDirtyPatchIndices();
+
+    std::vector<float> srcSnapshot = *m_data;
+    std::vector<float> dst = srcSnapshot;
+
+    int changes = 0;
+    changes += applyBlockedCheckerboardErosionRange(srcSnapshot.data(), dst.data(), 0);
+    changes += applyBlockedCheckerboardErosionRange(srcSnapshot.data(), dst.data(), 1);
+
+    *m_data = std::move(dst);
+
+    mIterationFinished = true;
+    mNeedsVisualUpdate = false;
+    mCellsProcessedSinceLastCommit = 0;
+    mCurrentIndex = 0;
+
+    return changes;
+}
 int ThermalErosion::applyBlockedParallelErosionToThreadLocalBuffers(
     const float* src,
     std::vector<std::vector<float>>& threadDeltas,
