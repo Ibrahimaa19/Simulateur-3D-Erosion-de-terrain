@@ -127,4 +127,8 @@ private:
 
     int applyBlockedParallelErosionToDelta(const float* src,
                                            float* delta);
+    int applyBlockedParallelErosionToThreadLocalBuffers(
+        const float* src,
+        std::vector<std::vector<float>>& threadDeltas,
+        std::vector<std::vector<unsigned char>>& threadPatchMarked);
 };

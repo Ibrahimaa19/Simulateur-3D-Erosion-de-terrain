@@ -1,5 +1,7 @@
 #include "ThermalErosion.hpp"
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 
 const ThermalErosion::NeighborOffset ThermalErosion::kNeighbors8[8] = {
     {-1,  0},
@@ -363,6 +365,113 @@ int ThermalErosion::applyBlockedParallelErosionToDelta(const float* src,
 
     return changes;
 }
+int ThermalErosion::applyBlockedParallelErosionToThreadLocalBuffers(
+    const float* src,
+    std::vector<std::vector<float>>& threadDeltas,
+    std::vector<std::vector<unsigned char>>& threadPatchMarked)
+{
+    const int W = m_width;
+    const int H = m_height;
+    const int innerWidth = W - 2;
+    const int innerHeight = H - 2;
+
+    int changes = 0;
+
+    #pragma omp parallel for collapse(2) schedule(static) reduction(+:changes)
+    for (int blockI = 0; blockI < innerHeight; blockI += BLOCK_SIZE)
+    {
+        for (int blockJ = 0; blockJ < innerWidth; blockJ += BLOCK_SIZE)
+        {
+#ifdef _OPENMP
+            const int tid = omp_get_thread_num();
+#else
+            const int tid = 0;
+#endif
+
+            std::vector<float>& localDelta = threadDeltas[tid];
+            std::vector<unsigned char>& localPatchMask = threadPatchMarked[tid];
+
+            const int blockHeight = std::min(BLOCK_SIZE, innerHeight - blockI);
+            const int blockWidth  = std::min(BLOCK_SIZE, innerWidth - blockJ);
+
+            for (int di = 0; di < blockHeight; ++di)
+            {
+                const int innerI = blockI + di;
+                const int i = innerI + 1;
+
+                for (int dj = 0; dj < blockWidth; ++dj)
+                {
+                    const int innerJ = blockJ + dj;
+                    const int j = innerJ + 1;
+
+                    const int center = toIndex(i, j);
+                    const float currentHeight = src[center];
+
+                    float totalDiff = 0.0f;
+                    int validNeighbors = 0;
+
+                    float diffs[8] = {0.0f};
+                    int neighborIndices[8] = {0};
+                    int neighborI[8] = {0};
+                    int neighborJ[8] = {0};
+
+                    for (int k = 0; k < mNeighborCount; ++k)
+                    {
+                        const int ni = i + mActiveNeighbors[k].di;
+                        const int nj = j + mActiveNeighbors[k].dj;
+                        const int nIndex = toIndex(ni, nj);
+
+                        const float diff = currentHeight - src[nIndex];
+
+                        diffs[k] = diff;
+                        neighborIndices[k] = nIndex;
+                        neighborI[k] = ni;
+                        neighborJ[k] = nj;
+
+                        if (diff > talusAngle) {
+                            totalDiff += diff;
+                            ++validNeighbors;
+                        }
+                    }
+
+                    if (totalDiff <= 0.0f || validNeighbors <= 0) {
+                        continue;
+                    }
+
+                    float materialToMove = transferRate * (totalDiff / validNeighbors);
+                    materialToMove = std::min(materialToMove, currentHeight * transferRate);
+
+                    localDelta[center] -= materialToMove;
+
+                    const float invTotalDiff = 1.0f / totalDiff;
+
+                    for (int k = 0; k < mNeighborCount; ++k)
+                    {
+                        if (diffs[k] > talusAngle) {
+                            const float moveAmount = materialToMove * (diffs[k] * invTotalDiff);
+                            localDelta[neighborIndices[k]] += moveAmount;
+                        }
+                    }
+
+                    const int centerPatch = patchIndexFromCell(i, j);
+                    localPatchMask[centerPatch] = 1;
+
+                    for (int k = 0; k < mNeighborCount; ++k)
+                    {
+                        if (diffs[k] > talusAngle) {
+                            const int patchIdx = patchIndexFromCell(neighborI[k], neighborJ[k]);
+                            localPatchMask[patchIdx] = 1;
+                        }
+                    }
+
+                    ++changes;
+                }
+            }
+        }
+    }
+
+    return changes;
+}
 void ThermalErosion::resetProgress()
 {
     m_workingData.clear();
@@ -533,14 +642,58 @@ int ThermalErosion::stepBlockedParallelPureTwoPhase()
     clearDirtyPatchIndices();
 
     std::vector<float> srcSnapshot = *m_data;
-    std::vector<float> delta(srcSnapshot.size(), 0.0f);
     std::vector<float> dst = srcSnapshot;
+    std::vector<float> delta(srcSnapshot.size(), 0.0f);
 
-    const int changes = applyBlockedParallelErosionToDelta(srcSnapshot.data(),
-                                                           delta.data());
+#ifdef _OPENMP
+    const int numThreads = omp_get_max_threads();
+#else
+    const int numThreads = 1;
+#endif
+
+    std::vector<std::vector<float>> threadDeltas(
+        numThreads,
+        std::vector<float>(srcSnapshot.size(), 0.0f)
+    );
+
+    std::vector<std::vector<unsigned char>> threadPatchMarked(
+        numThreads,
+        std::vector<unsigned char>(mNbPatchX * mNbPatchZ, 0)
+    );
+
+    const int changes = applyBlockedParallelErosionToThreadLocalBuffers(
+        srcSnapshot.data(),
+        threadDeltas,
+        threadPatchMarked
+    );
+
+    for (int t = 0; t < numThreads; ++t)
+    {
+        const std::vector<float>& localDelta = threadDeltas[t];
+        for (std::size_t idx = 0; idx < delta.size(); ++idx) {
+            delta[idx] += localDelta[idx];
+        }
+    }
 
     for (std::size_t idx = 0; idx < dst.size(); ++idx) {
         dst[idx] += delta[idx];
+    }
+
+    for (int patchIdx = 0; patchIdx < mNbPatchX * mNbPatchZ; ++patchIdx)
+    {
+        bool dirty = false;
+        for (int t = 0; t < numThreads; ++t)
+        {
+            if (threadPatchMarked[t][patchIdx]) {
+                dirty = true;
+                break;
+            }
+        }
+
+        if (dirty) {
+            mPatchMarked[patchIdx] = true;
+            mDirtyPatchIndices.push_back(patchIdx);
+        }
     }
 
     *m_data = std::move(dst);
