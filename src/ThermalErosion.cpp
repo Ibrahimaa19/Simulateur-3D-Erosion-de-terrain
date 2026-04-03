@@ -643,7 +643,6 @@ int ThermalErosion::stepBlockedParallelPureTwoPhase()
 
     std::vector<float> srcSnapshot = *m_data;
     std::vector<float> dst = srcSnapshot;
-    std::vector<float> delta(srcSnapshot.size(), 0.0f);
 
 #ifdef _OPENMP
     const int numThreads = omp_get_max_threads();
@@ -667,16 +666,14 @@ int ThermalErosion::stepBlockedParallelPureTwoPhase()
         threadPatchMarked
     );
 
-    for (int t = 0; t < numThreads; ++t)
+    #pragma omp parallel for schedule(static)
+    for (std::ptrdiff_t idx = 0; idx < static_cast<std::ptrdiff_t>(dst.size()); ++idx)
     {
-        const std::vector<float>& localDelta = threadDeltas[t];
-        for (std::size_t idx = 0; idx < delta.size(); ++idx) {
-            delta[idx] += localDelta[idx];
+        float sum = 0.0f;
+        for (int t = 0; t < numThreads; ++t) {
+            sum += threadDeltas[t][idx];
         }
-    }
-
-    for (std::size_t idx = 0; idx < dst.size(); ++idx) {
-        dst[idx] += delta[idx];
+        dst[idx] += sum;
     }
 
     for (int patchIdx = 0; patchIdx < mNbPatchX * mNbPatchZ; ++patchIdx)
