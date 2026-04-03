@@ -49,6 +49,7 @@ public:
     int stepBlockedParallelPureTwoPhase();
     int stepCheckerboardPureTwoPhase();
     int stepBlockedCheckerboardPureTwoPhase();
+    int stepCheckerboardInPlace();
     void resetProgress();
 
     bool isIterationFinished() const { return mIterationFinished; }
@@ -110,7 +111,8 @@ private:
                                int neighborJ);
 
     bool erodeCell(int i, int j, const float* src, float* dst);
-
+    bool erodeCellInPlace(int i, int j, float* data);
+    int applyCheckerboardInPlaceColor(float* data, int color);
     int applyErosionRange(const float* src,
                           float* dst,
                           int startIndex,

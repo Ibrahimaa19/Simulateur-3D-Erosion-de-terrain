@@ -135,6 +135,61 @@ bool ThermalErosion::erodeCell(int i, int j, const float* src, float* dst)
 
     return true;
 }
+bool ThermalErosion::erodeCellInPlace(int i, int j, float* data)
+{
+    const int center = toIndex(i, j);
+    const float currentHeight = data[center];
+
+    float totalDiff = 0.0f;
+    int validNeighbors = 0;
+
+    float diffs[8] = {0.0f};
+    int neighborIndices[8] = {0};
+    int neighborI[8] = {0};
+    int neighborJ[8] = {0};
+
+    for (int k = 0; k < mNeighborCount; ++k)
+    {
+        const int ni = i + mActiveNeighbors[k].di;
+        const int nj = j + mActiveNeighbors[k].dj;
+        const int nIndex = toIndex(ni, nj);
+
+        const float diff = currentHeight - data[nIndex];
+
+        diffs[k] = diff;
+        neighborIndices[k] = nIndex;
+        neighborI[k] = ni;
+        neighborJ[k] = nj;
+
+        if (diff > talusAngle) {
+            totalDiff += diff;
+            ++validNeighbors;
+        }
+    }
+
+    if (totalDiff <= 0.0f || validNeighbors <= 0) {
+        return false;
+    }
+
+    float materialToMove = transferRate * (totalDiff / validNeighbors);
+    materialToMove = std::min(materialToMove, currentHeight * transferRate);
+
+    data[center] -= materialToMove;
+    markPatchDirtyFromCell(i, j);
+
+    const float invTotalDiff = 1.0f / totalDiff;
+
+    for (int k = 0; k < mNeighborCount; ++k)
+    {
+        if (diffs[k] > talusAngle) {
+            const float moveAmount = materialToMove * (diffs[k] * invTotalDiff);
+            data[neighborIndices[k]] += moveAmount;
+            markPatchDirtyFromCell(neighborI[k], neighborJ[k]);
+        }
+    }
+
+    return true;
+}
 bool ThermalErosion::erodeCellToDeltaSerial(int i,
                                             int j,
                                             const float* src,
@@ -600,6 +655,56 @@ int ThermalErosion::applyBlockedParallelErosionToThreadLocalBuffers(
             }
         }
     }
+
+    return changes;
+}
+int ThermalErosion::applyCheckerboardInPlaceColor(float* data, int color)
+{
+    int changes = 0;
+
+    for (int i = 1; i < m_height - 1; ++i)
+    {
+        for (int j = 1; j < m_width - 1; ++j)
+        {
+            if (((i + j) & 1) != color) {
+                continue;
+            }
+
+            if (erodeCellInPlace(i, j, data)) {
+                ++changes;
+            }
+        }
+    }
+
+    return changes;
+}
+int ThermalErosion::stepCheckerboardInPlace()
+{
+    if (!m_data) {
+        std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
+        return 0;
+    }
+
+    if (m_width < 3 || m_height < 3) {
+        return 0;
+    }
+
+    if (mNeighborCount != 4) {
+        std::cerr << "Warning: in-place checkerboard is intended for four-neighbor mode.\n";
+    }
+
+    clearDirtyPatchIndices();
+
+    float* data = m_data->data();
+
+    int changes = 0;
+    changes += applyCheckerboardInPlaceColor(data, 0);
+    changes += applyCheckerboardInPlaceColor(data, 1);
+
+    mIterationFinished = true;
+    mNeedsVisualUpdate = false;
+    mCellsProcessedSinceLastCommit = 0;
+    mCurrentIndex = 0;
 
     return changes;
 }

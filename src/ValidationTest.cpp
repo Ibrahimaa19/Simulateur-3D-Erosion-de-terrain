@@ -57,6 +57,8 @@ std::string ValidationTest::variant_to_string(ThermalVariant variant)
             return "checkerboardPureTwoPhase";
         case ThermalVariant::BlockedCheckerboardPureTwoPhase:
             return "blockedCheckerboardPureTwoPhase";
+        case ThermalVariant::CheckerboardInPlace:
+            return "checkerboardInPlace";
     }
     return "unknown";
 }
@@ -87,6 +89,8 @@ int ValidationTest::run_one_step(ThermalErosion& erosion, ThermalVariant variant
             return erosion.stepCheckerboardPureTwoPhase();
         case ThermalVariant::BlockedCheckerboardPureTwoPhase:
             return erosion.stepBlockedCheckerboardPureTwoPhase();
+        case ThermalVariant::CheckerboardInPlace:
+            return erosion.stepCheckerboardInPlace();
     }
 
     return 0;
@@ -386,7 +390,8 @@ void ValidationTest::run_all_tests(std::unique_ptr<Terrain>& terrain,
         ThermalVariant::BlockedPureTwoPhase,
         ThermalVariant::BlockedParallelPureTwoPhase,
         ThermalVariant::CheckerboardPureTwoPhase,
-        ThermalVariant::BlockedCheckerboardPureTwoPhase
+        ThermalVariant::BlockedCheckerboardPureTwoPhase,
+        ThermalVariant::CheckerboardInPlace
     };
 
     for (ThermalVariant variant : fourNeighborVariants) {
