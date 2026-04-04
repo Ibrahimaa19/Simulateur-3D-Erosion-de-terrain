@@ -86,7 +86,7 @@ int main(int argc, char const *argv[])
         case Heightmap::PerlinNoise:
         {
             auto generator = std::make_unique<PerlinNoiseTerrain>();
-            generator->CreatePerlinNoise(2048, 2048, 0, 255, 1, 0.005);
+            generator->CreatePerlinNoise(5000, 5000, 0, 255, 1, 0.005);
             terrain = std::move(generator);
             break;
         }

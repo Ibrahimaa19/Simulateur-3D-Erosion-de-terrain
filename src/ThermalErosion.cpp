@@ -938,3 +938,165 @@ int ThermalErosion::stepBlockedParallelPureTwoPhase()
 
     return changes;
 }
+
+int ThermalErosion::applyCheckerboardInPlaceColorParallelBuffered(float* data, int color)
+{
+    if (mNeighborCount != 4) {
+        std::cerr << "Warning: checkerboard in-place parallel is intended for four-neighbor mode.\n";
+    }
+
+#ifdef _OPENMP
+    const int numThreads = omp_get_max_threads();
+#else
+    const int numThreads = 1;
+#endif
+
+    const std::size_t dataSize = static_cast<std::size_t>(m_width) * static_cast<std::size_t>(m_height);
+    const int numPatches = mNbPatchX * mNbPatchZ;
+
+    std::vector<std::vector<float>> threadDeltas(
+        numThreads,
+        std::vector<float>(dataSize, 0.0f)
+    );
+
+    std::vector<std::vector<unsigned char>> threadPatchMasks(
+        numThreads,
+        std::vector<unsigned char>(numPatches, 0)
+    );
+
+    int changes = 0;
+
+    #pragma omp parallel for reduction(+:changes) schedule(static)
+    for (int i = 1; i < m_height - 1; ++i)
+    {
+#ifdef _OPENMP
+        const int tid = omp_get_thread_num();
+#else
+        const int tid = 0;
+#endif
+
+        std::vector<float>& localDelta = threadDeltas[tid];
+        std::vector<unsigned char>& localPatchMask = threadPatchMasks[tid];
+
+        for (int j = 1; j < m_width - 1; ++j)
+        {
+            if (((i + j) & 1) != color) {
+                continue;
+            }
+
+            const int center = toIndex(i, j);
+            const float currentHeight = data[center];
+
+            float totalDiff = 0.0f;
+            int validNeighbors = 0;
+
+            float diffs[8] = {0.0f};
+            int neighborIndices[8] = {0};
+            int neighborI[8] = {0};
+            int neighborJ[8] = {0};
+
+            for (int k = 0; k < mNeighborCount; ++k)
+            {
+                const int ni = i + mActiveNeighbors[k].di;
+                const int nj = j + mActiveNeighbors[k].dj;
+                const int nIndex = toIndex(ni, nj);
+
+                const float diff = currentHeight - data[nIndex];
+
+                diffs[k] = diff;
+                neighborIndices[k] = nIndex;
+                neighborI[k] = ni;
+                neighborJ[k] = nj;
+
+                if (diff > talusAngle) {
+                    totalDiff += diff;
+                    ++validNeighbors;
+                }
+            }
+
+            if (totalDiff <= 0.0f || validNeighbors <= 0) {
+                continue;
+            }
+
+            float materialToMove = transferRate * (totalDiff / validNeighbors);
+            materialToMove = std::min(materialToMove, currentHeight * transferRate);
+
+            localDelta[center] -= materialToMove;
+            localPatchMask[patchIndexFromCell(i, j)] = 1;
+
+            const float invTotalDiff = 1.0f / totalDiff;
+
+            for (int k = 0; k < mNeighborCount; ++k)
+            {
+                if (diffs[k] > talusAngle) {
+                    const float moveAmount = materialToMove * (diffs[k] * invTotalDiff);
+                    localDelta[neighborIndices[k]] += moveAmount;
+                    localPatchMask[patchIndexFromCell(neighborI[k], neighborJ[k])] = 1;
+                }
+            }
+
+            ++changes;
+        }
+    }
+
+    // Réduction parallèle des contributions vers data
+    #pragma omp parallel for schedule(static)
+    for (std::ptrdiff_t idx = 0; idx < static_cast<std::ptrdiff_t>(dataSize); ++idx)
+    {
+        float sum = 0.0f;
+        for (int t = 0; t < numThreads; ++t) {
+            sum += threadDeltas[t][idx];
+        }
+        data[idx] += sum;
+    }
+
+    // Fusion des patches sales
+    for (int patchIdx = 0; patchIdx < numPatches; ++patchIdx)
+    {
+        bool dirty = false;
+        for (int t = 0; t < numThreads; ++t)
+        {
+            if (threadPatchMasks[t][patchIdx]) {
+                dirty = true;
+                break;
+            }
+        }
+
+        if (dirty && !mPatchMarked[patchIdx]) {
+            mPatchMarked[patchIdx] = true;
+            mDirtyPatchIndices.push_back(patchIdx);
+        }
+    }
+
+    return changes;
+}
+int ThermalErosion::stepCheckerboardInPlaceParallel()
+{
+    if (!m_data) {
+        std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
+        return 0;
+    }
+
+    if (m_width < 3 || m_height < 3) {
+        return 0;
+    }
+
+    if (mNeighborCount != 4) {
+        std::cerr << "Warning: parallel in-place checkerboard is intended for four-neighbor mode.\n";
+    }
+
+    clearDirtyPatchIndices();
+
+    float* data = m_data->data();
+
+    int changes = 0;
+    changes += applyCheckerboardInPlaceColorParallelBuffered(data, 0);
+    changes += applyCheckerboardInPlaceColorParallelBuffered(data, 1);
+
+    mIterationFinished = true;
+    mNeedsVisualUpdate = false;
+    mCellsProcessedSinceLastCommit = 0;
+    mCurrentIndex = 0;
+
+    return changes;
+}

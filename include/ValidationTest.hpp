@@ -15,7 +15,8 @@ public:
         BlockedParallelPureTwoPhase,
         CheckerboardPureTwoPhase,
         BlockedCheckerboardPureTwoPhase,
-        CheckerboardInPlace
+        CheckerboardInPlace,
+        CheckerboardInPlaceParallel
     };
 
     enum class NeighborhoodMode {

@@ -50,6 +50,7 @@ public:
     int stepCheckerboardPureTwoPhase();
     int stepBlockedCheckerboardPureTwoPhase();
     int stepCheckerboardInPlace();
+    int stepCheckerboardInPlaceParallel();
     void resetProgress();
 
     bool isIterationFinished() const { return mIterationFinished; }
@@ -141,4 +142,5 @@ private:
     int applyBlockedCheckerboardErosionRange(const float* src,
                                              float* dst,
                                              int color);
+    int applyCheckerboardInPlaceColorParallelBuffered(float* data, int color);
 };
