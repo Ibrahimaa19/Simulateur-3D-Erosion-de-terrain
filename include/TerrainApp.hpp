@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -8,16 +7,18 @@
 #include <iostream>
 #include <memory>
 #include <string.h>
-#include <cmath> 
+#include <cmath>
+#include <future>
+#include <atomic>
+#include <mutex>
 
 #include "Camera.hpp"
 #include "Shader.hpp"
 #include "Terrain.hpp"
 #include "FaultFormationTerrain.hpp"
 #include "MidpointDisplacement.hpp"
-#include "PerlinNoiseTerrain.hpp" 
+#include "PerlinNoiseTerrain.hpp"
 #include "ThermalErosion.hpp"
-
 #include "Gui.hpp"
 
 /**
@@ -86,6 +87,26 @@ private:
      */
     void GenerateTerrainFromGui();
 
+    /**
+     * @brief Builds a terrain object from current GUI selection.
+     */
+    std::unique_ptr<Terrain> BuildTerrainFromGuiSelection();
+
+    /**
+     * @brief Finalizes terrain after CPU build (camera, textures, LOD, erosion info).
+     */
+    void FinalizeTerrainAfterBuild();
+
+    /**
+     * @brief Starts asynchronous terrain generation.
+     */
+    void StartTerrainGenerationAsync();
+
+    /**
+     * @brief Checks async generation completion and finalizes on main thread.
+     */
+    void UpdateTerrainGeneration();
+
 private:
     GLFWwindow* mWindow;              ///< Pointer to the GLFW window
 
@@ -102,25 +123,31 @@ private:
     glm::mat4 mView;                  ///< View matrix
     glm::mat4 mProjection;            ///< Projection matrix
 
-    std::unique_ptr<Shader> mShader;  ///< Smart pointer to the shader program
-
+    std::unique_ptr<Shader> mShader;   ///< Smart pointer to the shader program
     std::unique_ptr<Terrain> mTerrain; ///< Smart pointer to the Terrain object (Polymorphic)
     ThermalErosion mThermalErosion;    ///< Objet gérant l’érosion thermique appliquée au terrain courant
 
-    GLuint mVAO;                      ///< Vertex Array Object
-    GLuint mVBO;                      ///< Vertex Buffer Object
-    GLuint mIBO;                      ///< Index Buffer Object
+    GLuint mVAO = 0;                   ///< Vertex Array Object
+    GLuint mVBO = 0;                   ///< Vertex Buffer Object
+    GLuint mIBO = 0;                   ///< Index Buffer Object
 
-    float mCameraSpeed;               ///< Speed used for keyboard movement
+    float mCameraSpeed;                ///< Speed used for keyboard movement
 
     bool thermalEnabled;
     bool thermalStarted;
 
     bool hydraulicEnabled;
     bool hydraulicStarted;
-    
-    Gui mGui;                         ///< User Interface instance
-    bool mShowMenu;                   ///< Boolean to toggle menu visibility
+
+    Gui mGui;                          ///< User Interface instance
+    bool mShowMenu;                    ///< Boolean to toggle menu visibility
+
+    std::future<void> mGenerationFuture;   ///< Tâche asynchrone de génération du terrain
+    std::atomic<bool> mIsGenerating{false}; ///< Indique si une génération est en cours
+    std::atomic<bool> mPendingFinalize{false}; ///< Indique qu'une finalisation sur le thread principal est attendue
+
+    std::mutex mGenerationMutex;           ///< Mutex protégeant l'échange du terrain généré
+    std::unique_ptr<Terrain> mPendingTerrain; ///< Terrain généré en arrière-plan en attente d'intégration
 
 private:
     /** Keyboard callback wrapper */

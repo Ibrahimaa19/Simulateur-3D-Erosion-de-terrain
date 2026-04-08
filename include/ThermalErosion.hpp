@@ -4,87 +4,143 @@
 #include <memory>
 #include <cmath>
 #include <vector>
+#include <iostream>
+#include <algorithm>
 
-/**
- * @class ThermalErosion
- * @brief Implémente un algorithme d’érosion thermique sur un terrain.
-**/
 class ThermalErosion
 {
 public:
+    struct NeighborOffset
+    {
+        int di;
+        int dj;
+    };
 
-    /**
-     * @brief Charge les informations nécessaires depuis un terrain.
-     *
-     * Récupère :
-     * - le pointeur vers les données de hauteur
-     * - les dimensions du terrain
-     *
-     * @param terrain Pointeur vers le terrain à éroder
-     *
-     */
+    ThermalErosion();
+
     void loadTerrainInfo(std::unique_ptr<Terrain>& terrain) {
         m_data   = terrain->getData();
         m_height = terrain->getTerrainHeight();
         m_width  = terrain->getTerrainWidth();
-    }
-    
-    /**
-     * @brief Définit l’angle de talus critique.
-     *
-     * @param talus Angle de talus en degrés
-     */
-    void setTalusAngle(float angle) { 
-        float PI = 3.14159265f;
-        float talus = std::tan(angle * PI / 180.0);
-        talusAngle = talus; 
-        //talusAngle = 0.006; 
+
+        mNbPatchX = (m_width + PATCH_SIZE - 1) / PATCH_SIZE;
+        mNbPatchZ = (m_height + PATCH_SIZE - 1) / PATCH_SIZE;
+
+        mPatchMarked.resize(mNbPatchX * mNbPatchZ, false);
+
+        resetProgress();
     }
 
-    /**
-     * @brief Définit le taux de transfert de matière.
-     *
-     * @param c Coefficient de transfert (généralement entre 0 et 1)
-     */
+    void setTalusAngle(float angle) {
+        const float PI = 3.14159265f;
+        talusAngle = std::tan(angle * PI / 180.0f);
+    }
+
     void setTransferRate(float c) { transferRate = c; }
 
-    /**
-     * @brief Exécute une étape de l’algorithme d’érosion thermique.
-     *
-     */
+    void useEightNeighbors();
+    void useFourNeighbors();
+
     int step();
+    int stepChunk(int maxCells);
 
-private:
-    /** Pointeur vers les données de hauteur du terrain */
-    std::vector<float>* m_data = nullptr;
+    int stepPureTwoPhase();
+    int stepBlockedPureTwoPhase();
+    int stepBlockedParallelPureTwoPhase();
+    int stepCheckerboardPureTwoPhase();
+    int stepBlockedCheckerboardPureTwoPhase();
+    int stepCheckerboardInPlace();
+    int stepCheckerboardInPlaceParallel();
+    void resetProgress();
 
-    /** hauteur du terrain */
-    int m_height = 0;
+    bool isIterationFinished() const { return mIterationFinished; }
+    bool needsVisualUpdate() const;
+    void commitWorkingData();
 
-    /** largeur du terrain */
-    int m_width = 0;
+    const std::vector<int>& getDirtyPatchIndices() const { return mDirtyPatchIndices; }
 
-    /** Angle de talus critique (en degrés) */
-    float talusAngle = 0.f;
+    void clearDirtyPatchIndices()
+    {
+        for (int idx : mDirtyPatchIndices)
+            mPatchMarked[idx] = false;
 
-    /** Taux de transfert de matière */
-    float transferRate = 0.f;
-
-    /**
-     * @brief Retourne la hauteur au point (i, j).
-     *
-     * @param i Indice de ligne
-     * @param j Indice de colonne
-     * @return Hauteur à la position (i, j)
-     */
-    float get_height(int i, int j) const {
-        return (*m_data)[i * m_width + j];
+        mDirtyPatchIndices.clear();
     }
 
-    /**
-     * @brief Retourne l’angle de talus courant.
-     *
-     * @return Angle de talus en degrés
-     */
-    float get_talus() { return talusAngle; }
+private:
+    static constexpr int BLOCK_SIZE = 32;
+
+    std::vector<float>* m_data = nullptr;
+
+    int m_height = 0;
+    int m_width = 0;
+
+    float talusAngle = 0.f;
+    float transferRate = 0.f;
+
+    std::vector<float> m_workingData;
+    int mCurrentIndex = 0;
+    bool mIterationFinished = false;
+
+    int mCellsProcessedSinceLastCommit = 0;
+    int mCommitThreshold = 20000;
+    bool mNeedsVisualUpdate = false;
+
+    std::vector<int> mDirtyPatchIndices;
+    std::vector<bool> mPatchMarked;
+
+    int mNbPatchX = 0;
+    int mNbPatchZ = 0;
+
+    const NeighborOffset* mActiveNeighbors = nullptr;
+    int mNeighborCount = 0;
+
+    static const NeighborOffset kNeighbors8[8];
+    static const NeighborOffset kNeighbors4[4];
+
+private:
+    inline int toIndex(int i, int j) const;
+    inline void localIndexToCoords(int localIndex, int& i, int& j) const;
+
+    inline int patchIndexFromCell(int i, int j) const;
+    void markPatchDirtyFromCell(int i, int j);
+
+    void addMaterialToNeighbor(float* dst,
+                               int neighborIndex,
+                               float moveAmount,
+                               int neighborI,
+                               int neighborJ);
+
+    bool erodeCell(int i, int j, const float* src, float* dst);
+    bool erodeCellInPlace(int i, int j, float* data);
+    int applyCheckerboardInPlaceColor(float* data, int color);
+    int applyErosionRange(const float* src,
+                          float* dst,
+                          int startIndex,
+                          int endIndex);
+
+    int applyBlockedErosionRange(const float* src,
+                                 float* dst,
+                                 int startIndex,
+                                 int endIndex);
+
+    bool erodeCellToDeltaSerial(int i,
+                                int j,
+                                const float* src,
+                                float* delta);
+
+    int applyBlockedParallelErosionToDelta(const float* src,
+                                           float* delta);
+    int applyBlockedParallelErosionToThreadLocalBuffers(
+        const float* src,
+        std::vector<std::vector<float>>& threadDeltas,
+        std::vector<std::vector<unsigned char>>& threadPatchMarked);
+        int applyCheckerboardErosionRange(const float* src,
+                                      float* dst,
+                                      int color);
+
+    int applyBlockedCheckerboardErosionRange(const float* src,
+                                             float* dst,
+                                             int color);
+    int applyCheckerboardInPlaceColorParallelBuffered(float* data, int color);
 };
