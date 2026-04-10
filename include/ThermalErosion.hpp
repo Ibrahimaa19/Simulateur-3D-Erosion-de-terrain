@@ -27,7 +27,6 @@ public:
         mNbPatchZ = (m_height + PATCH_SIZE - 1) / PATCH_SIZE;
 
         mPatchMarked.resize(mNbPatchX * mNbPatchZ, false);
-
         resetProgress();
     }
 

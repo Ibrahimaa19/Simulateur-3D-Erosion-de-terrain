@@ -13,7 +13,16 @@ enum GenMethod {
     GEN_MIDPOINT_DISPLACEMENT = 2,
     GEN_PERLIN_NOISE = 3 
 };
-
+enum ThermalVariant {
+    THERMAL_CHUNK_BLOCKED = 0,
+    THERMAL_PURE_TWO_PHASE,
+    THERMAL_BLOCKED_PURE_TWO_PHASE,
+    THERMAL_BLOCKED_PARALLEL_PURE_TWO_PHASE,
+    THERMAL_CHECKERBOARD_PURE_TWO_PHASE,
+    THERMAL_BLOCKED_CHECKERBOARD_PURE_TWO_PHASE,
+    THERMAL_CHECKERBOARD_IN_PLACE,
+    THERMAL_CHECKERBOARD_IN_PLACE_PARALLEL
+};
 class Gui {
 public:
     Gui();
@@ -85,6 +94,10 @@ public:
     float evaporationRate = 0.5f;
 
     glm::vec3 cameraPos = glm::vec3(0.0f); 
+
+    int thermalVariant = THERMAL_CHUNK_BLOCKED;
+    int thermalChunkBudget = 8000;
+    bool thermalUseFourNeighbors = false;
 };
 
 #endif

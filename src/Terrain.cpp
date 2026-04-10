@@ -44,17 +44,20 @@ void Terrain::loadTerrain(const char *imagePath, float yFactor, float xzFactor)
 
 void Terrain::createPatches()
 {
-    int nbPatchX = std::ceil(mWidth / 32);
-    int nbPatchZ = std::ceil(mHeight / 32);
+    const int nbPatchX = (mWidth  + PATCH_SIZE - 1) / PATCH_SIZE;
+    const int nbPatchZ = (mHeight + PATCH_SIZE - 1) / PATCH_SIZE;
 
-    std::cout << "nb_patch_x : " << nbPatchX << " ,nb_patch_z : " << nbPatchZ << std::endl;
-    for (int i = 0; i < nbPatchX; ++i)
-    {
-        for (int j = 0; j < nbPatchZ; ++j)
-        {
-            std::unique_ptr<Patch> p = std::make_unique<Patch>();
-            p->setPatch(i, j, mXzFactor, nbPatchX, nbPatchZ,mTexture);
-            this->mPatches.push_back(std::move(p));
+    std::cout << "nb_patch_x : " << nbPatchX
+              << " ,nb_patch_z : " << nbPatchZ << std::endl;
+
+    mPatches.clear();
+    mPatches.reserve(nbPatchX * nbPatchZ);
+
+    for (int i = 0; i < nbPatchX; ++i) {
+        for (int j = 0; j < nbPatchZ; ++j) {
+            auto p = std::make_unique<Patch>();
+            p->setPatch(i, j, mXzFactor, nbPatchX, nbPatchZ, mTexture);
+            mPatches.push_back(std::move(p));
         }
     }
 }

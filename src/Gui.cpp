@@ -195,7 +195,25 @@ void Gui::Render(Terrain* terrain) {
                     ImGui::SliderFloat("Taux de transfert", &thermalK, 0.0f, 1.0f);
 
                     ImGui::Spacing();
-                    
+                    const char* thermalVariantItems[] = {
+                        "Chunk blocked (rendu progressif)",
+                        "Pure two-phase",
+                        "Blocked pure two-phase",
+                        "Blocked parallel pure two-phase",
+                        "Checkerboard pure two-phase",
+                        "Blocked checkerboard pure two-phase",
+                        "Checkerboard in-place",
+                        "Checkerboard in-place parallel"
+                    };
+
+                    ImGui::Combo("Variante thermique", &thermalVariant,
+                                thermalVariantItems, IM_ARRAYSIZE(thermalVariantItems));
+
+                    ImGui::Checkbox("Utiliser voisinage 4", &thermalUseFourNeighbors);
+
+                    if (thermalVariant == THERMAL_CHUNK_BLOCKED) {
+                        ImGui::SliderInt("Budget chunk", &thermalChunkBudget, 1000, 100000);
+                    }
                     if (thermalRunning) {
                         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.4f, 0.4f, 1.0f));
                         if (ImGui::Button("PAUSE ##Thermal", ImVec2(-1, 35))) { 

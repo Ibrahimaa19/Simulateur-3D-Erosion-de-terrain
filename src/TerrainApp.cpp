@@ -157,30 +157,13 @@ void TerrainApp::Run()
 
             if (thermalEnabled && mTerrain)
             {
-                int nbChanges = mThermalErosion.stepChunk(8000);
-                mGui.thermalCellsModified += nbChanges;
+                auto frameResult = AdvanceThermalErosionFrame();
 
-                bool didVisualCommit = false;
+                mGui.thermalCellsModified = frameResult.cellsModified;
 
-                if (mThermalErosion.needsVisualUpdate()) {
-                    mThermalErosion.commitWorkingData();
-                    mTerrain->updateVerticesGpuLod(mThermalErosion.getDirtyPatchIndices());
-                    didVisualCommit = true;
-                }
-
-                if (mThermalErosion.isIterationFinished()) {
-                    stepCounter++;
+                if (frameResult.iterationFinished) {
+                    ++stepCounter;
                     mGui.thermalCurrentStep = stepCounter;
-
-                    if (!didVisualCommit) {
-                        mTerrain->updateVerticesGpuLod(mThermalErosion.getDirtyPatchIndices());
-                    }
-
-                    mThermalErosion.clearDirtyPatchIndices();
-                    mGui.thermalCellsModified = 0;
-                }
-                else if (didVisualCommit) {
-                    mThermalErosion.clearDirtyPatchIndices();
                 }
             }
 
@@ -447,6 +430,10 @@ void TerrainApp::FinalizeTerrainAfterBuild()
     mTerrain->initTexture();
     mTerrain->setupTerrainLod(mVAO, mVBO, mIBO);
     mThermalErosion.loadTerrainInfo(mTerrain);
+    mGui.thermalCurrentStep = 0;
+    mGui.thermalCellsModified = 0;
+    mGui.thermalRunning = false;
+    thermalEnabled = false;
 }
 
 void TerrainApp::StartTerrainGenerationAsync() {
@@ -487,4 +474,88 @@ void TerrainApp::UpdateTerrainGeneration() {
     }
 
     mPendingFinalize = false;
+}
+
+ThermalFrameResult TerrainApp::AdvanceThermalErosionFrame()
+{
+    ThermalFrameResult result{};
+
+    if (!mTerrain) return result;
+
+    const auto variant = static_cast<ThermalVariant>(mGui.thermalVariant);
+
+    const bool checkerboardVariant =
+        variant == THERMAL_CHECKERBOARD_PURE_TWO_PHASE ||
+        variant == THERMAL_BLOCKED_CHECKERBOARD_PURE_TWO_PHASE ||
+        variant == THERMAL_CHECKERBOARD_IN_PLACE ||
+        variant == THERMAL_CHECKERBOARD_IN_PLACE_PARALLEL;
+
+    if (checkerboardVariant || mGui.thermalUseFourNeighbors)
+        mThermalErosion.useFourNeighbors();
+    else
+        mThermalErosion.useEightNeighbors();
+
+    switch (variant)
+    {
+        case THERMAL_CHUNK_BLOCKED:
+        {
+            result.cellsModified = mThermalErosion.stepChunk(mGui.thermalChunkBudget);
+
+            if (mThermalErosion.needsVisualUpdate()) {
+                mThermalErosion.commitWorkingData();
+                mTerrain->updateVerticesGpuLod(mThermalErosion.getDirtyPatchIndices());
+                mThermalErosion.clearDirtyPatchIndices();
+            }
+
+            result.iterationFinished = mThermalErosion.isIterationFinished();
+
+            if (result.iterationFinished) {
+                mTerrain->updateVerticesGpuLod(mThermalErosion.getDirtyPatchIndices());
+                mThermalErosion.clearDirtyPatchIndices();
+            }
+            break;
+        }
+
+        case THERMAL_PURE_TWO_PHASE:
+            result.cellsModified = mThermalErosion.stepPureTwoPhase();
+            result.iterationFinished = true;
+            break;
+
+        case THERMAL_BLOCKED_PURE_TWO_PHASE:
+            result.cellsModified = mThermalErosion.stepBlockedPureTwoPhase();
+            result.iterationFinished = true;
+            break;
+
+        case THERMAL_BLOCKED_PARALLEL_PURE_TWO_PHASE:
+            result.cellsModified = mThermalErosion.stepBlockedParallelPureTwoPhase();
+            result.iterationFinished = true;
+            break;
+
+        case THERMAL_CHECKERBOARD_PURE_TWO_PHASE:
+            result.cellsModified = mThermalErosion.stepCheckerboardPureTwoPhase();
+            result.iterationFinished = true;
+            break;
+
+        case THERMAL_BLOCKED_CHECKERBOARD_PURE_TWO_PHASE:
+            result.cellsModified = mThermalErosion.stepBlockedCheckerboardPureTwoPhase();
+            result.iterationFinished = true;
+            break;
+
+        case THERMAL_CHECKERBOARD_IN_PLACE:
+            result.cellsModified = mThermalErosion.stepCheckerboardInPlace();
+            result.iterationFinished = true;
+            break;
+
+        case THERMAL_CHECKERBOARD_IN_PLACE_PARALLEL:
+            result.cellsModified = mThermalErosion.stepCheckerboardInPlaceParallel();
+            result.iterationFinished = true;
+            break;
+    }
+
+    if (variant != THERMAL_CHUNK_BLOCKED) {
+        mTerrain->updateVerticesGpuLod(mThermalErosion.getDirtyPatchIndices());
+        mThermalErosion.clearDirtyPatchIndices();
+    }
+
+    return result;
 }

@@ -715,6 +715,7 @@ void ThermalErosion::resetProgress()
     mIterationFinished = false;
     mCellsProcessedSinceLastCommit = 0;
     mNeedsVisualUpdate = false;
+    std::fill(mPatchMarked.begin(), mPatchMarked.end(), false);
     mDirtyPatchIndices.clear();
 }
 
@@ -764,7 +765,9 @@ int ThermalErosion::stepChunk(int maxCells)
     }
 
     const int totalInnerCells = (H - 2) * (W - 2);
-
+    if (mCurrentIndex == 0) {
+        clearDirtyPatchIndices();
+    }
     if (m_workingData.empty() || static_cast<int>(m_workingData.size()) != W * H) {
         m_workingData = *m_data;
         mCurrentIndex = 0;

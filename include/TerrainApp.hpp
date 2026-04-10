@@ -21,6 +21,11 @@
 #include "ThermalErosion.hpp"
 #include "Gui.hpp"
 
+struct ThermalFrameResult {
+    int cellsModified = 0;
+    bool iterationFinished = false;
+};
+
 /**
  * @class TerrainApp
  * @brief Manages window creation, input callbacks, camera, rendering loop, and terrain rendering.
@@ -55,6 +60,7 @@ public:
      * @brief Change the camera speed
      */
     void setCameraSpeed(float value);
+    ThermalFrameResult  AdvanceThermalErosionFrame();
 
 private:
     /**
