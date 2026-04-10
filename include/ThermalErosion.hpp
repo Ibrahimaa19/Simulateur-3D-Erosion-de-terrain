@@ -15,7 +15,21 @@ public:
         int di;
         int dj;
     };
+    struct CellStencil
+    {
+        int center = 0;
+        float currentHeight = 0.0f;
 
+        float totalDiff = 0.0f;
+        int validNeighbors = 0;
+
+        float diffs[8] = {0.0f};
+        int neighborIndices[8] = {0};
+        int neighborI[8] = {0};
+        int neighborJ[8] = {0};
+        int activeSlots[8] = {0};
+        int activeCount = 0;
+    };
     ThermalErosion();
 
     void loadTerrainInfo(std::unique_ptr<Terrain>& terrain) {
@@ -104,12 +118,6 @@ private:
     inline int patchIndexFromCell(int i, int j) const;
     void markPatchDirtyFromCell(int i, int j);
 
-    void addMaterialToNeighbor(float* dst,
-                               int neighborIndex,
-                               float moveAmount,
-                               int neighborI,
-                               int neighborJ);
-
     bool erodeCell(int i, int j, const float* src, float* dst);
     bool erodeCellInPlace(int i, int j, float* data);
     int applyCheckerboardInPlaceColor(float* data, int color);
@@ -142,4 +150,16 @@ private:
                                              float* dst,
                                              int color);
     int applyCheckerboardInPlaceColorParallelBuffered(float* data, int color);
+    bool buildCellStencil(int i, int j, const float* src, CellStencil& stencil) const;
+    float computeMaterialToMove(const CellStencil& stencil) const;
+
+    void applyTransfersToBuffer(const CellStencil& stencil,
+                                float materialToMove,
+                                float* dst);
+
+    void markDirtyFromStencil(int i, int j, const CellStencil& stencil);
+    void markPatchMaskFromStencil(int i,
+                              int j,
+                              const CellStencil& stencil,
+                              std::vector<unsigned char>& patchMask) const;
 };

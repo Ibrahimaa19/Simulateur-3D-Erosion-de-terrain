@@ -66,28 +66,15 @@ void ThermalErosion::markPatchDirtyFromCell(int i, int j)
     }
 }
 
-void ThermalErosion::addMaterialToNeighbor(float* dst,
-                                           int neighborIndex,
-                                           float moveAmount,
-                                           int neighborI,
-                                           int neighborJ)
+bool ThermalErosion::buildCellStencil(int i,
+                                      int j,
+                                      const float* src,
+                                      CellStencil& stencil) const
 {
-    dst[neighborIndex] += moveAmount;
-    markPatchDirtyFromCell(neighborI, neighborJ);
-}
+    stencil = CellStencil{};
 
-bool ThermalErosion::erodeCell(int i, int j, const float* src, float* dst)
-{
-    const int center = toIndex(i, j);
-    const float currentHeight = src[center];
-
-    float totalDiff = 0.0f;
-    int validNeighbors = 0;
-
-    float diffs[8] = {0.0f};
-    int neighborIndices[8] = {0};
-    int neighborI[8] = {0};
-    int neighborJ[8] = {0};
+    stencil.center = toIndex(i, j);
+    stencil.currentHeight = src[stencil.center];
 
     for (int k = 0; k < mNeighborCount; ++k)
     {
@@ -95,98 +82,94 @@ bool ThermalErosion::erodeCell(int i, int j, const float* src, float* dst)
         const int nj = j + mActiveNeighbors[k].dj;
         const int nIndex = toIndex(ni, nj);
 
-        const float diff = currentHeight - src[nIndex];
+        const float diff = stencil.currentHeight - src[nIndex];
 
-        diffs[k] = diff;
-        neighborIndices[k] = nIndex;
-        neighborI[k] = ni;
-        neighborJ[k] = nj;
+        stencil.diffs[k] = diff;
+        stencil.neighborIndices[k] = nIndex;
+        stencil.neighborI[k] = ni;
+        stencil.neighborJ[k] = nj;
 
         if (diff > talusAngle) {
-            totalDiff += diff;
-            ++validNeighbors;
+            stencil.totalDiff += diff;
+            ++stencil.validNeighbors;
+            stencil.activeSlots[stencil.activeCount++] = k;
         }
     }
 
-    if (totalDiff <= 0.0f || validNeighbors <= 0) {
-        return false;
+    return stencil.totalDiff > 0.0f && stencil.validNeighbors > 0;
+}
+
+float ThermalErosion::computeMaterialToMove(const CellStencil& stencil) const
+{
+    float materialToMove =
+        transferRate * (stencil.totalDiff / stencil.validNeighbors);
+
+    materialToMove = std::min(materialToMove,
+                              stencil.currentHeight * transferRate);
+
+    return materialToMove;
+}
+
+void ThermalErosion::applyTransfersToBuffer(const CellStencil& stencil,
+                                            float materialToMove,
+                                            float* dst)
+{
+    dst[stencil.center] -= materialToMove;
+
+    const float invTotalDiff = 1.0f / stencil.totalDiff;
+
+    for (int a = 0; a < stencil.activeCount; ++a)
+    {
+        const int k = stencil.activeSlots[a];
+        const float moveAmount =
+            materialToMove * (stencil.diffs[k] * invTotalDiff);
+
+        dst[stencil.neighborIndices[k]] += moveAmount;
     }
+}
 
+void ThermalErosion::markDirtyFromStencil(int i,
+                                          int j,
+                                          const CellStencil& stencil)
+{
     markPatchDirtyFromCell(i, j);
-
-    float materialToMove = transferRate * (totalDiff / validNeighbors);
-    materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-    dst[center] -= materialToMove;
-
-    const float invTotalDiff = 1.0f / totalDiff;
 
     for (int k = 0; k < mNeighborCount; ++k)
     {
-        if (diffs[k] > talusAngle) {
-            const float moveAmount = materialToMove * (diffs[k] * invTotalDiff);
-            addMaterialToNeighbor(dst,
-                                  neighborIndices[k],
-                                  moveAmount,
-                                  neighborI[k],
-                                  neighborJ[k]);
+        if (stencil.diffs[k] > talusAngle) {
+            markPatchDirtyFromCell(stencil.neighborI[k],
+                                   stencil.neighborJ[k]);
         }
     }
+}
+
+bool ThermalErosion::erodeCell(int i, int j, const float* src, float* dst)
+{
+    CellStencil stencil;
+
+    if (!buildCellStencil(i, j, src, stencil)) {
+        return false;
+    }
+
+    const float materialToMove = computeMaterialToMove(stencil);
+
+    applyTransfersToBuffer(stencil, materialToMove, dst);
+    markDirtyFromStencil(i, j, stencil);
 
     return true;
 }
 bool ThermalErosion::erodeCellInPlace(int i, int j, float* data)
 {
-    const int center = toIndex(i, j);
-    const float currentHeight = data[center];
+    CellStencil stencil;
 
-    float totalDiff = 0.0f;
-    int validNeighbors = 0;
-
-    float diffs[8] = {0.0f};
-    int neighborIndices[8] = {0};
-    int neighborI[8] = {0};
-    int neighborJ[8] = {0};
-
-    for (int k = 0; k < mNeighborCount; ++k)
-    {
-        const int ni = i + mActiveNeighbors[k].di;
-        const int nj = j + mActiveNeighbors[k].dj;
-        const int nIndex = toIndex(ni, nj);
-
-        const float diff = currentHeight - data[nIndex];
-
-        diffs[k] = diff;
-        neighborIndices[k] = nIndex;
-        neighborI[k] = ni;
-        neighborJ[k] = nj;
-
-        if (diff > talusAngle) {
-            totalDiff += diff;
-            ++validNeighbors;
-        }
-    }
-
-    if (totalDiff <= 0.0f || validNeighbors <= 0) {
+    if (!buildCellStencil(i, j, data, stencil)) {
         return false;
     }
 
-    float materialToMove = transferRate * (totalDiff / validNeighbors);
-    materialToMove = std::min(materialToMove, currentHeight * transferRate);
+    const float materialToMove = computeMaterialToMove(stencil);
 
-    data[center] -= materialToMove;
-    markPatchDirtyFromCell(i, j);
-
-    const float invTotalDiff = 1.0f / totalDiff;
-
-    for (int k = 0; k < mNeighborCount; ++k)
-    {
-        if (diffs[k] > talusAngle) {
-            const float moveAmount = materialToMove * (diffs[k] * invTotalDiff);
-            data[neighborIndices[k]] += moveAmount;
-            markPatchDirtyFromCell(neighborI[k], neighborJ[k]);
-        }
-    }
+    applyTransfersToBuffer(stencil, materialToMove, data);
+    markDirtyFromStencil(i, j, stencil);
 
     return true;
 }
@@ -195,62 +178,16 @@ bool ThermalErosion::erodeCellToDeltaSerial(int i,
                                             const float* src,
                                             float* delta)
 {
-    const int center = toIndex(i, j);
-    const float currentHeight = src[center];
+    CellStencil stencil;
 
-    float totalDiff = 0.0f;
-    int validNeighbors = 0;
-
-    float diffs[8] = {0.0f};
-    int neighborIndices[8] = {0};
-    int neighborI[8] = {0};
-    int neighborJ[8] = {0};
-
-    for (int k = 0; k < mNeighborCount; ++k)
-    {
-        const int ni = i + mActiveNeighbors[k].di;
-        const int nj = j + mActiveNeighbors[k].dj;
-        const int nIndex = toIndex(ni, nj);
-
-        const float diff = currentHeight - src[nIndex];
-
-        diffs[k] = diff;
-        neighborIndices[k] = nIndex;
-        neighborI[k] = ni;
-        neighborJ[k] = nj;
-
-        if (diff > talusAngle) {
-            totalDiff += diff;
-            ++validNeighbors;
-        }
-    }
-
-    if (totalDiff <= 0.0f || validNeighbors <= 0) {
+    if (!buildCellStencil(i, j, src, stencil)) {
         return false;
     }
 
-    float materialToMove = transferRate * (totalDiff / validNeighbors);
-    materialToMove = std::min(materialToMove, currentHeight * transferRate);
+    const float materialToMove = computeMaterialToMove(stencil);
 
-    delta[center] -= materialToMove;
-
-    const float invTotalDiff = 1.0f / totalDiff;
-
-    for (int k = 0; k < mNeighborCount; ++k)
-    {
-        if (diffs[k] > talusAngle) {
-            const float moveAmount = materialToMove * (diffs[k] * invTotalDiff);
-            delta[neighborIndices[k]] += moveAmount;
-        }
-    }
-
-    markPatchDirtyFromCell(i, j);
-    for (int k = 0; k < mNeighborCount; ++k)
-    {
-        if (diffs[k] > talusAngle) {
-            markPatchDirtyFromCell(neighborI[k], neighborJ[k]);
-        }
-    }
+    applyTransfersToBuffer(stencil, materialToMove, delta);
+    markDirtyFromStencil(i, j, stencil);
 
     return true;
 }
@@ -590,65 +527,19 @@ int ThermalErosion::applyBlockedParallelErosionToThreadLocalBuffers(
                     const int innerJ = blockJ + dj;
                     const int j = innerJ + 1;
 
-                    const int center = toIndex(i, j);
-                    const float currentHeight = src[center];
+                    CellStencil stencil;
 
-                    float totalDiff = 0.0f;
-                    int validNeighbors = 0;
-
-                    float diffs[8] = {0.0f};
-                    int neighborIndices[8] = {0};
-                    int neighborI[8] = {0};
-                    int neighborJ[8] = {0};
-
-                    for (int k = 0; k < mNeighborCount; ++k)
-                    {
-                        const int ni = i + mActiveNeighbors[k].di;
-                        const int nj = j + mActiveNeighbors[k].dj;
-                        const int nIndex = toIndex(ni, nj);
-
-                        const float diff = currentHeight - src[nIndex];
-
-                        diffs[k] = diff;
-                        neighborIndices[k] = nIndex;
-                        neighborI[k] = ni;
-                        neighborJ[k] = nj;
-
-                        if (diff > talusAngle) {
-                            totalDiff += diff;
-                            ++validNeighbors;
-                        }
-                    }
-
-                    if (totalDiff <= 0.0f || validNeighbors <= 0) {
+                    if (!buildCellStencil(i, j, src, stencil)) {
                         continue;
                     }
 
-                    float materialToMove = transferRate * (totalDiff / validNeighbors);
-                    materialToMove = std::min(materialToMove, currentHeight * transferRate);
+                    const float materialToMove = computeMaterialToMove(stencil);
 
-                    localDelta[center] -= materialToMove;
+                    applyTransfersToBuffer(stencil,
+                                           materialToMove,
+                                           localDelta.data());
 
-                    const float invTotalDiff = 1.0f / totalDiff;
-
-                    for (int k = 0; k < mNeighborCount; ++k)
-                    {
-                        if (diffs[k] > talusAngle) {
-                            const float moveAmount = materialToMove * (diffs[k] * invTotalDiff);
-                            localDelta[neighborIndices[k]] += moveAmount;
-                        }
-                    }
-
-                    const int centerPatch = patchIndexFromCell(i, j);
-                    localPatchMask[centerPatch] = 1;
-
-                    for (int k = 0; k < mNeighborCount; ++k)
-                    {
-                        if (diffs[k] > talusAngle) {
-                            const int patchIdx = patchIndexFromCell(neighborI[k], neighborJ[k]);
-                            localPatchMask[patchIdx] = 1;
-                        }
-                    }
+                    markPatchMaskFromStencil(i, j, stencil, localPatchMask);
 
                     ++changes;
                 }
@@ -954,7 +845,8 @@ int ThermalErosion::applyCheckerboardInPlaceColorParallelBuffered(float* data, i
     const int numThreads = 1;
 #endif
 
-    const std::size_t dataSize = static_cast<std::size_t>(m_width) * static_cast<std::size_t>(m_height);
+    const std::size_t dataSize =
+        static_cast<std::size_t>(m_width) * static_cast<std::size_t>(m_height);
     const int numPatches = mNbPatchX * mNbPatchZ;
 
     std::vector<std::vector<float>> threadDeltas(
@@ -987,62 +879,24 @@ int ThermalErosion::applyCheckerboardInPlaceColorParallelBuffered(float* data, i
                 continue;
             }
 
-            const int center = toIndex(i, j);
-            const float currentHeight = data[center];
+            CellStencil stencil;
 
-            float totalDiff = 0.0f;
-            int validNeighbors = 0;
-
-            float diffs[8] = {0.0f};
-            int neighborIndices[8] = {0};
-            int neighborI[8] = {0};
-            int neighborJ[8] = {0};
-
-            for (int k = 0; k < mNeighborCount; ++k)
-            {
-                const int ni = i + mActiveNeighbors[k].di;
-                const int nj = j + mActiveNeighbors[k].dj;
-                const int nIndex = toIndex(ni, nj);
-
-                const float diff = currentHeight - data[nIndex];
-
-                diffs[k] = diff;
-                neighborIndices[k] = nIndex;
-                neighborI[k] = ni;
-                neighborJ[k] = nj;
-
-                if (diff > talusAngle) {
-                    totalDiff += diff;
-                    ++validNeighbors;
-                }
-            }
-
-            if (totalDiff <= 0.0f || validNeighbors <= 0) {
+            if (!buildCellStencil(i, j, data, stencil)) {
                 continue;
             }
 
-            float materialToMove = transferRate * (totalDiff / validNeighbors);
-            materialToMove = std::min(materialToMove, currentHeight * transferRate);
+            const float materialToMove = computeMaterialToMove(stencil);
 
-            localDelta[center] -= materialToMove;
-            localPatchMask[patchIndexFromCell(i, j)] = 1;
+            applyTransfersToBuffer(stencil,
+                                   materialToMove,
+                                   localDelta.data());
 
-            const float invTotalDiff = 1.0f / totalDiff;
-
-            for (int k = 0; k < mNeighborCount; ++k)
-            {
-                if (diffs[k] > talusAngle) {
-                    const float moveAmount = materialToMove * (diffs[k] * invTotalDiff);
-                    localDelta[neighborIndices[k]] += moveAmount;
-                    localPatchMask[patchIndexFromCell(neighborI[k], neighborJ[k])] = 1;
-                }
-            }
+            markPatchMaskFromStencil(i, j, stencil, localPatchMask);
 
             ++changes;
         }
     }
 
-    // Réduction parallèle des contributions vers data
     #pragma omp parallel for schedule(static)
     for (std::ptrdiff_t idx = 0; idx < static_cast<std::ptrdiff_t>(dataSize); ++idx)
     {
@@ -1053,7 +907,6 @@ int ThermalErosion::applyCheckerboardInPlaceColorParallelBuffered(float* data, i
         data[idx] += sum;
     }
 
-    // Fusion des patches sales
     for (int patchIdx = 0; patchIdx < numPatches; ++patchIdx)
     {
         bool dirty = false;
@@ -1102,4 +955,21 @@ int ThermalErosion::stepCheckerboardInPlaceParallel()
     mCurrentIndex = 0;
 
     return changes;
+}
+
+void ThermalErosion::markPatchMaskFromStencil(
+    int i,
+    int j,
+    const CellStencil& stencil,
+    std::vector<unsigned char>& patchMask) const
+{
+    patchMask[patchIndexFromCell(i, j)] = 1;
+
+    for (int k = 0; k < mNeighborCount; ++k)
+    {
+        if (stencil.diffs[k] > talusAngle) {
+            patchMask[patchIndexFromCell(stencil.neighborI[k],
+                                         stencil.neighborJ[k])] = 1;
+        }
+    }
 }
