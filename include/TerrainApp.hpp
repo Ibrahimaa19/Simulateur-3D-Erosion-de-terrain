@@ -21,10 +21,6 @@
 #include "ThermalErosion.hpp"
 #include "Gui.hpp"
 
-struct ThermalFrameResult {
-    int cellsModified = 0;
-    bool iterationFinished = false;
-};
 
 /**
  * @class TerrainApp
@@ -60,7 +56,7 @@ public:
      * @brief Change the camera speed
      */
     void setCameraSpeed(float value);
-    ThermalFrameResult  AdvanceThermalErosionFrame();
+
 
 private:
     /**
@@ -112,7 +108,13 @@ private:
      * @brief Checks async generation completion and finalizes on main thread.
      */
     void UpdateTerrainGeneration();
+    struct ThermalFrameResult
+    {
+        int cellsModified = 0;
+        bool iterationFinished = false;
+    };
 
+    ThermalFrameResult AdvanceThermalErosionFrame();
 private:
     GLFWwindow* mWindow;              ///< Pointer to the GLFW window
 

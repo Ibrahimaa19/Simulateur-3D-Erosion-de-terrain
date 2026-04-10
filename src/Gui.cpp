@@ -194,9 +194,7 @@ void Gui::Render(Terrain* terrain) {
                     ImGui::SliderFloat("Angle Talus", &talusAngle, 0.0f, 90.0f, "%.1f deg");
                     ImGui::SliderFloat("Taux de transfert", &thermalK, 0.0f, 1.0f);
 
-                    ImGui::Spacing();
-                    const char* thermalVariantItems[] = {
-                        "Chunk blocked (rendu progressif)",
+                    const char* kernelItems[] = {
                         "Pure two-phase",
                         "Blocked pure two-phase",
                         "Blocked parallel pure two-phase",
@@ -206,17 +204,49 @@ void Gui::Render(Terrain* terrain) {
                         "Checkerboard in-place parallel"
                     };
 
-                    ImGui::Combo("Variante thermique", &thermalVariant,
-                                thermalVariantItems, IM_ARRAYSIZE(thermalVariantItems));
+                    const char* execModeItems[] = {
+                        "Iteration complete",
+                        "Progressif (chunk)"
+                    };
+
+                    ImGui::Combo("Noyau thermique",
+                                &thermalKernel,
+                                kernelItems,
+                                IM_ARRAYSIZE(kernelItems));
+
+                    ImGui::Combo("Mode execution",
+                                &thermalExecutionMode,
+                                execModeItems,
+                                IM_ARRAYSIZE(execModeItems));
 
                     ImGui::Checkbox("Utiliser voisinage 4", &thermalUseFourNeighbors);
 
-                    if (thermalVariant == THERMAL_CHUNK_BLOCKED) {
-                        ImGui::SliderInt("Budget chunk", &thermalChunkBudget, 1000, 100000);
+                    const bool blockedKernel =
+                        thermalKernel == THERMAL_KERNEL_BLOCKED_PURE_TWO_PHASE ||
+                        thermalKernel == THERMAL_KERNEL_BLOCKED_PARALLEL_PURE_TWO_PHASE ||
+                        thermalKernel == THERMAL_KERNEL_BLOCKED_CHECKERBOARD_PURE_TWO_PHASE ||
+                        thermalKernel == THERMAL_KERNEL_CHECKERBOARD_IN_PLACE_PARALLEL;
+
+                    if (thermalExecutionMode == THERMAL_EXEC_CHUNKED)
+                    {
+                        if (blockedKernel) {
+                            ImGui::SliderInt("Budget chunk (blocs)",
+                                            &thermalChunkBudgetBlocks,
+                                            1,
+                                            128);
+                        } else {
+                            ImGui::SliderInt("Budget chunk (cellules)",
+                                            &thermalChunkBudgetCells,
+                                            1000,
+                                            100000);
+                        }
                     }
+
+                    ImGui::Spacing();
+
                     if (thermalRunning) {
                         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.4f, 0.4f, 1.0f));
-                        if (ImGui::Button("PAUSE ##Thermal", ImVec2(-1, 35))) { 
+                        if (ImGui::Button("PAUSE ##Thermal", ImVec2(-1, 35))) {
                             thermalRunning = false;
                         }
                         ImGui::PopStyleColor();
@@ -228,7 +258,7 @@ void Gui::Render(Terrain* terrain) {
                         ImGui::PopStyleColor();
                     }
 
-                    ImGui::Spacing(); 
+                    ImGui::Spacing();
                     ImGui::Text("Step               : %d", thermalCurrentStep);
                     ImGui::Text("Cellules modifiees : %d", thermalCellsModified);
                 }

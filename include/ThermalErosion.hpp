@@ -15,6 +15,7 @@ public:
         int di;
         int dj;
     };
+
     struct CellStencil
     {
         int center = 0;
@@ -30,6 +31,39 @@ public:
         int activeSlots[8] = {0};
         int activeCount = 0;
     };
+
+    enum class ChunkVariant
+    {
+        None = 0,
+        PureTwoPhase,
+        BlockedPureTwoPhase,
+        BlockedParallelPureTwoPhase,
+        CheckerboardPureTwoPhase,
+        BlockedCheckerboardPureTwoPhase,
+        CheckerboardInPlace,
+        CheckerboardInPlaceParallel
+    };
+
+    struct BlockCoord
+    {
+        int blockI = 0;
+        int blockJ = 0;
+    };
+
+    struct ChunkState
+    {
+        ChunkVariant variant = ChunkVariant::None;
+        bool active = false;
+
+        int phase = 0;
+        int nextLinearIndex = 0;
+
+        int nextBlockI = 0;
+        int nextBlockJ = 0;
+
+        std::vector<float> srcSnapshot;
+    };
+
     ThermalErosion();
 
     void loadTerrainInfo(std::unique_ptr<Terrain>& terrain) {
@@ -64,6 +98,15 @@ public:
     int stepBlockedCheckerboardPureTwoPhase();
     int stepCheckerboardInPlace();
     int stepCheckerboardInPlaceParallel();
+
+    int stepPureTwoPhaseChunk(int budgetCells);
+    int stepBlockedPureTwoPhaseChunk(int budgetBlocks);
+    int stepBlockedParallelPureTwoPhaseChunk(int budgetBlocks);
+    int stepCheckerboardPureTwoPhaseChunk(int budgetCells);
+    int stepBlockedCheckerboardPureTwoPhaseChunk(int budgetBlocks);
+    int stepCheckerboardInPlaceChunk(int budgetCells);
+    int stepCheckerboardInPlaceParallelChunk(int budgetBlocks);
+
     void resetProgress();
 
     bool isIterationFinished() const { return mIterationFinished; }
@@ -108,6 +151,8 @@ private:
     const NeighborOffset* mActiveNeighbors = nullptr;
     int mNeighborCount = 0;
 
+    ChunkState mChunkState;
+
     static const NeighborOffset kNeighbors8[8];
     static const NeighborOffset kNeighbors4[4];
 
@@ -120,7 +165,8 @@ private:
 
     bool erodeCell(int i, int j, const float* src, float* dst);
     bool erodeCellInPlace(int i, int j, float* data);
-    int applyCheckerboardInPlaceColor(float* data, int color);
+    bool erodeCellToDeltaSerial(int i, int j, const float* src, float* delta);
+
     int applyErosionRange(const float* src,
                           float* dst,
                           int startIndex,
@@ -131,25 +177,26 @@ private:
                                  int startIndex,
                                  int endIndex);
 
-    bool erodeCellToDeltaSerial(int i,
-                                int j,
-                                const float* src,
-                                float* delta);
-
-    int applyBlockedParallelErosionToDelta(const float* src,
-                                           float* delta);
-    int applyBlockedParallelErosionToThreadLocalBuffers(
-        const float* src,
-        std::vector<std::vector<float>>& threadDeltas,
-        std::vector<std::vector<unsigned char>>& threadPatchMarked);
-        int applyCheckerboardErosionRange(const float* src,
+    int applyCheckerboardErosionRange(const float* src,
                                       float* dst,
                                       int color);
 
     int applyBlockedCheckerboardErosionRange(const float* src,
                                              float* dst,
                                              int color);
+
+    int applyCheckerboardInPlaceColor(float* data, int color);
+
+    int applyBlockedParallelErosionToDelta(const float* src,
+                                           float* delta);
+
+    int applyBlockedParallelErosionToThreadLocalBuffers(
+        const float* src,
+        std::vector<std::vector<float>>& threadDeltas,
+        std::vector<std::vector<unsigned char>>& threadPatchMarked);
+
     int applyCheckerboardInPlaceColorParallelBuffered(float* data, int color);
+
     bool buildCellStencil(int i, int j, const float* src, CellStencil& stencil) const;
     float computeMaterialToMove(const CellStencil& stencil) const;
 
@@ -158,8 +205,51 @@ private:
                                 float* dst);
 
     void markDirtyFromStencil(int i, int j, const CellStencil& stencil);
+
     void markPatchMaskFromStencil(int i,
-                              int j,
-                              const CellStencil& stencil,
-                              std::vector<unsigned char>& patchMask) const;
+                                  int j,
+                                  const CellStencil& stencil,
+                                  std::vector<unsigned char>& patchMask) const;
+
+    void resetChunkState();
+    void beginChunkIteration(ChunkVariant variant);
+    bool advanceCheckerboardPhase();
+    int collectNextBlocks(int budgetBlocks, std::vector<BlockCoord>& blocks);
+    bool isBlockTraversalFinished() const;
+    void finalizeChunkIteration();
+
+    int applyCheckerboardErosionLinearRange(const float* src,
+                                            float* dst,
+                                            int color,
+                                            int startIndex,
+                                            int endIndex);
+
+    int applyCheckerboardInPlaceLinearRange(float* data,
+                                            int color,
+                                            int startIndex,
+                                            int endIndex);
+
+    int applyBlockedPureOnBlocks(const float* src,
+                                 float* dst,
+                                 const std::vector<BlockCoord>& blocks,
+                                 int& processedCells);
+
+    int applyBlockedCheckerboardPureOnBlocks(const float* src,
+                                             float* dst,
+                                             int color,
+                                             const std::vector<BlockCoord>& blocks,
+                                             int& processedCells);
+
+    int applyBlockedParallelOnBlocksToThreadLocalBuffers(
+        const float* src,
+        const std::vector<BlockCoord>& blocks,
+        std::vector<std::vector<float>>& threadDeltas,
+        std::vector<std::vector<unsigned char>>& threadPatchMarked,
+        int& processedCells);
+
+    int applyCheckerboardInPlaceParallelOnBlocksBuffered(
+        float* data,
+        int color,
+        const std::vector<BlockCoord>& blocks,
+        int& processedCells);
 };

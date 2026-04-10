@@ -157,12 +157,12 @@ void TerrainApp::Run()
 
             if (thermalEnabled && mTerrain)
             {
-                auto frameResult = AdvanceThermalErosionFrame();
+                ThermalFrameResult frameResult = AdvanceThermalErosionFrame();
 
                 mGui.thermalCellsModified = frameResult.cellsModified;
 
                 if (frameResult.iterationFinished) {
-                    ++stepCounter;
+                    stepCounter++;
                     mGui.thermalCurrentStep = stepCounter;
                 }
             }
@@ -476,83 +476,76 @@ void TerrainApp::UpdateTerrainGeneration() {
     mPendingFinalize = false;
 }
 
-ThermalFrameResult TerrainApp::AdvanceThermalErosionFrame()
+TerrainApp::ThermalFrameResult TerrainApp::AdvanceThermalErosionFrame()
 {
     ThermalFrameResult result{};
 
-    if (!mTerrain) return result;
+    if (!mTerrain) {
+        return result;
+    }
 
-    const auto variant = static_cast<ThermalVariant>(mGui.thermalVariant);
-
-    const bool checkerboardVariant =
-        variant == THERMAL_CHECKERBOARD_PURE_TWO_PHASE ||
-        variant == THERMAL_BLOCKED_CHECKERBOARD_PURE_TWO_PHASE ||
-        variant == THERMAL_CHECKERBOARD_IN_PLACE ||
-        variant == THERMAL_CHECKERBOARD_IN_PLACE_PARALLEL;
-
-    if (checkerboardVariant || mGui.thermalUseFourNeighbors)
+    if (mGui.thermalUseFourNeighbors) {
         mThermalErosion.useFourNeighbors();
-    else
+    } else {
         mThermalErosion.useEightNeighbors();
+    }
 
-    switch (variant)
+    const bool chunked = (mGui.thermalExecutionMode == THERMAL_EXEC_CHUNKED);
+
+    switch (mGui.thermalKernel)
     {
-        case THERMAL_CHUNK_BLOCKED:
-        {
-            result.cellsModified = mThermalErosion.stepChunk(mGui.thermalChunkBudget);
-
-            if (mThermalErosion.needsVisualUpdate()) {
-                mThermalErosion.commitWorkingData();
-                mTerrain->updateVerticesGpuLod(mThermalErosion.getDirtyPatchIndices());
-                mThermalErosion.clearDirtyPatchIndices();
-            }
-
-            result.iterationFinished = mThermalErosion.isIterationFinished();
-
-            if (result.iterationFinished) {
-                mTerrain->updateVerticesGpuLod(mThermalErosion.getDirtyPatchIndices());
-                mThermalErosion.clearDirtyPatchIndices();
-            }
-            break;
-        }
-
-        case THERMAL_PURE_TWO_PHASE:
-            result.cellsModified = mThermalErosion.stepPureTwoPhase();
-            result.iterationFinished = true;
+        case THERMAL_KERNEL_PURE_TWO_PHASE:
+            result.cellsModified = chunked
+                ? mThermalErosion.stepPureTwoPhaseChunk(mGui.thermalChunkBudgetCells)
+                : mThermalErosion.stepPureTwoPhase();
             break;
 
-        case THERMAL_BLOCKED_PURE_TWO_PHASE:
-            result.cellsModified = mThermalErosion.stepBlockedPureTwoPhase();
-            result.iterationFinished = true;
+        case THERMAL_KERNEL_BLOCKED_PURE_TWO_PHASE:
+            result.cellsModified = chunked
+                ? mThermalErosion.stepBlockedPureTwoPhaseChunk(mGui.thermalChunkBudgetBlocks)
+                : mThermalErosion.stepBlockedPureTwoPhase();
             break;
 
-        case THERMAL_BLOCKED_PARALLEL_PURE_TWO_PHASE:
-            result.cellsModified = mThermalErosion.stepBlockedParallelPureTwoPhase();
-            result.iterationFinished = true;
+        case THERMAL_KERNEL_BLOCKED_PARALLEL_PURE_TWO_PHASE:
+            result.cellsModified = chunked
+                ? mThermalErosion.stepBlockedParallelPureTwoPhaseChunk(mGui.thermalChunkBudgetBlocks)
+                : mThermalErosion.stepBlockedParallelPureTwoPhase();
             break;
 
-        case THERMAL_CHECKERBOARD_PURE_TWO_PHASE:
-            result.cellsModified = mThermalErosion.stepCheckerboardPureTwoPhase();
-            result.iterationFinished = true;
+        case THERMAL_KERNEL_CHECKERBOARD_PURE_TWO_PHASE:
+            result.cellsModified = chunked
+                ? mThermalErosion.stepCheckerboardPureTwoPhaseChunk(mGui.thermalChunkBudgetCells)
+                : mThermalErosion.stepCheckerboardPureTwoPhase();
             break;
 
-        case THERMAL_BLOCKED_CHECKERBOARD_PURE_TWO_PHASE:
-            result.cellsModified = mThermalErosion.stepBlockedCheckerboardPureTwoPhase();
-            result.iterationFinished = true;
+        case THERMAL_KERNEL_BLOCKED_CHECKERBOARD_PURE_TWO_PHASE:
+            result.cellsModified = chunked
+                ? mThermalErosion.stepBlockedCheckerboardPureTwoPhaseChunk(mGui.thermalChunkBudgetBlocks)
+                : mThermalErosion.stepBlockedCheckerboardPureTwoPhase();
             break;
 
-        case THERMAL_CHECKERBOARD_IN_PLACE:
-            result.cellsModified = mThermalErosion.stepCheckerboardInPlace();
-            result.iterationFinished = true;
+        case THERMAL_KERNEL_CHECKERBOARD_IN_PLACE:
+            result.cellsModified = chunked
+                ? mThermalErosion.stepCheckerboardInPlaceChunk(mGui.thermalChunkBudgetCells)
+                : mThermalErosion.stepCheckerboardInPlace();
             break;
 
-        case THERMAL_CHECKERBOARD_IN_PLACE_PARALLEL:
-            result.cellsModified = mThermalErosion.stepCheckerboardInPlaceParallel();
-            result.iterationFinished = true;
+        case THERMAL_KERNEL_CHECKERBOARD_IN_PLACE_PARALLEL:
+            result.cellsModified = chunked
+                ? mThermalErosion.stepCheckerboardInPlaceParallelChunk(mGui.thermalChunkBudgetBlocks)
+                : mThermalErosion.stepCheckerboardInPlaceParallel();
             break;
     }
 
-    if (variant != THERMAL_CHUNK_BLOCKED) {
+    if (mThermalErosion.needsVisualUpdate()) {
+        mThermalErosion.commitWorkingData();
+        mTerrain->updateVerticesGpuLod(mThermalErosion.getDirtyPatchIndices());
+        mThermalErosion.clearDirtyPatchIndices();
+    }
+
+    result.iterationFinished = mThermalErosion.isIterationFinished();
+
+    if (result.iterationFinished) {
         mTerrain->updateVerticesGpuLod(mThermalErosion.getDirtyPatchIndices());
         mThermalErosion.clearDirtyPatchIndices();
     }
