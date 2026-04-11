@@ -96,55 +96,80 @@
 
 
 #define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
 
+#include "stb_image_write.h"
 #include "ValidationTest.hpp"
 #include "ThermalErosion.hpp"
-#include "FaultFormationTerrain.hpp"
+#include "PerlinNoiseTerrain.hpp"
 #include <mpi.h>
+#include <fstream>
 
 
-int stepChunkMPI(float* inData,float* bottomFlux,const int width,const int height)
+void saveBinaryHeightmap(const char* nom_fichier, float* heightmap, int largeur, int hauteur) {
+    std::ofstream fichier(nom_fichier, std::ios::binary);
+    fichier.write(reinterpret_cast<char*>(heightmap), largeur * hauteur * sizeof(float));
+}
+
+void savePngHeightmap(const char* nom_fichier, float* heightmap, int largeur, int hauteur) {
+    unsigned char* pixels = new unsigned char[largeur * hauteur];
+    
+    for (int i = 0; i < largeur * hauteur; i++) {
+        pixels[i] = (unsigned char)(heightmap[i] * 255);
+    }
+    
+    stbi_write_png(nom_fichier, largeur, hauteur, 1, pixels, largeur);
+    delete[] pixels;
+}
+
+int stepChunkMPI(float* initialData,float* fluxData,float* bottomFlux,float* topFlux, const int width,const int height)
 {
-    float transferRate = 0.1;
+    float transferRate = 0.5;
 
     const float PI = 3.14159265f;
-    float talusAngle = std::tan(25.f * PI / 180.0f);
+    float talusAngle = std::tan(30.f * PI / 180.0f);
 
     const int W = width;
     const int H = height;
 
-    if (!inData) {
+
+    if (!initialData) {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
         return 0;
     }
 
-    //float* data = inData;// Copie du pointeur
-        
+    memset(fluxData,0,sizeof(float)*(H+2)*W);
     int changes = 0;
 
     // Boucle sur le terrain
-    for (int i = 1; i < H ; i++) {
+    for (int i = 1; i <= H ; i++) {
         for (int j = 1; j < W - 1; j++) {
+            float currentHeight = initialData[i * W + j];
 
-            //printf("test, indata[%d * %d + %d]: %d \n",i,W,j,i * W + j);
-            float currentHeight = inData[i * W + j];
+            // Hauteurs des 8 voisins
+            float diffBottomLeft  = currentHeight - (initialData[(i + 1) * W + (j - 1)]);
+            float diffBottom      = currentHeight - (initialData[(i + 1) * W + j]);
+            float diffBottomRight = currentHeight - (initialData[(i + 1) * W + (j + 1)]);
+            float diffLeft        = currentHeight - (initialData[i * W + (j - 1)]);
+            float diffRight       = currentHeight - (initialData[i * W + (j + 1)]);
+            float diffTopLeft     = currentHeight - (initialData[(i - 1) * W + (j - 1)]);
+            float diffTop         = currentHeight - (initialData[(i - 1) * W + j]);
+            float diffTopRight    = currentHeight - (initialData[(i - 1) * W + (j + 1)]);
 
-            // Hauteurs des 8 voisins (Moore neighborhood)
-            float diffUp         = currentHeight - inData[(i - 1) * W + j];
-            float diffDown       = currentHeight - inData[(i + 1) * W + j];
-            float diffLeft       = currentHeight - inData[i * W + (j - 1)];
-            float diffRight      = currentHeight - inData[i * W + (j + 1)];
-            float diffUpLeft     = currentHeight - inData[(i - 1) * W + (j - 1)];
-            float diffUpRight    = currentHeight - inData[(i - 1) * W + (j + 1)];
-            float diffDownLeft   = currentHeight - inData[(i + 1) * W + (j - 1)];
-            float diffDownRight  = currentHeight - inData[(i + 1) * W + (j + 1)];
+            // Stockage des différences et indices des voisins (dans le même ordre)
+            float dist[8] = { diffBottomLeft, diffBottom, diffBottomRight,
+                            diffLeft, diffRight,
+                            diffTopLeft, diffTop, diffTopRight };
 
-            // Stockage des différences et indices des voisins
-            float dist[8] = { diffUp, diffDown, diffLeft, diffRight,
-                              diffUpLeft, diffUpRight, diffDownLeft, diffDownRight };
-            
             int neighbors[8][2] = { 
-                {0, -1}, {-1, -1},{-1, 0}, {1, 0}, {0, 1},{1, -1},{-1, 1}, {1, 1}    // 4 voisins diagonaux
+                {1, -1},  // bas-gauche
+                {1, 0},   // bas
+                {1, 1},   // bas-droite
+                {0, -1},  // gauche
+                {0, 1},   // droite
+                {-1, -1}, // haut-gauche
+                {-1, 0},  // haut
+                {-1, 1}   // haut-droite
             };
 
             float totalDiff = 0.0f;
@@ -165,7 +190,7 @@ int stepChunkMPI(float* inData,float* bottomFlux,const int width,const int heigh
                 materialToMove = std::min(materialToMove, currentHeight * transferRate);
 
                 // On retire la matière de la cellule actuelle
-                inData[i * W + j] -= materialToMove;
+                fluxData[i * W + j] -= materialToMove;
 
                 // Redistribution aux voisins
                 for (int k = 0; k < 8; k++) {
@@ -176,10 +201,25 @@ int stepChunkMPI(float* inData,float* bottomFlux,const int width,const int heigh
                         int ni = i + neighbors[k][0];
                         int nj = j + neighbors[k][1];
 
-                        if (i == H-1 && k < 3)
-                            bottomFlux[j -1 +k] += moveAmount;
-                        else
-                            inData[ni * W + nj] += moveAmount;
+                        if (i == H && ni == H+1) {
+                            if (nj >= 0 && nj < width) {
+                                bottomFlux[nj] += moveAmount;
+                            }else {
+                                fluxData[i * W + j] += moveAmount;
+                            }
+                        } else if (i == 1 && ni == 0) {
+                            if (nj >= 0 && nj < width) {
+                                topFlux[nj] += moveAmount;
+                            }else {
+                                fluxData[i * W + j] += moveAmount;
+                            }
+                        }else if (nj == -1) {
+                            fluxData[i * W + j] += moveAmount;
+                        } else if (nj == W) {
+                            fluxData[i * W + j] += moveAmount;
+                        }else {
+                            fluxData[ni * W + nj] += moveAmount;   
+                        }
                     }
                 }
 
@@ -188,19 +228,25 @@ int stepChunkMPI(float* inData,float* bottomFlux,const int width,const int heigh
         }
     }
 
+    for (int i = 1; i <= H; i++) {
+        for (int j = 0; j < W; j++) {
+            initialData[i * W + j] += fluxData[i * W + j];
+        }
+    }
+
     return changes;
 }
 
 void generateTerrain(std::unique_ptr<Terrain>& terrain,int width,int height)
 {
-    auto generator = std::make_unique<FaultFormationTerrain>();
-    generator->CreateFaultFormation(width, height, 1000, 0, 255, 1);
+    auto generator = std::make_unique<PerlinNoiseTerrain>();
+    generator->CreatePerlinNoise(width, height, 0, 255, 1, 0.005);
     terrain = std::move(generator);
 }
 
-float checksum(float* tab,int size)
+double checksum(float* tab,int size)
 {
-    float sum = 0;
+    double sum = 0.;
     for(int i =0;i<size;++i)
     {
         sum +=tab[i];
@@ -211,8 +257,14 @@ float checksum(float* tab,int size)
 struct Mesh
 {
 	float* meshData;
-    float* meshDataTemp;
+    float* meshFluxData;
+    
     float* bottomFlux;
+    float* topFlux;
+
+
+    float* tempFlux;
+    float* deltaFlux;
 
 	int meshWidth;
 	int meshHeight;
@@ -229,27 +281,31 @@ struct Mesh
         meshHeight = height;
 
         meshSize = meshHeight*meshWidth;
-        meshBufferSize = (meshHeight+2)*meshWidth;
+        meshBufferSize = (meshHeight+2)*(meshWidth);
 
-        meshData = (float*)malloc(sizeof(float)*meshBufferSize);
-        meshDataTemp = (float*)malloc(sizeof(float)*meshBufferSize);
-        bottomFlux = (float*)malloc(sizeof(float)*meshWidth);
+        meshData = (float*)calloc(meshBufferSize,sizeof(float));
+        meshFluxData = (float*)calloc(meshBufferSize,sizeof(float));
+        deltaFlux = (float*)calloc(meshBufferSize, sizeof(float));
+
+        bottomFlux = (float*)calloc(meshWidth,sizeof(float));
+        topFlux = (float*)calloc(meshWidth,sizeof(float));
+
+        tempFlux = (float*)calloc(meshWidth*2,sizeof(float));
 
         meshTopId = topId;
         meshBottomId = botId;
-    }
-
-    void transferFlux()
-    {
-        for(int i=0;i<meshWidth;i++)
-            meshData[i] += bottomFlux[i];
     }
     
     ~Mesh()
     {
         free(meshData);
-        free(meshDataTemp);
+        free(meshFluxData);
+
         free(bottomFlux);
+        free(topFlux); 
+           
+        free(tempFlux);  
+        free(deltaFlux);
     }
 };
 
@@ -281,9 +337,8 @@ enum COMM
     RECV
 };
 
-void horizontaleComm(int targetRank,COMM comm,Mesh& mesh,int paddingSend,int paddingRecv,bool bottomFlux)
+void horizontal_Comm(int targetRank,int tag,COMM comm,float* src,int width,int paddingSend,int paddingRecv)
 {
-
     if (targetRank == -1) {
     return;
     }
@@ -293,18 +348,14 @@ void horizontaleComm(int targetRank,COMM comm,Mesh& mesh,int paddingSend,int pad
     {
         case SEND:
         {
-            if (!bottomFlux)
-                MPI_Send(mesh.meshData+paddingSend, mesh.meshWidth, MPI_FLOAT, targetRank, 0, MPI_COMM_WORLD);
-            else
-                MPI_Send(mesh.bottomFlux, mesh.meshWidth, MPI_FLOAT, targetRank, 0, MPI_COMM_WORLD);
 
+            MPI_Send(src+paddingSend, width, MPI_FLOAT, targetRank, tag, MPI_COMM_WORLD);
             break;
         }
         case RECV:
         {
 
-            MPI_Recv(mesh.meshData+paddingRecv, mesh.meshWidth, MPI_FLOAT, targetRank, 0, MPI_COMM_WORLD, &status);
-
+            MPI_Recv(src+paddingRecv, width, MPI_FLOAT, targetRank, tag, MPI_COMM_WORLD, &status);
             break;
         }
     
@@ -313,15 +364,39 @@ void horizontaleComm(int targetRank,COMM comm,Mesh& mesh,int paddingSend,int pad
     }
 }
 
+double testConservation(float* initialData,float* finalData,int size) {
+    if(!initialData || !finalData)
+    {
+        printf("intialData or finalData is null ! \n");
+        return 1;
+    }
+
+    double mass_before = checksum(initialData, size);
+    double mass_after = checksum(finalData, size);
+    printf("Mass before: %.10f, Mass after: %.10f\n", mass_before, mass_after);
+    if (mass_before == 0) return 0;
+    return std::abs(mass_after - mass_before) / mass_before;
+}
+
+
+void transferFluxTopBot(float* top,float* bot,float* flux,int size)
+{
+    for(int i=0;i<size;i++)
+    {
+        top[i] += flux[i];
+        bot[i] += flux[size+i];
+    }
+
+    memset(flux,0,sizeof(float)*size*2);
+        
+}
 
 int main(int argc, char **argv)
 {
 
     int rank,size,sizeRecvBuf,nbChanges;
     
-    double ma_var;
-
-    float* data;
+    float* data = nullptr;
 
     ThermalErosion erosion;
     std::unique_ptr<Terrain> terrain;
@@ -332,22 +407,34 @@ int main(int argc, char **argv)
         return 1;
     }
 
+
     int terrainWidth = atoi(argv[1]);
     int terrainHeight = atoi(argv[2]);
     int terrainStep = atoi(argv[3]);
+    int terrainSize = terrainHeight*terrainWidth;
 
     MPI_Init(&argc, &argv);
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+    if(size <= 1)
+    {
+        printf("You must launch this code with atleast 2 processors \n");
+        return 1;
+    }
+
+    float* initialData = nullptr;
+
     if (rank == 0){
         
         generateTerrain(terrain,terrainWidth,terrainHeight);
         erosion.loadTerrainInfo(terrain);
 
-        printf("data: %d\n",terrain->getData()->size());
         data = terrain->getData()->data();
+
+        initialData = (float*)malloc(sizeof(float)*terrainHeight*terrainWidth);
+        memcpy(initialData,data,terrainSize*sizeof(float));
 
     }
 
@@ -359,52 +446,80 @@ int main(int argc, char **argv)
         myTerrain.meshSize,
         MPI_FLOAT,
         myTerrain.meshData+myTerrain.meshWidth,
-        myTerrain.meshHeight*myTerrain.meshWidth,
+        myTerrain.meshSize,
         MPI_FLOAT,
         0,
         MPI_COMM_WORLD
     );
 
-    memccpy(
-        myTerrain.meshDataTemp,
-        myTerrain.meshData,
-        myTerrain.meshBufferSize,
-        myTerrain.meshBufferSize
-    );
 
-    int lastLineIndex = myTerrain.meshBufferSize - myTerrain.meshWidth;
-
-
-    horizontaleComm(myTerrain.meshTopId,COMM::SEND,myTerrain,0,lastLineIndex,false);
-    horizontaleComm(myTerrain.meshBottomId,COMM::RECV,myTerrain,0,lastLineIndex,false);
-
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    horizontaleComm(myTerrain.meshBottomId,COMM::SEND,myTerrain,0,lastLineIndex,false);
-    horizontaleComm(myTerrain.meshTopId,COMM::RECV,myTerrain,0,lastLineIndex,false);
-
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    for(int i=0;i< terrainStep ; ++i)
+    if (rank == 0)
     {
-        nbChanges = stepChunkMPI(myTerrain.meshData,myTerrain.bottomFlux,myTerrain.meshWidth,myTerrain.meshHeight);
-        printf("[%d][%d/%d] changes : %d \n",rank,i,terrainStep,nbChanges);
+        savePngHeightmap("MPI_heightmap_before.png",data,terrainWidth,terrainHeight);
+    }
 
-        horizontaleComm(myTerrain.meshBottomId,COMM::SEND,myTerrain,0,lastLineIndex,true);
-        horizontaleComm(myTerrain.meshTopId,COMM::RECV,myTerrain,0,0,true);
+    int ghostStartIndex = myTerrain.meshBufferSize - myTerrain.meshWidth;
+    int lastLineIndex = myTerrain.meshBufferSize - (myTerrain.meshWidth*2);
+    int tagCpt = 0;
+
+    for(int i=1; i <= terrainStep ; ++i)
+    {
+
+        horizontal_Comm(myTerrain.meshTopId,tagCpt,COMM::SEND,myTerrain.meshData,myTerrain.meshWidth,myTerrain.meshWidth,0);
+        horizontal_Comm(myTerrain.meshBottomId,tagCpt,COMM::RECV,myTerrain.meshData,myTerrain.meshWidth,0,ghostStartIndex);
+        tagCpt++;
+ 
+
+        horizontal_Comm(myTerrain.meshBottomId,tagCpt,COMM::SEND,myTerrain.meshData,myTerrain.meshWidth,lastLineIndex,0);
+        horizontal_Comm(myTerrain.meshTopId,tagCpt,COMM::RECV,myTerrain.meshData,myTerrain.meshWidth,0,0);
+        tagCpt++;
+        
         MPI_Barrier(MPI_COMM_WORLD);
 
-        myTerrain.transferFlux();
+        nbChanges = stepChunkMPI(myTerrain.meshData,myTerrain.meshFluxData,myTerrain.bottomFlux,myTerrain.topFlux,myTerrain.meshWidth,myTerrain.meshHeight);
 
-        horizontaleComm(myTerrain.meshTopId,COMM::SEND,myTerrain,0,lastLineIndex,false);
-        horizontaleComm(myTerrain.meshBottomId,COMM::RECV,myTerrain,0,lastLineIndex,false);
+        memset(myTerrain.tempFlux, 0, myTerrain.meshWidth * 2 * sizeof(float));
+        // On transfert les changement à faire sur la dernière ligne du terrain
+        
+        horizontal_Comm(myTerrain.meshTopId,tagCpt,COMM::SEND,myTerrain.topFlux,myTerrain.meshWidth,0,0);
+        horizontal_Comm(myTerrain.meshBottomId,tagCpt,COMM::RECV,myTerrain.tempFlux,myTerrain.meshWidth,0,0);
+        tagCpt++;
 
+        // On transfert les changements à faire sur le première ligne du terrain
+        horizontal_Comm(myTerrain.meshBottomId,tagCpt,COMM::SEND,myTerrain.bottomFlux,myTerrain.meshWidth,0,0);
+        horizontal_Comm(myTerrain.meshTopId,tagCpt,COMM::RECV,myTerrain.tempFlux+myTerrain.meshWidth,myTerrain.meshWidth,0,0);
+        tagCpt++;
+
+        transferFluxTopBot(myTerrain.meshData+myTerrain.meshWidth,myTerrain.meshData+lastLineIndex,myTerrain.tempFlux,myTerrain.meshWidth);
+
+
+        if (myTerrain.meshTopId == -1){
+            for(int i =0; i< myTerrain.meshWidth; ++i)
+                myTerrain.meshData[myTerrain.meshWidth + i] += myTerrain.topFlux[i];
+        }
+
+        if (myTerrain.meshBottomId == -1){
+            for(int i =0; i< myTerrain.meshWidth; ++i)
+                myTerrain.meshData[lastLineIndex+i] += myTerrain.bottomFlux[i];
+        }
+
+        memset(myTerrain.topFlux, 0, myTerrain.meshWidth * sizeof(float));
+        memset(myTerrain.bottomFlux, 0, myTerrain.meshWidth * sizeof(float));
+
+        printf("[%d][%d/%d] changes : %d \n",rank,i,terrainStep,nbChanges);
     }
 
 
-    MPI_Gather(myTerrain.meshData,myTerrain.meshSize,MPI_FLOAT,data,myTerrain.meshSize,MPI_FLOAT,0,MPI_COMM_WORLD);
+    MPI_Gather(myTerrain.meshData+myTerrain.meshWidth,myTerrain.meshSize,MPI_FLOAT,data,myTerrain.meshSize,MPI_FLOAT,0,MPI_COMM_WORLD);
+
+    if (rank == 0)
+    {
+        //saveBinaryHeightmap("MPI_heightmap2.raw",data,terrainWidth,terrainHeight);
+        savePngHeightmap("MPI_heightmap_After.png",data,terrainWidth,terrainHeight);
+
+        printf("Error : %f\n",testConservation(initialData,data,terrainSize));
+    }
+
 
     MPI_Finalize();
-
-
 }
