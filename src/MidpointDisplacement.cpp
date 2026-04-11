@@ -7,7 +7,7 @@ static float RandomFloat(float a, float b)
 {
     return a + (b - a) * (float(rand()) / float(RAND_MAX));
 }
-static bool isPowerOfTwo(int n) {
+static inline bool isPowerOfTwo(int n) {
     return n > 0 && (n & (n - 1)) == 0;
 }
 
