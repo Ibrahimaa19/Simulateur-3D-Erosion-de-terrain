@@ -8,10 +8,20 @@
 #include "MidpointDisplacement.hpp"
 #include "ThermalErosion.hpp"
 #include <mpi.h>
+#include <omp.h>
 #include <fstream>
 #include <chrono>
 #include <numeric>
 
+
+int neighbors[8][2] = {
+    {1,-1},{1,0},{1,1},
+    {0,-1},{0,1},
+    {-1,-1},{-1,0},{-1,1}
+};
+
+float dist[8];
+bool boolNeightbors [8];
 
 void savePngHeightmap(const char* nom_fichier, float* heightmap, int largeur, int hauteur) {
     unsigned char* pixels = new unsigned char[largeur * hauteur];
@@ -30,6 +40,209 @@ static inline bool isPowerOfTwo(int n) {
     return n > 0 && (n & (n - 1)) == 0;
 }
 
+void computeDist(float* initialData,float current,int i,int j,int W){
+    #pragma omp simd
+    for(int p=0;p<8;++p)
+    {
+        dist[p] = current - initialData[(i+neighbors[p][0]) * W + (j+neighbors[p][1])];
+    }
+}
+
+void computeTotal(float& totalDiff,float const talus,int& validNeightbors){
+
+    #pragma omp simd reduction(+:totalDiff,validNeightbors)
+    for(int p=0;p<8;++p)
+    {
+        if(dist[p] > talus){
+            totalDiff = totalDiff + dist[p];
+            ++validNeightbors;
+        }
+    }
+}
+
+
+int stepChunkMPIBlockVect(float* __restrict__ initialData ,float* __restrict__ fluxData,float* __restrict__ bottomFlux,float* __restrict__ topFlux, const int width,const int height)
+{
+    const float transferRate = 0.5f;
+    const float PI = 3.14159265f;
+    const float talusAngle = std::tan(30.f * PI / 180.0f);
+
+    const int W = width;
+    const int H = height;
+
+    memset(fluxData,0,sizeof(float)*(H+2)*W);
+    int changes = 0;
+
+    const int BLOCKSIZE = 32;
+
+    for (int ii = 1; ii < H; ii += BLOCKSIZE) {
+        int i_end = std::min(H, ii + BLOCKSIZE);
+
+        for (int jj = 1; jj < W - 1; jj += BLOCKSIZE) {
+            int j_end = std::min(W - 1, jj + BLOCKSIZE);
+
+            for (int i = ii; i < i_end; i++) {
+                for (int j = jj; j < j_end; j++) {
+
+                    float currentHeight = initialData[i * W + j];
+
+                    computeDist(initialData,currentHeight,i,j,W);
+
+                    float totalDiff = 0.f;
+                    int validNeighbors = 0;
+
+                    computeTotal(totalDiff,talusAngle,validNeighbors);
+
+                    if (totalDiff > 0 && validNeighbors > 0) {
+
+                        float materialToMove = transferRate * (totalDiff / validNeighbors);
+                        materialToMove = std::min(materialToMove, currentHeight * transferRate);
+
+                        fluxData[i * W + j] -= materialToMove;
+
+                        for (int k = 0; k < 8; k++) {
+                            if (dist[k] > talusAngle) {
+
+                                float move = materialToMove * (dist[k] / totalDiff);
+                                int ni = i + neighbors[k][0];
+                                int nj = j + neighbors[k][1];
+
+                                if(ni > 1 && ni < W && nj > 1 && nj < H)
+                                {
+                                    fluxData[ni * W + nj] += move;
+                                }
+                                else if (i == H-1 && ni == H) {
+                                    if (nj >= 0 && nj < W)
+                                        bottomFlux[nj] += move;
+                                }
+                                else if (i == 1 && ni == 0) {
+                                    if (nj >= 0 && nj < W)
+                                        topFlux[nj] += move;
+                                }
+                                else if (nj <= 0 || nj >= W-1) {
+                                    fluxData[i * W + j] += move;
+                                }
+                                else {
+                                    fluxData[ni * W + nj] += move;
+                                }
+                            }
+                        }
+
+                        changes++;
+                    }
+                }
+            }
+        }
+    }
+
+    for (int i = 1; i < H; i++) {
+        for (int j = 0; j < W; j++) {
+            initialData[i * W + j] += fluxData[i * W + j];
+        }
+    }
+
+    return changes;
+}
+
+
+int stepChunkMPIBlock(float* initialData,float* fluxData,float* bottomFlux,float* topFlux, const int width,const int height)
+{
+    const float transferRate = 0.5f;
+    const float PI = 3.14159265f;
+    const float talusAngle = std::tan(30.f * PI / 180.0f);
+
+    const int W = width;
+    const int H = height;
+
+    memset(fluxData,0,sizeof(float)*(H+2)*W);
+    int changes = 0;
+
+    const int BLOCKSIZE = 32;
+
+    for (int ii = 1; ii < H; ii += BLOCKSIZE) {
+        int i_end = std::min(H, ii + BLOCKSIZE);
+
+        for (int jj = 1; jj < W - 1; jj += BLOCKSIZE) {
+            int j_end = std::min(W - 1, jj + BLOCKSIZE);
+
+            for (int i = ii; i < i_end; i++) {
+                for (int j = jj; j < j_end; j++) {
+
+                    float currentHeight = initialData[i * W + j];
+
+                    float dist[8] = {
+                        currentHeight - initialData[(i + 1) * W + (j - 1)],
+                        currentHeight - initialData[(i + 1) * W + j],
+                        currentHeight - initialData[(i + 1) * W + (j + 1)],
+                        currentHeight - initialData[i * W + (j - 1)],
+                        currentHeight - initialData[i * W + (j + 1)],
+                        currentHeight - initialData[(i - 1) * W + (j - 1)],
+                        currentHeight - initialData[(i - 1) * W + j],
+                        currentHeight - initialData[(i - 1) * W + (j + 1)]
+                    };
+
+                    int neighbors[8][2] = {
+                        {1,-1},{1,0},{1,1},
+                        {0,-1},{0,1},
+                        {-1,-1},{-1,0},{-1,1}
+                    };
+
+                    float totalDiff = 0.f;
+                    int validNeighbors = 0;
+
+                    for (int k = 0; k < 8; k++) {
+                        if (dist[k] > talusAngle) {
+                            totalDiff += dist[k];
+                            validNeighbors++;
+                        }
+                    }
+
+                    if (totalDiff > 0 && validNeighbors > 0) {
+
+                        float materialToMove = transferRate * (totalDiff / validNeighbors);
+                        materialToMove = std::min(materialToMove, currentHeight * transferRate);
+
+                        fluxData[i * W + j] -= materialToMove;
+
+                        for (int k = 0; k < 8; k++) {
+                            if (dist[k] > talusAngle) {
+
+                                float move = materialToMove * (dist[k] / totalDiff);
+                                int ni = i + neighbors[k][0];
+                                int nj = j + neighbors[k][1];
+
+                                if (i == H-1 && ni == H) {
+                                    if (nj >= 0 && nj < W)
+                                        bottomFlux[nj] += move;
+                                }
+                                else if (i == 1 && ni == 0) {
+                                    if (nj >= 0 && nj < W)
+                                        topFlux[nj] += move;
+                                }
+                                else if (nj <= 0 || nj >= W-1) {
+                                    fluxData[i * W + j] += move;
+                                }
+                                else {
+                                    fluxData[ni * W + nj] += move;
+                                }
+                            }
+                        }
+
+                        changes++;
+                    }
+                }
+            }
+        }
+    }
+
+    for (int i = 1; i < H; i++) {
+        for (int j = 0; j < W; j++) {
+            initialData[i * W + j] += fluxData[i * W + j];
+        }
+    }
+
+    return changes;
+}
 
 int stepChunkMPI(float* initialData,float* fluxData,float* bottomFlux,float* topFlux, const int width,const int height)
 {
@@ -55,29 +268,21 @@ int stepChunkMPI(float* initialData,float* fluxData,float* bottomFlux,float* top
         for (int j = 1; j < W - 1; j++) {
             float currentHeight = initialData[i * W + j];
 
-            // Hauteurs des 8 voisins
-            float diffBottomLeft  = currentHeight - (initialData[(i + 1) * W + (j - 1)]);
-            float diffBottom      = currentHeight - (initialData[(i + 1) * W + j]);
-            float diffBottomRight = currentHeight - (initialData[(i + 1) * W + (j + 1)]);
-            float diffLeft        = currentHeight - (initialData[i * W + (j - 1)]);
-            float diffRight       = currentHeight - (initialData[i * W + (j + 1)]);
-            float diffTopLeft     = currentHeight - (initialData[(i - 1) * W + (j - 1)]);
-            float diffTop         = currentHeight - (initialData[(i - 1) * W + j]);
-            float diffTopRight    = currentHeight - (initialData[(i - 1) * W + (j + 1)]);
+            float dist[8] = {
+                currentHeight - initialData[(i + 1) * W + (j - 1)],
+                currentHeight - initialData[(i + 1) * W + j],
+                currentHeight - initialData[(i + 1) * W + (j + 1)],
+                currentHeight - initialData[i * W + (j - 1)],
+                currentHeight - initialData[i * W + (j + 1)],
+                currentHeight - initialData[(i - 1) * W + (j - 1)],
+                currentHeight - initialData[(i - 1) * W + j],
+                currentHeight - initialData[(i - 1) * W + (j + 1)]
+            };
 
-            float dist[8] = { diffBottomLeft, diffBottom, diffBottomRight,
-                            diffLeft, diffRight,
-                            diffTopLeft, diffTop, diffTopRight };
-
-            int neighbors[8][2] = { 
-                {1, -1},  // bas-gauche
-                {1, 0},   // bas
-                {1, 1},   // bas-droite
-                {0, -1},  // gauche
-                {0, 1},   // droite
-                {-1, -1}, // haut-gauche
-                {-1, 0},  // haut
-                {-1, 1}   // haut-droite
+            int neighbors[8][2] = {
+                {1,-1},{1,0},{1,1},
+                {0,-1},{0,1},
+                {-1,-1},{-1,0},{-1,1}
             };
 
             float totalDiff = 0.0f;
@@ -103,30 +308,23 @@ int stepChunkMPI(float* initialData,float* fluxData,float* bottomFlux,float* top
                 // Redistribution aux voisins
                 for (int k = 0; k < 8; k++) {
                     if (dist[k] > talusAngle) {
-                        float proportion = dist[k] / totalDiff;
-                        float moveAmount = materialToMove * proportion;
+                        float move = materialToMove * (dist[k] / totalDiff);
 
                         int ni = i + neighbors[k][0];
                         int nj = j + neighbors[k][1];
 
                         if (i == H && ni == H+1) {
-                            if (nj >= 0 && nj < width) {
-                                bottomFlux[nj] += moveAmount;
-                            }else {
-                                fluxData[i * W + j] += moveAmount; // diagonale
-                            }
+                            if (nj >= 0 && nj < W) 
+                                bottomFlux[nj] += move;
+                            
                         } else if (i == 1 && ni == 0) {
-                            if (nj >= 0 && nj < width) {
-                                topFlux[nj] += moveAmount;
-                            }else {
-                                fluxData[i * W + j] += moveAmount; // diagonale
-                            }
-                        }else if (nj == -1) {
-                            fluxData[i * W + j] += moveAmount; // diagonale
-                        } else if (nj == W) {
-                            fluxData[i * W + j] += moveAmount; // diagonale
+                            if (nj >= 0 && nj < W) 
+                                topFlux[nj] += move;
+                            
+                        }else if (nj <= 0 || nj >= W-1) {
+                            fluxData[i * W + j] += move; // reflexion
                         }else {
-                            fluxData[ni * W + nj] += moveAmount;   
+                            fluxData[ni * W + nj] += move;   
                         }
                     }
                 }
@@ -169,7 +367,6 @@ void generateTerrain(std::unique_ptr<Terrain>& terrain,int width,int height,std:
     }
 
 }
-
 
 double checksum(float* tab,int size)
 {
@@ -271,28 +468,6 @@ void initSplitMesh(int rank,int sizeProc,Mesh& mesh,int terrainWidth,int terrain
 
     for(int i=0;i<sizeProc;++i)
         offsets[i] = i*meshNbElement;
-}
-
-void horizontal_Comm(int targetRank,int tag,COMM comm,float* src,int width,int paddingSend,int paddingRecv)
-{
-    if (targetRank == -1) {
-    return;
-    }
-
-    MPI_Status status;
-    switch (comm)
-    {
-        case SEND:
-            MPI_Send(src+paddingSend, width, MPI_FLOAT, targetRank, tag, MPI_COMM_WORLD);
-            break;
-        
-        case RECV:
-            MPI_Recv(src+paddingRecv, width, MPI_FLOAT, targetRank, tag, MPI_COMM_WORLD, &status);
-            break;
-    
-        default:
-            break;
-    }
 }
 
 double testConservation(float* initialData,float* finalData,int size) {
@@ -403,33 +578,87 @@ int lauchMPI(int argc, char *argv[])
     for(int i=1; i <= terrainStep ; ++i)
     {
 
-        horizontal_Comm(myTerrain.meshTopId,tagCpt,COMM::SEND,myTerrain.meshData,myTerrain.meshWidth,myTerrain.meshWidth,0);
-        horizontal_Comm(myTerrain.meshBottomId,tagCpt,COMM::RECV,myTerrain.meshData,myTerrain.meshWidth,0,ghostStartIndex);
-        tagCpt++;
- 
+        MPI_Sendrecv(
+            myTerrain.meshData,
+            myTerrain.meshWidth,
+            MPI_FLOAT,
+            myTerrain.meshTopId,
+            tagCpt,
 
-        horizontal_Comm(myTerrain.meshBottomId,tagCpt,COMM::SEND,myTerrain.meshData,myTerrain.meshWidth,lastLineIndex,0);
-        horizontal_Comm(myTerrain.meshTopId,tagCpt,COMM::RECV,myTerrain.meshData,myTerrain.meshWidth,0,0);
+            myTerrain.meshData + ghostStartIndex,
+            myTerrain.meshWidth,
+            MPI_FLOAT,
+            myTerrain.meshBottomId,
+            tagCpt,
+
+            MPI_COMM_WORLD,
+            MPI_STATUS_IGNORE
+        );
+        tagCpt++;
+
+
+        MPI_Sendrecv(
+            myTerrain.meshData + lastLineIndex,
+            myTerrain.meshWidth,
+            MPI_FLOAT,
+            myTerrain.meshBottomId,
+            tagCpt,
+
+            myTerrain.meshData,
+            myTerrain.meshWidth,
+            MPI_FLOAT,
+            myTerrain.meshTopId,
+            tagCpt,
+
+            MPI_COMM_WORLD,
+            MPI_STATUS_IGNORE
+        );
         tagCpt++;
         
-        MPI_Barrier(MPI_COMM_WORLD);
 
-        nbChanges = stepChunkMPI(myTerrain.meshData,myTerrain.meshFluxData,myTerrain.bottomFlux,myTerrain.topFlux,myTerrain.meshWidth,myTerrain.meshHeight);
+        nbChanges = stepChunkMPIBlockVect(myTerrain.meshData,myTerrain.meshFluxData,myTerrain.bottomFlux,myTerrain.topFlux,myTerrain.meshWidth,myTerrain.meshHeight);
+        memset(myTerrain.tempFlux, 0, myTerrain.meshWidth * 2 * sizeof(float));    
 
-        memset(myTerrain.tempFlux, 0, myTerrain.meshWidth * 2 * sizeof(float));
-        // On transfert les changement à faire sur la dernière ligne du terrain
-        
-        horizontal_Comm(myTerrain.meshTopId,tagCpt,COMM::SEND,myTerrain.topFlux,myTerrain.meshWidth,0,0);
-        horizontal_Comm(myTerrain.meshBottomId,tagCpt,COMM::RECV,myTerrain.tempFlux,myTerrain.meshWidth,0,0);
+        MPI_Sendrecv(
+            myTerrain.topFlux,
+            myTerrain.meshWidth,
+            MPI_FLOAT,
+            myTerrain.meshTopId,
+            tagCpt,
+
+            myTerrain.tempFlux,
+            myTerrain.meshWidth,
+            MPI_FLOAT,
+            myTerrain.meshBottomId,
+            tagCpt,
+
+            MPI_COMM_WORLD,
+            MPI_STATUS_IGNORE
+        );
+
         tagCpt++;
 
-        // On transfert les changements à faire sur le première ligne du terrain
-        horizontal_Comm(myTerrain.meshBottomId,tagCpt,COMM::SEND,myTerrain.bottomFlux,myTerrain.meshWidth,0,0);
-        horizontal_Comm(myTerrain.meshTopId,tagCpt,COMM::RECV,myTerrain.tempFlux+myTerrain.meshWidth,myTerrain.meshWidth,0,0);
+
+        MPI_Sendrecv(
+            myTerrain.bottomFlux,
+            myTerrain.meshWidth,
+            MPI_FLOAT,
+            myTerrain.meshBottomId,
+            tagCpt,
+
+            myTerrain.tempFlux + myTerrain.meshWidth,
+            myTerrain.meshWidth,
+            MPI_FLOAT,
+            myTerrain.meshTopId,
+            tagCpt,
+
+            MPI_COMM_WORLD,
+            MPI_STATUS_IGNORE
+        );
         tagCpt++;
+
 
         transferFluxTopBot(myTerrain.meshData+myTerrain.meshWidth,myTerrain.meshData+lastLineIndex,myTerrain.tempFlux,myTerrain.meshWidth);
-
 
         if (myTerrain.meshTopId == -1){
             for(int i =0; i< myTerrain.meshWidth; ++i)
@@ -444,8 +673,6 @@ int lauchMPI(int argc, char *argv[])
         memset(myTerrain.topFlux, 0, myTerrain.meshWidth * sizeof(float));
         memset(myTerrain.bottomFlux, 0, myTerrain.meshWidth * sizeof(float));
 
-        if(i%100 == 0)
-            printf("[%d][%d/%d] changes : %d \n",rank,i,terrainStep,nbChanges);
     }
 
 
@@ -478,3 +705,4 @@ int lauchMPI(int argc, char *argv[])
 
     return 0;
 }
+	
