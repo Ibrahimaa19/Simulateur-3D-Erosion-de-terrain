@@ -47,7 +47,10 @@ public:
     int stepPureTwoPhase();
     int stepBlockedPureTwoPhase();
     int stepBlockedParallelPureTwoPhase();
-
+    int stepCheckerboardPureTwoPhase();
+    int stepBlockedCheckerboardPureTwoPhase();
+    int stepCheckerboardInPlace();
+    int stepCheckerboardInPlaceParallel();
     void resetProgress();
 
     bool isIterationFinished() const { return mIterationFinished; }
@@ -109,7 +112,8 @@ private:
                                int neighborJ);
 
     bool erodeCell(int i, int j, const float* src, float* dst);
-
+    bool erodeCellInPlace(int i, int j, float* data);
+    int applyCheckerboardInPlaceColor(float* data, int color);
     int applyErosionRange(const float* src,
                           float* dst,
                           int startIndex,
@@ -127,4 +131,16 @@ private:
 
     int applyBlockedParallelErosionToDelta(const float* src,
                                            float* delta);
+    int applyBlockedParallelErosionToThreadLocalBuffers(
+        const float* src,
+        std::vector<std::vector<float>>& threadDeltas,
+        std::vector<std::vector<unsigned char>>& threadPatchMarked);
+        int applyCheckerboardErosionRange(const float* src,
+                                      float* dst,
+                                      int color);
+
+    int applyBlockedCheckerboardErosionRange(const float* src,
+                                             float* dst,
+                                             int color);
+    int applyCheckerboardInPlaceColorParallelBuffered(float* data, int color);
 };
