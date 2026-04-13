@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
             return 1;
         }   
 
-        lauchMPI(argc,argv);
+        lauchSequential(argc,argv);
     }
 
     else{

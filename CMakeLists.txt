@@ -14,7 +14,7 @@ find_package(MPI REQUIRED)
 
 # Flags d'optimisation
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O3 -march=native -fopt-info-vec")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O3 -march=native -fopt-info-vec-all=report.txt -ffast-math -funroll-loops")
 
 include(FetchContent)
 
