@@ -111,7 +111,7 @@ int stepChunkMPIBlockVect2(float* __restrict__ initialData ,float* __restrict__ 
                         float materialToMove = transferRate * (totalDiff / validNeighbors);
                         materialToMove = std::min(materialToMove, currentHeight * transferRate);
 
-                        fluxCurr[i * W + j] -= materialToMove;
+                        fluxCurr[j] -= materialToMove;
                         
                         const float material = materialToMove / totalDiff;
 
@@ -1447,7 +1447,7 @@ int lauchMPI(int argc, char *argv[])
         tagCpt++;
         
 
-        nbChanges = stepChunkMPIBlock(myTerrain.meshData,myTerrain.meshFluxData,myTerrain.bottomFlux,myTerrain.topFlux,myTerrain.meshWidth,myTerrain.meshHeight);
+        nbChanges = stepChunkMPIBlockVect2(myTerrain.meshData,myTerrain.meshFluxData,myTerrain.bottomFlux,myTerrain.topFlux,myTerrain.meshWidth,myTerrain.meshHeight);
         memset(myTerrain.tempFlux, 0, myTerrain.meshWidth * 2 * sizeof(float));    
 
         MPI_Sendrecv(
@@ -1596,7 +1596,7 @@ int lauchSequential(int argc, char *argv[])
 
     for (int step = 1; step <= terrainStep; step++) {
         // Érosion (version non MPI)
-        changes = stepChunkMPIBlockVect(meshData, fluxData, bottomFlux, topFlux, W, H);
+        changes = stepChunkMPIBlock(meshData, fluxData, bottomFlux, topFlux, W, H);
         
         // Appliquer les flux de bordure
         // Transfert topFlux vers la première ligne réelle

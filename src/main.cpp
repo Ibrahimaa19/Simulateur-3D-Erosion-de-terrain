@@ -37,10 +37,10 @@ int main(int argc, char *argv[])
 {
 
     if(argc == 1 || State::Render == dicState[argv[1]]){
-        if(!isMPI()){
-            printf("[!] Vous lancez le mode graphique avec mpirun ! \n");
-            exit(1);
-        }
+        // if(!isMPI()){
+        //     printf("[!] Vous lancez le mode graphique avec mpirun ! \n");
+        //     exit(1);
+        // }
 
         TerrainApp app;
         app.Init();
@@ -50,10 +50,10 @@ int main(int argc, char *argv[])
     }
     else if (State::Test == dicState[argv[1]]) {
 
-        if(!isMPI()){
-            printf("[!] Vous lancez le mode test avec mpirun ! \n");
-            exit(1);
-        }
+        // if(!isMPI()){
+        //     printf("[!] Vous lancez le mode test avec mpirun ! \n");
+        //     exit(1);
+        // }
 
         std::unique_ptr<Terrain> terrain;
 
@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
         case Heightmap::PerlinNoise:
         {
             auto generator = std::make_unique<PerlinNoiseTerrain>();
-            generator->CreatePerlinNoise(5000, 5000, 0, 255, 1, 0.005);
+            generator->CreatePerlinNoise(2048, 2048, 0, 255, 1, 0.005);
             terrain = std::move(generator);
             break;
         }
@@ -117,7 +117,7 @@ int main(int argc, char *argv[])
             return 1;
         }   
 
-        lauchSequential(argc,argv);
+        lauchMPI(argc,argv);
     }
 
     else{
