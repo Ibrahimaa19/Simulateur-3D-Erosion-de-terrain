@@ -92,6 +92,15 @@ class Gui
     int thermalChunkBudgetBlocks = 8;
     bool thermalUseFourNeighbors = false;
 
+    float renderSunAzimuth = -35.0f;
+    float renderSunElevation = 50.0f;
+    float renderFogStart = 850.0f;
+    float renderFogEnd = 2400.0f;
+    float renderTintStrength = 0.46f;
+    float renderExposure = 1.0f;
+    float renderSkyColor[3] = {0.58f, 0.68f, 0.74f};
+    float renderFogColor[3] = {0.58f, 0.68f, 0.74f};
+
     int hydroIterations = 50000;
     float rainAmount = 1.0f;
     float evaporationRate = 0.5f;

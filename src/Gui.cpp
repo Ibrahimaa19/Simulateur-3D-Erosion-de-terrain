@@ -284,6 +284,26 @@ void Gui::Render(Terrain* terrain)
                 ImGui::EndTabItem();
             }
 
+            if (ImGui::BeginTabItem("Rendu"))
+            {
+                ImGui::Spacing();
+                ImGui::SliderFloat("Azimut soleil", &renderSunAzimuth, -180.0f, 180.0f, "%.0f deg");
+                ImGui::SliderFloat("Hauteur soleil", &renderSunElevation, 5.0f, 85.0f, "%.0f deg");
+                ImGui::SliderFloat("Brume debut", &renderFogStart, 100.0f, 2500.0f, "%.0f");
+                ImGui::SliderFloat("Brume fin", &renderFogEnd, 300.0f, 5000.0f, "%.0f");
+
+                if (renderFogEnd < renderFogStart + 50.0f)
+                {
+                    renderFogEnd = renderFogStart + 50.0f;
+                }
+
+                ImGui::SliderFloat("Teinte terrain", &renderTintStrength, 0.0f, 1.0f, "%.2f");
+                ImGui::SliderFloat("Exposition", &renderExposure, 0.5f, 1.8f, "%.2f");
+                ImGui::ColorEdit3("Couleur ciel", renderSkyColor);
+                ImGui::ColorEdit3("Couleur brume", renderFogColor);
+                ImGui::EndTabItem();
+            }
+
             // ONGLET INFOS
             if (ImGui::BeginTabItem("Infos"))
             {

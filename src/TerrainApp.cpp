@@ -114,7 +114,7 @@ void TerrainApp::Run()
 
     while (!glfwWindowShouldClose(mWindow))
     {
-        glClearColor(0.58f, 0.68f, 0.74f, 1.0f);
+        glClearColor(mGui.renderSkyColor[0], mGui.renderSkyColor[1], mGui.renderSkyColor[2], 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         if (mGui.startGeneration)
@@ -202,10 +202,19 @@ void TerrainApp::RenderScene()
     mShader->SetFloat("gMaxHeight", mTerrain->getMaxHeight());
     mShader->SetFloat("gMinHeight", mTerrain->getMinHeight());
     mShader->SetVec3("gCameraPos", mCamera.GetPosition());
-    mShader->SetVec3("gLightDirection", glm::normalize(glm::vec3(-0.45f, -0.85f, -0.25f)));
-    mShader->SetVec3("gFogColor", glm::vec3(0.58f, 0.68f, 0.74f));
-    mShader->SetFloat("gFogStart", 850.0f);
-    mShader->SetFloat("gFogEnd", 2400.0f);
+
+    const float sunAzimuth = glm::radians(mGui.renderSunAzimuth);
+    const float sunElevation = glm::radians(mGui.renderSunElevation);
+    const glm::vec3 sunVector =
+        glm::normalize(glm::vec3(std::cos(sunElevation) * std::cos(sunAzimuth), std::sin(sunElevation),
+                                 std::cos(sunElevation) * std::sin(sunAzimuth)));
+
+    mShader->SetVec3("gLightDirection", -sunVector);
+    mShader->SetVec3("gFogColor", glm::vec3(mGui.renderFogColor[0], mGui.renderFogColor[1], mGui.renderFogColor[2]));
+    mShader->SetFloat("gFogStart", mGui.renderFogStart);
+    mShader->SetFloat("gFogEnd", mGui.renderFogEnd);
+    mShader->SetFloat("gTintStrength", mGui.renderTintStrength);
+    mShader->SetFloat("gExposure", mGui.renderExposure);
 
     for (int i = 0; i < 4; i++)
     {

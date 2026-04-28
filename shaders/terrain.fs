@@ -17,6 +17,8 @@ uniform vec3 gLightDirection;
 uniform vec3 gFogColor;
 uniform float gFogStart;
 uniform float gFogEnd;
+uniform float gTintStrength;
+uniform float gExposure;
 
 vec3 terrainNormal()
 {
@@ -68,7 +70,7 @@ void main()
     vec3 baseColor = sampleTerrainTexture();
     vec3 tint = altitudeTint(slope);
 
-    vec3 color = mix(baseColor, tint, 0.46);
+    vec3 color = mix(baseColor, tint, gTintStrength);
 
     float rim = pow(1.0 - max(dot(normal, viewDir), 0.0), 2.0);
     vec3 ambient = vec3(0.18, 0.22, 0.26);
@@ -81,6 +83,7 @@ void main()
     float distanceToCamera = length(gCameraPos - WorldPos);
     float fog = smoothstep(gFogStart, gFogEnd, distanceToCamera);
     color = mix(color, gFogColor, fog);
+    color *= gExposure;
 
     fragColor = vec4(pow(color, vec3(1.0 / 2.2)), 1.0);
 }
