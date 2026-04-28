@@ -1,5 +1,7 @@
 #include "Patch.hpp"
 
+#include <cstddef>
+
 void Patch::setPatch(unsigned int x, unsigned int z, float xzFactor, unsigned int nbPatchX, unsigned int nbPatchZ,
                      Texture* texture)
 {
@@ -44,7 +46,8 @@ GLuint Patch::getVbo(int lodLevel)
 void Patch::createBuffersGL()
 {
     unsigned int idBufPos = 0;
-    unsigned int idBufTex = 1;
+    unsigned int idBufNormal = 1;
+    unsigned int idBufTex = 2;
 
     for (int lod = 0; lod < 5; lod++)
     {
@@ -61,10 +64,11 @@ void Patch::createBuffersGL()
         glBufferData(GL_ARRAY_BUFFER, this->mLod[lod].vertices.size() * sizeof(Vertex), this->mLod[lod].vertices.data(),
                      GL_DYNAMIC_DRAW);
 
-        unsigned numFloat = 3;
+        glEnableVertexAttribArray(idBufNormal);
+        glVertexAttribPointer(idBufNormal, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
 
         glEnableVertexAttribArray(idBufTex);
-        glVertexAttribPointer(idBufTex, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(numFloat * sizeof(float)));
+        glVertexAttribPointer(idBufTex, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texture));
 
         // Créer EBO
         glGenBuffers(1, &mEbo[lod]);
@@ -87,6 +91,15 @@ void Patch::generateLodVertices(std::vector<float>& heights, unsigned int width,
     const float invXzFactor = 1.0f / mXzFactor;
     const float invTexWidth = textureScale / (static_cast<float>(width) * mXzFactor);
     const float invTexHeight = textureScale / (static_cast<float>(height) * mXzFactor);
+    const int maxX = static_cast<int>(width) - 1;
+    const int maxZ = static_cast<int>(height) - 1;
+
+    auto heightAt = [&heights, width, maxX, maxZ](int x, int z)
+    {
+        const int sx = std::clamp(x, 0, maxX);
+        const int sz = std::clamp(z, 0, maxZ);
+        return heights[sz * static_cast<int>(width) + sx];
+    };
 
     for (int k = 0; k < 5; ++k)
     {
@@ -107,7 +120,7 @@ void Patch::generateLodVertices(std::vector<float>& heights, unsigned int width,
 
             const int worldZ = basePatchZ + innerY * step;
             int sampleZ = basePatchZ + clampedY * step;
-            sampleZ = std::clamp(sampleZ, 0, static_cast<int>(height) - 1);
+            sampleZ = std::clamp(sampleZ, 0, maxZ);
 
             const bool borderY = (localY == 0 || localY == resolution - 1);
 
@@ -118,9 +131,12 @@ void Patch::generateLodVertices(std::vector<float>& heights, unsigned int width,
 
                 const int worldX = basePatchX + innerX * step;
                 int sampleX = basePatchX + clampedX * step;
-                sampleX = std::clamp(sampleX, 0, static_cast<int>(width) - 1);
+                sampleX = std::clamp(sampleX, 0, maxX);
 
-                float heightValue = heights[sampleZ * static_cast<int>(width) + sampleX];
+                float heightValue = heightAt(sampleX, sampleZ);
+                glm::vec3 normal = glm::normalize(glm::vec3(
+                    heightAt(sampleX - step, sampleZ) - heightAt(sampleX + step, sampleZ), 2.0f * step * invXzFactor,
+                    heightAt(sampleX, sampleZ - step) - heightAt(sampleX, sampleZ + step)));
 
                 if (borderY || localX == 0 || localX == resolution - 1)
                 {
@@ -129,6 +145,7 @@ void Patch::generateLodVertices(std::vector<float>& heights, unsigned int width,
 
                 vertices[outIndex].position = glm::vec3(static_cast<float>(worldX) * invXzFactor, heightValue,
                                                         static_cast<float>(worldZ) * invXzFactor);
+                vertices[outIndex].normal = normal;
 
                 vertices[outIndex].texture =
                     glm::vec2(static_cast<float>(worldX) * invTexWidth, static_cast<float>(worldZ) * invTexHeight);

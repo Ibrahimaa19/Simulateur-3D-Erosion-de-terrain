@@ -4,6 +4,7 @@ layout(location = 0) out vec4 fragColor;
 
 in vec2 texCoord;
 in vec3 WorldPos;
+in vec3 WorldNormal;
 in float HeightRatio;
 
 uniform sampler2D terrainTexture0;
@@ -19,16 +20,8 @@ uniform float gFogEnd;
 
 vec3 terrainNormal()
 {
-    vec3 dx = dFdx(WorldPos);
-    vec3 dz = dFdy(WorldPos);
-    vec3 normal = normalize(cross(dz, dx));
-
-    if (normal.y < 0.0)
-    {
-        normal = -normal;
-    }
-
-    return normal;
+    vec3 normal = normalize(WorldNormal);
+    return normal.y < 0.0 ? -normal : normal;
 }
 
 vec3 sampleTerrainTexture()

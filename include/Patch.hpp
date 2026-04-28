@@ -19,6 +19,7 @@
 struct Vertex
 {
     glm::vec3 position; /**< Position du sommet dans l'espace */
+    glm::vec3 normal;   /**< Normale locale utilisée pour l'éclairage */
     glm::vec2 texture;  /**< Coordonnées de texture (u, v) */
 
     Vertex() = default;
@@ -27,7 +28,7 @@ struct Vertex
      * @param pos Position 3D
      * @param tex Coordonnées de texture
      */
-    Vertex(glm::vec3 pos, glm::vec2 tex) : position(pos), texture(tex){};
+    Vertex(glm::vec3 pos, glm::vec3 n, glm::vec2 tex) : position(pos), normal(n), texture(tex){};
 };
 
 /**

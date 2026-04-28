@@ -1,7 +1,8 @@
 #version 330
 
 layout(location = 0) in vec3 position;
-layout(location = 1) in vec2 aTexCoord;
+layout(location = 1) in vec3 normal;
+layout(location = 2) in vec2 aTexCoord;
 
 uniform mat4 gFinalMatrix;
 uniform float gMinHeight;
@@ -9,6 +10,7 @@ uniform float gMaxHeight;
 
 out vec2 texCoord;
 out vec3 WorldPos;
+out vec3 WorldNormal;
 out float HeightRatio;
 
 void main()
@@ -20,4 +22,5 @@ void main()
 
     texCoord = aTexCoord;
     WorldPos = position;
+    WorldNormal = normalize(normal);
 }
