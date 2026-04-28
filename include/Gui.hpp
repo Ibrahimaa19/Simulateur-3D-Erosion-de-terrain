@@ -7,7 +7,8 @@
 struct GLFWwindow;
 class Terrain;
 
-enum GenMethod {
+enum GenMethod
+{
     GEN_HEIGHTMAP = 0,
     GEN_FAULT_FORMATION = 1,
     GEN_MIDPOINT_DISPLACEMENT = 2,
@@ -31,8 +32,9 @@ enum ThermalExecutionMode
     THERMAL_EXEC_CHUNKED
 };
 
-class Gui {
-public:
+class Gui
+{
+  public:
     Gui();
     ~Gui();
 

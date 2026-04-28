@@ -1,7 +1,7 @@
 #include "test-shader.hpp"
 #include "Shader.hpp"
-#include <fstream>
 #include <cstdio>
+#include <fstream>
 
 /**
  * @brief Test: minimal shader reading and compilation

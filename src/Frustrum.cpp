@@ -1,14 +1,10 @@
 #include "Frustrum.hpp"
 
-Frustrum::Frustrum()
-{
-}
+Frustrum::Frustrum() {}
 
-Frustrum::~Frustrum()
-{
-}
+Frustrum::~Frustrum() {}
 
-void Frustrum::updateFrustum(glm::mat4 &projection, glm::mat4 &view)
+void Frustrum::updateFrustum(glm::mat4& projection, glm::mat4& view)
 {
     glm::mat4 mat = projection * view;
 
@@ -37,7 +33,7 @@ void Frustrum::updateFrustum(glm::mat4 &projection, glm::mat4 &view)
     mPlans[5].d = mat[3][3] - mat[3][2];
 }
 
-bool Frustrum::isPatchInFrustum(const glm::vec3 &patchCentre, float radius)
+bool Frustrum::isPatchInFrustum(const glm::vec3& patchCentre, float radius)
 {
     Sphere patch(patchCentre, radius);
 

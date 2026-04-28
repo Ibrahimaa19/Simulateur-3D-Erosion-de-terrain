@@ -1,14 +1,14 @@
 #include "../include/Shader.hpp"
 #include <fstream>
-#include <sstream>
 #include <iostream>
+#include <sstream>
 
 /**
  * @brief Reads a text file and returns its content.
  * @param path Path to the file
  * @return File content as a string, or an empty string on error
  */
-std::string Shader::ReadFile(const std::string &path) const
+std::string Shader::ReadFile(const std::string& path) const
 {
     std::ifstream file(path);
     if (!file)
@@ -30,10 +30,10 @@ std::string Shader::ReadFile(const std::string &path) const
  *
  * Prints the compilation error log to stderr if compilation fails.
  */
-GLuint Shader::CompileShader(const std::string &source, GLenum type) const
+GLuint Shader::CompileShader(const std::string& source, GLenum type) const
 {
     GLuint shader = glCreateShader(type);
-    const char *src = source.c_str();
+    const char* src = source.c_str();
 
     glShaderSource(shader, 1, &src, nullptr);
     glCompileShader(shader);
@@ -45,9 +45,8 @@ GLuint Shader::CompileShader(const std::string &source, GLenum type) const
     {
         char log[1024];
         glGetShaderInfoLog(shader, 1024, nullptr, log);
-        std::cerr << "[Shader Compile Error] "
-                  << (type == GL_VERTEX_SHADER ? "VERTEX" : "FRAGMENT")
-                  << ":\n" << log << std::endl;
+        std::cerr << "[Shader Compile Error] " << (type == GL_VERTEX_SHADER ? "VERTEX" : "FRAGMENT") << ":\n"
+                  << log << std::endl;
     }
 
     return shader;
@@ -62,9 +61,9 @@ GLuint Shader::CompileShader(const std::string &source, GLenum type) const
  *
  * Prints linking errors to stderr if linking fails.
  */
-Shader::Shader(const std::string &vertexPath, const std::string &fragmentPath)
+Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath)
 {
-    std::string vertexCode   = ReadFile(vertexPath);
+    std::string vertexCode = ReadFile(vertexPath);
     std::string fragmentCode = ReadFile(fragmentPath);
 
     GLuint vert = CompileShader(vertexCode, GL_VERTEX_SHADER);
@@ -114,7 +113,7 @@ void Shader::Use() const
  * @param name Name of the uniform variable
  * @param value Boolean value
  */
-void Shader::SetBool(const std::string &name, bool value) const
+void Shader::SetBool(const std::string& name, bool value) const
 {
     glUniform1i(glGetUniformLocation(mProgramID, name.c_str()), (int)value);
 }
@@ -124,7 +123,7 @@ void Shader::SetBool(const std::string &name, bool value) const
  * @param name Name of the uniform variable
  * @param value Integer value
  */
-void Shader::SetInt(const std::string &name, int value) const
+void Shader::SetInt(const std::string& name, int value) const
 {
     glUniform1i(glGetUniformLocation(mProgramID, name.c_str()), value);
 }
@@ -134,7 +133,7 @@ void Shader::SetInt(const std::string &name, int value) const
  * @param name Name of the uniform variable
  * @param value Float value
  */
-void Shader::SetFloat(const std::string &name, float value) const
+void Shader::SetFloat(const std::string& name, float value) const
 {
     glUniform1f(glGetUniformLocation(mProgramID, name.c_str()), value);
 }
@@ -144,7 +143,7 @@ void Shader::SetFloat(const std::string &name, float value) const
  * @param name Name of the uniform
  * @param value 2D vector value
  */
-void Shader::SetVec2(const std::string &name, const glm::vec2 &value) const
+void Shader::SetVec2(const std::string& name, const glm::vec2& value) const
 {
     glUniform2fv(glGetUniformLocation(mProgramID, name.c_str()), 1, &value[0]);
 }
@@ -154,7 +153,7 @@ void Shader::SetVec2(const std::string &name, const glm::vec2 &value) const
  * @param name Name of the uniform
  * @param value 3D vector value
  */
-void Shader::SetVec3(const std::string &name, const glm::vec3 &value) const
+void Shader::SetVec3(const std::string& name, const glm::vec3& value) const
 {
     glUniform3fv(glGetUniformLocation(mProgramID, name.c_str()), 1, &value[0]);
 }
@@ -164,7 +163,7 @@ void Shader::SetVec3(const std::string &name, const glm::vec3 &value) const
  * @param name Name of the uniform
  * @param value 4D vector value
  */
-void Shader::SetVec4(const std::string &name, const glm::vec4 &value) const
+void Shader::SetVec4(const std::string& name, const glm::vec4& value) const
 {
     glUniform4fv(glGetUniformLocation(mProgramID, name.c_str()), 1, &value[0]);
 }
@@ -174,10 +173,9 @@ void Shader::SetVec4(const std::string &name, const glm::vec4 &value) const
  * @param name Name of the uniform
  * @param mat 4x4 matrix
  */
-void Shader::SetMat4(const std::string &name, const glm::mat4 &mat) const
+void Shader::SetMat4(const std::string& name, const glm::mat4& mat) const
 {
-    glUniformMatrix4fv(glGetUniformLocation(mProgramID, name.c_str()),
-                       1, GL_FALSE, &mat[0][0]);
+    glUniformMatrix4fv(glGetUniformLocation(mProgramID, name.c_str()), 1, GL_FALSE, &mat[0][0]);
 }
 
 /**
@@ -185,8 +183,7 @@ void Shader::SetMat4(const std::string &name, const glm::mat4 &mat) const
  * @param name Name of the uniform
  * @param mat 3x3 matrix
  */
-void Shader::SetMat3(const std::string &name, const glm::mat3 &mat) const
+void Shader::SetMat3(const std::string& name, const glm::mat3& mat) const
 {
-    glUniformMatrix3fv(glGetUniformLocation(mProgramID, name.c_str()),
-                       1, GL_FALSE, &mat[0][0]);
+    glUniformMatrix3fv(glGetUniformLocation(mProgramID, name.c_str()), 1, GL_FALSE, &mat[0][0]);
 }
