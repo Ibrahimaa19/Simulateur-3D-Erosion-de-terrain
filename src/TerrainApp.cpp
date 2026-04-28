@@ -52,6 +52,7 @@ bool TerrainApp::InitWindow()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, 4);
 
     mWindow = glfwCreateWindow(mScreenWidth, mScreenHeight, "Height Map", nullptr, nullptr);
     if (!mWindow)
@@ -60,6 +61,7 @@ bool TerrainApp::InitWindow()
 
     glewInit();
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_MULTISAMPLE);
 
     return true;
 }
@@ -112,7 +114,7 @@ void TerrainApp::Run()
 
     while (!glfwWindowShouldClose(mWindow))
     {
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClearColor(0.58f, 0.68f, 0.74f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         if (mGui.startGeneration)
@@ -199,6 +201,11 @@ void TerrainApp::RenderScene()
     mShader->SetMat4("gFinalMatrix", finalMatrix);
     mShader->SetFloat("gMaxHeight", mTerrain->getMaxHeight());
     mShader->SetFloat("gMinHeight", mTerrain->getMinHeight());
+    mShader->SetVec3("gCameraPos", mCamera.GetPosition());
+    mShader->SetVec3("gLightDirection", glm::normalize(glm::vec3(-0.45f, -0.85f, -0.25f)));
+    mShader->SetVec3("gFogColor", glm::vec3(0.58f, 0.68f, 0.74f));
+    mShader->SetFloat("gFogStart", 850.0f);
+    mShader->SetFloat("gFogEnd", 2400.0f);
 
     for (int i = 0; i < 4; i++)
     {
