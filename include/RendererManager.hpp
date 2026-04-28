@@ -29,6 +29,7 @@ class RendererManager
     void loadVerticesLod();
     void loadIndicesLod();
     void createPatches();
+    void connectPatchNeighbors();
 
     /**
      * @brief Corrige les différences de LOD entre patches voisins.

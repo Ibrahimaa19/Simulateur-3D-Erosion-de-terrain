@@ -172,7 +172,9 @@ class ThermalErosion
     inline int toIndex(int i, int j) const;
     inline void localIndexToCoords(int localIndex, int& i, int& j) const;
 
+    inline int patchIndexFromCoords(int patchX, int patchZ) const;
     inline int patchIndexFromCell(int i, int j) const;
+    void markPatchDirtyFromCoords(int patchX, int patchZ);
     void markPatchDirtyFromCell(int i, int j);
 
     bool erodeCell(int i, int j, const float* src, float* dst);

@@ -39,6 +39,47 @@ void RendererManager::createPatches()
             mPatches.push_back(std::move(patch));
         }
     }
+
+    connectPatchNeighbors();
+}
+
+void RendererManager::connectPatchNeighbors()
+{
+    if (!mTerrain)
+    {
+        return;
+    }
+
+    const int nbPatchX = (mTerrain->getTerrainWidth() + kTerrainPatchSize - 1) / kTerrainPatchSize;
+    const int nbPatchZ = (mTerrain->getTerrainHeight() + kTerrainPatchSize - 1) / kTerrainPatchSize;
+
+    auto patchAt = [this, nbPatchZ](int patchX, int patchZ) -> Patch*
+    { return mPatches[patchX * nbPatchZ + patchZ].get(); };
+
+    for (int patchX = 0; patchX < nbPatchX; ++patchX)
+    {
+        for (int patchZ = 0; patchZ < nbPatchZ; ++patchZ)
+        {
+            Patch* patch = patchAt(patchX, patchZ);
+
+            if (patchX > 0)
+            {
+                patch->addNeighbor(patchAt(patchX - 1, patchZ));
+            }
+            if (patchX + 1 < nbPatchX)
+            {
+                patch->addNeighbor(patchAt(patchX + 1, patchZ));
+            }
+            if (patchZ > 0)
+            {
+                patch->addNeighbor(patchAt(patchX, patchZ - 1));
+            }
+            if (patchZ + 1 < nbPatchZ)
+            {
+                patch->addNeighbor(patchAt(patchX, patchZ + 1));
+            }
+        }
+    }
 }
 
 void RendererManager::loadVerticesLod()
@@ -118,6 +159,8 @@ void RendererManager::renderLod(const glm::vec3& cameraPos, glm::mat4& projectio
             patch->setLodLevel(patch->chooseLod(cameraPos, &mFrustrum));
         }
 
+        correctLod();
+
         for (auto& patch : mPatches)
         {
             if (patch->getLodLevel() != -1)
@@ -147,19 +190,31 @@ void RendererManager::correctLod()
 
         for (auto& patch : mPatches)
         {
+            if (patch->getLodLevel() == -1)
+            {
+                continue;
+            }
+
             for (int j = 0; j < static_cast<int>(patch->getNeighbors().size()); ++j)
             {
-                if (patch->getLodLevel() > patch->getNeighborLodLevel(j) + 1)
+                Patch* neighbor = patch->getNeighbors()[j];
+
+                if (neighbor->getLodLevel() == -1)
                 {
-                    temp = patch->getNeighborLodLevel(j) + 1;
+                    continue;
+                }
+
+                if (patch->getLodLevel() > neighbor->getLodLevel() + 1)
+                {
+                    temp = neighbor->getLodLevel() + 1;
                     patch->setLodLevel(temp);
                     changed = true;
                 }
 
-                if (patch->getNeighborLodLevel(j) > patch->getLodLevel() + 1)
+                if (neighbor->getLodLevel() > patch->getLodLevel() + 1)
                 {
                     temp = patch->getLodLevel() + 1;
-                    patch->getNeighbors()[j]->setLodLevel(temp);
+                    neighbor->setLodLevel(temp);
                     changed = true;
                 }
             }

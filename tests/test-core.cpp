@@ -58,5 +58,18 @@ int main()
     assert(modifiedCells > 0);
     assert(std::fabs(before - after) < 1e-3f);
 
+    TestTerrain boundaryTerrain(65, 65, std::vector<float>(65 * 65, 0.0f));
+    boundaryTerrain.setHeight(32, 32, 100.0f);
+
+    ThermalErosion boundaryErosion;
+    boundaryErosion.loadTerrainInfo(boundaryTerrain);
+    boundaryErosion.useFourNeighbors();
+    boundaryErosion.setTalusAngle(1.0f);
+    boundaryErosion.setTransferRate(0.5f);
+    boundaryErosion.stepPureTwoPhase();
+
+    const std::vector<int>& dirtyPatches = boundaryErosion.getDirtyPatchIndices();
+    assert(std::find(dirtyPatches.begin(), dirtyPatches.end(), 0) != dirtyPatches.end());
+
     return 0;
 }

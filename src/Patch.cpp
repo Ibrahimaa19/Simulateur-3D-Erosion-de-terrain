@@ -16,12 +16,12 @@ void Patch::addNeighbor(Patch* neighbor)
     mNeighbors.push_back(neighbor);
 }
 
-std::vector<Patch*> Patch::getNeighbors()
+const std::vector<Patch*>& Patch::getNeighbors() const
 {
     return this->mNeighbors;
 }
 
-int Patch::getNeighborLodLevel(int index)
+int Patch::getNeighborLodLevel(int index) const
 {
     return mNeighbors[index]->mLodLevel;
 }
@@ -219,7 +219,7 @@ int Patch::chooseLod(glm::vec3 cameraPos, Frustrum* frustrum)
     }
 }
 
-int Patch::getLodLevel()
+int Patch::getLodLevel() const
 {
     return this->mLodLevel;
 }

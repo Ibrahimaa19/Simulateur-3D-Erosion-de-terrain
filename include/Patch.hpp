@@ -100,14 +100,14 @@ class Patch
      * @brief Retourne la liste des patches voisins
      * @return Vecteur de pointeurs vers les patches voisins
      */
-    std::vector<Patch*> getNeighbors();
+    const std::vector<Patch*>& getNeighbors() const;
 
     /**
      * @brief Retourne le niveau LOD d'un voisin
      * @param index Index du voisin
      * @return Niveau LOD du voisin
      */
-    int getNeighborLodLevel(int index);
+    int getNeighborLodLevel(int index) const;
 
     /**
      * @brief Retourne la coordonnée X du patch
@@ -183,7 +183,7 @@ class Patch
      * @brief Retourne le niveau LOD actuel
      * @return Niveau LOD courant
      */
-    int getLodLevel();
+    int getLodLevel() const;
 
     /**
      * @brief Définit le niveau LOD actuel

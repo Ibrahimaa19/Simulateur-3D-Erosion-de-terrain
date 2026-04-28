@@ -40,17 +40,53 @@ int ThermalErosion::patchIndexFromCell(int i, int j) const
 {
     const int patchX = j / kTerrainPatchSize;
     const int patchZ = i / kTerrainPatchSize;
+    return patchIndexFromCoords(patchX, patchZ);
+}
+
+int ThermalErosion::patchIndexFromCoords(int patchX, int patchZ) const
+{
     return patchX * mNbPatchZ + patchZ;
 }
 
-void ThermalErosion::markPatchDirtyFromCell(int i, int j)
+void ThermalErosion::markPatchDirtyFromCoords(int patchX, int patchZ)
 {
-    const int patchIndex = patchIndexFromCell(i, j);
+    if (patchX < 0 || patchX >= mNbPatchX || patchZ < 0 || patchZ >= mNbPatchZ)
+    {
+        return;
+    }
+
+    const int patchIndex = patchIndexFromCoords(patchX, patchZ);
 
     if (!mPatchMarked[patchIndex])
     {
         mPatchMarked[patchIndex] = true;
         mDirtyPatchIndices.push_back(patchIndex);
+    }
+}
+
+void ThermalErosion::markPatchDirtyFromCell(int i, int j)
+{
+    const int patchX = j / kTerrainPatchSize;
+    const int patchZ = i / kTerrainPatchSize;
+
+    markPatchDirtyFromCoords(patchX, patchZ);
+
+    const bool sharedLeftEdge = (j % kTerrainPatchSize == 0);
+    const bool sharedTopEdge = (i % kTerrainPatchSize == 0);
+
+    if (sharedLeftEdge)
+    {
+        markPatchDirtyFromCoords(patchX - 1, patchZ);
+    }
+
+    if (sharedTopEdge)
+    {
+        markPatchDirtyFromCoords(patchX, patchZ - 1);
+    }
+
+    if (sharedLeftEdge && sharedTopEdge)
+    {
+        markPatchDirtyFromCoords(patchX - 1, patchZ - 1);
     }
 }
 
