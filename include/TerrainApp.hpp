@@ -21,6 +21,7 @@
 #include "ThermalErosion.hpp"
 #include "Gui.hpp"
 
+
 /**
  * @class TerrainApp
  * @brief Manages window creation, input callbacks, camera, rendering loop, and terrain rendering.
@@ -55,6 +56,7 @@ public:
      * @brief Change the camera speed
      */
     void setCameraSpeed(float value);
+
 
 private:
     /**
@@ -106,7 +108,13 @@ private:
      * @brief Checks async generation completion and finalizes on main thread.
      */
     void UpdateTerrainGeneration();
+    struct ThermalFrameResult
+    {
+        int cellsModified = 0;
+        bool iterationFinished = false;
+    };
 
+    ThermalFrameResult AdvanceThermalErosionFrame();
 private:
     GLFWwindow* mWindow;              ///< Pointer to the GLFW window
 
