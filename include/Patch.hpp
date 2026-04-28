@@ -1,15 +1,13 @@
 #ifndef PATCH_H
 #define PATCH_H
 
-#include "Texture.hpp"
 #include "Frustrum.hpp"
+#include "TerrainConstants.hpp"
+#include "Texture.hpp"
 #include <GL/glew.h>
 #include <algorithm>
 #include <iostream>
 #include <vector>
-
-#define PATCH_SIZE 32 /**< Taille d'un patch en nombre de cellules */
-
 
 /**
  * @brief Représente un sommet complet du terrain.
@@ -18,7 +16,8 @@
  * - la position 3D du sommet
  * - les coordonnées de texture associées
  */
-struct Vertex{
+struct Vertex
+{
     glm::vec3 position; /**< Position du sommet dans l'espace */
     glm::vec2 texture;  /**< Coordonnées de texture (u, v) */
 
@@ -28,7 +27,7 @@ struct Vertex{
      * @param pos Position 3D
      * @param tex Coordonnées de texture
      */
-    Vertex(glm::vec3 pos, glm::vec2 tex) : position(pos), texture(tex) {};
+    Vertex(glm::vec3 pos, glm::vec2 tex) : position(pos), texture(tex){};
 };
 
 /**
@@ -47,7 +46,7 @@ struct Lod
  * @class Patch
  * @brief Représente une portion du terrain avec gestion multi-LOD
  *
- * Un patch est une subdivision du terrain de taille fixe (PATCH_SIZE x PATCH_SIZE).
+ * Un patch est une subdivision du terrain de taille fixe.
  * Il gère plusieurs niveaux de détail (LOD) pour optimiser le rendu :
  * - LOD 0 : résolution maximale (pas = 1)
  * - LOD 1 : pas = 2
@@ -61,10 +60,10 @@ struct Lod
 class Patch
 {
   private:
-    float mXzFactor;                      /** Facteur d'échelle sur les axes X et Z */
-    unsigned int mPatchSize = PATCH_SIZE; /** Taille du patch (constante) */
-    unsigned int mPatchX, mPatchZ;        /** Coordonnées du patch dans la grille */
-    unsigned int mNbPatchX, mNbPatchZ;    /** Nombre total de patches en X et Z */
+    float mXzFactor;                             /** Facteur d'échelle sur les axes X et Z */
+    unsigned int mPatchSize = kTerrainPatchSize; /** Taille du patch (constante) */
+    unsigned int mPatchX, mPatchZ;               /** Coordonnées du patch dans la grille */
+    unsigned int mNbPatchX, mNbPatchZ;           /** Nombre total de patches en X et Z */
 
     Lod mLod[5];                         /** Données pour les 5 niveaux de LOD */
     int mLodSteps[5] = {1, 2, 4, 8, 16}; /** Pas de chaque niveau de LOD */
@@ -75,7 +74,7 @@ class Patch
 
     int mLodLevel; /** Niveau de LOD actuellement sélectionné */
 
-    std::vector<Patch *> mNeighbors; /** Vecteur des patches voisins */
+    std::vector<Patch*> mNeighbors; /** Vecteur des patches voisins */
 
     Texture* mPatchTexture; /**< Texture associée au patch */
 
@@ -88,19 +87,20 @@ class Patch
      * @param nbPatchX Nombre total de patches en X
      * @param nbPatchZ Nombre total de patches en Z
      */
-    void setPatch(unsigned int x, unsigned int z, float xzFactor, unsigned int nbPatchX, unsigned int nbPatchZ,Texture* texture);
+    void setPatch(unsigned int x, unsigned int z, float xzFactor, unsigned int nbPatchX, unsigned int nbPatchZ,
+                  Texture* texture);
 
     /**
      * @brief Ajoute un patch voisin
      * @param neighbor Pointeur vers le patch voisin
      */
-    void addNeighbor(Patch *neighbor);
+    void addNeighbor(Patch* neighbor);
 
     /**
      * @brief Retourne la liste des patches voisins
      * @return Vecteur de pointeurs vers les patches voisins
      */
-    std::vector<Patch *> getNeighbors();
+    std::vector<Patch*> getNeighbors();
 
     /**
      * @brief Retourne le niveau LOD d'un voisin
@@ -146,7 +146,7 @@ class Patch
      * - Échantillonnage adapté au pas du LOD
      * - Ajout de "skirt" (jupe) sur les bords pour masquer les trous
      */
-    void generateLodVertices(std::vector<float> &heights, unsigned int width, unsigned int height);
+    void generateLodVertices(std::vector<float>& heights, unsigned int width, unsigned int height);
 
     /**
      * @brief Génère les indices pour tous les niveaux LOD
@@ -157,7 +157,7 @@ class Patch
      * Crée les indices pour former une grille de triangles
      * pour chaque niveau de LOD.
      */
-    void generateLodIndices(std::vector<float> &heights, unsigned int width, unsigned int height);
+    void generateLodIndices(std::vector<float>& heights, unsigned int width, unsigned int height);
 
     /**
      * @brief Effectue le rendu du patch avec son LOD actuel
@@ -177,7 +177,7 @@ class Patch
      * 1. Test de visibilité dans le frustum
      * 2. Distance caméra-patch
      */
-    int chooseLod(glm::vec3 cameraPos, Frustrum *frustrum);
+    int chooseLod(glm::vec3 cameraPos, Frustrum* frustrum);
 
     /**
      * @brief Retourne le niveau LOD actuel

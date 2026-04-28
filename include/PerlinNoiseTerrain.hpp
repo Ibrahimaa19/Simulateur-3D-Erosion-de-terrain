@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Terrain.hpp"
-#include "RendererManager.hpp"
 #include <vector>
 
 /**
@@ -14,7 +13,7 @@
  */
 class PerlinNoiseTerrain : public Terrain
 {
-public:
+  public:
     /**
      * @brief Default constructor.
      */
@@ -33,15 +32,11 @@ public:
      * @param persistence Amplitude damping factor for each octave.
      * @param lacunarity Frequency multiplier for each octave.
      */
-    void CreatePerlinNoise(int width, int height,
-                           float minHeight, float maxHeight,
-                           float scale = 1.0f,
-                           float frequency = 0.005f,
-                           int octaves = 4,
-                           float persistence = 0.5f,
+    void CreatePerlinNoise(int width, int height, float minHeight, float maxHeight, float scale = 1.0f,
+                           float frequency = 0.005f, int octaves = 4, float persistence = 0.5f,
                            float lacunarity = 2.0f);
 
-private:
+  private:
     float mBaseFrequency;
     int mNumOctaves;
     float mPersistenceCoef;
@@ -66,7 +61,7 @@ private:
 
     /// Internal generation function.
     void CreatePerlinNoiseInternal(float minH, float maxH);
-    
+
     /**
      * @brief Normalizes terrain heights to fit within minHeight and maxHeight.
      *

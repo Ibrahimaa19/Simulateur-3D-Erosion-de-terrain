@@ -3,23 +3,10 @@
 #include <omp.h>
 #endif
 
-const ThermalErosion::NeighborOffset ThermalErosion::kNeighbors8[8] = {
-    {-1,  0},
-    { 1,  0},
-    { 0, -1},
-    { 0,  1},
-    {-1, -1},
-    {-1,  1},
-    { 1, -1},
-    { 1,  1}
-};
+const ThermalErosion::NeighborOffset ThermalErosion::kNeighbors8[8] = {{-1, 0},  {1, 0},  {0, -1}, {0, 1},
+                                                                       {-1, -1}, {-1, 1}, {1, -1}, {1, 1}};
 
-const ThermalErosion::NeighborOffset ThermalErosion::kNeighbors4[4] = {
-    {-1,  0},
-    { 1,  0},
-    { 0, -1},
-    { 0,  1}
-};
+const ThermalErosion::NeighborOffset ThermalErosion::kNeighbors4[4] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 
 ThermalErosion::ThermalErosion()
 {
@@ -51,8 +38,8 @@ void ThermalErosion::localIndexToCoords(int localIndex, int& i, int& j) const
 
 int ThermalErosion::patchIndexFromCell(int i, int j) const
 {
-    const int patchX = j / PATCH_SIZE;
-    const int patchZ = i / PATCH_SIZE;
+    const int patchX = j / kTerrainPatchSize;
+    const int patchZ = i / kTerrainPatchSize;
     return patchX * mNbPatchZ + patchZ;
 }
 
@@ -60,16 +47,14 @@ void ThermalErosion::markPatchDirtyFromCell(int i, int j)
 {
     const int patchIndex = patchIndexFromCell(i, j);
 
-    if (!mPatchMarked[patchIndex]) {
+    if (!mPatchMarked[patchIndex])
+    {
         mPatchMarked[patchIndex] = true;
         mDirtyPatchIndices.push_back(patchIndex);
     }
 }
 
-bool ThermalErosion::buildCellStencil(int i,
-                                      int j,
-                                      const float* src,
-                                      CellStencil& stencil) const
+bool ThermalErosion::buildCellStencil(int i, int j, const float* src, CellStencil& stencil) const
 {
     stencil = CellStencil{};
 
@@ -89,7 +74,8 @@ bool ThermalErosion::buildCellStencil(int i,
         stencil.neighborI[k] = ni;
         stencil.neighborJ[k] = nj;
 
-        if (diff > talusAngle) {
+        if (diff > talusAngle)
+        {
             stencil.totalDiff += diff;
             ++stencil.validNeighbors;
             stencil.activeSlots[stencil.activeCount++] = k;
@@ -101,18 +87,14 @@ bool ThermalErosion::buildCellStencil(int i,
 
 float ThermalErosion::computeMaterialToMove(const CellStencil& stencil) const
 {
-    float materialToMove =
-        transferRate * (stencil.totalDiff / stencil.validNeighbors);
+    float materialToMove = transferRate * (stencil.totalDiff / stencil.validNeighbors);
 
-    materialToMove = std::min(materialToMove,
-                              stencil.currentHeight * transferRate);
+    materialToMove = std::min(materialToMove, stencil.currentHeight * transferRate);
 
     return materialToMove;
 }
 
-void ThermalErosion::applyTransfersToBuffer(const CellStencil& stencil,
-                                            float materialToMove,
-                                            float* dst)
+void ThermalErosion::applyTransfersToBuffer(const CellStencil& stencil, float materialToMove, float* dst)
 {
     dst[stencil.center] -= materialToMove;
 
@@ -121,40 +103,32 @@ void ThermalErosion::applyTransfersToBuffer(const CellStencil& stencil,
     for (int a = 0; a < stencil.activeCount; ++a)
     {
         const int k = stencil.activeSlots[a];
-        const float moveAmount =
-            materialToMove * (stencil.diffs[k] * invTotalDiff);
+        const float moveAmount = materialToMove * (stencil.diffs[k] * invTotalDiff);
 
         dst[stencil.neighborIndices[k]] += moveAmount;
     }
 }
 
-void ThermalErosion::markDirtyFromStencil(int i,
-                                          int j,
-                                          const CellStencil& stencil)
+void ThermalErosion::markDirtyFromStencil(int i, int j, const CellStencil& stencil)
 {
     markPatchDirtyFromCell(i, j);
 
     for (int a = 0; a < stencil.activeCount; ++a)
     {
         const int k = stencil.activeSlots[a];
-        markPatchDirtyFromCell(stencil.neighborI[k],
-                               stencil.neighborJ[k]);
+        markPatchDirtyFromCell(stencil.neighborI[k], stencil.neighborJ[k]);
     }
 }
 
-void ThermalErosion::markPatchMaskFromStencil(
-    int i,
-    int j,
-    const CellStencil& stencil,
-    std::vector<unsigned char>& patchMask) const
+void ThermalErosion::markPatchMaskFromStencil(int i, int j, const CellStencil& stencil,
+                                              std::vector<unsigned char>& patchMask) const
 {
     patchMask[patchIndexFromCell(i, j)] = 1;
 
     for (int a = 0; a < stencil.activeCount; ++a)
     {
         const int k = stencil.activeSlots[a];
-        patchMask[patchIndexFromCell(stencil.neighborI[k],
-                                     stencil.neighborJ[k])] = 1;
+        patchMask[patchIndexFromCell(stencil.neighborI[k], stencil.neighborJ[k])] = 1;
     }
 }
 
@@ -177,22 +151,22 @@ void ThermalErosion::beginChunkIteration(ChunkVariant variant)
 
     switch (variant)
     {
-        case ChunkVariant::PureTwoPhase:
-        case ChunkVariant::BlockedPureTwoPhase:
-        case ChunkVariant::BlockedParallelPureTwoPhase:
-        case ChunkVariant::CheckerboardPureTwoPhase:
-        case ChunkVariant::BlockedCheckerboardPureTwoPhase:
-            mChunkState.srcSnapshot = *m_data;
-            m_workingData = mChunkState.srcSnapshot;
-            break;
+    case ChunkVariant::PureTwoPhase:
+    case ChunkVariant::BlockedPureTwoPhase:
+    case ChunkVariant::BlockedParallelPureTwoPhase:
+    case ChunkVariant::CheckerboardPureTwoPhase:
+    case ChunkVariant::BlockedCheckerboardPureTwoPhase:
+        mChunkState.srcSnapshot = *m_data;
+        m_workingData = mChunkState.srcSnapshot;
+        break;
 
-        case ChunkVariant::CheckerboardInPlace:
-        case ChunkVariant::CheckerboardInPlaceParallel:
-            m_workingData = *m_data;
-            break;
+    case ChunkVariant::CheckerboardInPlace:
+    case ChunkVariant::CheckerboardInPlaceParallel:
+        m_workingData = *m_data;
+        break;
 
-        default:
-            break;
+    default:
+        break;
     }
 
     mIterationFinished = false;
@@ -203,7 +177,8 @@ void ThermalErosion::beginChunkIteration(ChunkVariant variant)
 
 bool ThermalErosion::advanceCheckerboardPhase()
 {
-    if (mChunkState.phase == 0) {
+    if (mChunkState.phase == 0)
+    {
         mChunkState.phase = 1;
         mChunkState.nextLinearIndex = 0;
         mChunkState.nextBlockI = 0;
@@ -218,7 +193,8 @@ int ThermalErosion::collectNextBlocks(int budgetBlocks, std::vector<BlockCoord>&
 {
     blocks.clear();
 
-    if (budgetBlocks <= 0) {
+    if (budgetBlocks <= 0)
+    {
         return 0;
     }
 
@@ -234,7 +210,8 @@ int ThermalErosion::collectNextBlocks(int budgetBlocks, std::vector<BlockCoord>&
         --budgetBlocks;
 
         bj += BLOCK_SIZE;
-        if (bj >= innerWidth) {
+        if (bj >= innerWidth)
+        {
             bj = 0;
             bi += BLOCK_SIZE;
         }
@@ -253,7 +230,8 @@ bool ThermalErosion::isBlockTraversalFinished() const
 
 void ThermalErosion::finalizeChunkIteration()
 {
-    if (m_data && !m_workingData.empty()) {
+    if (m_data && !m_workingData.empty())
+    {
         *m_data = m_workingData;
     }
 
@@ -270,7 +248,8 @@ bool ThermalErosion::erodeCell(int i, int j, const float* src, float* dst)
 {
     CellStencil stencil;
 
-    if (!buildCellStencil(i, j, src, stencil)) {
+    if (!buildCellStencil(i, j, src, stencil))
+    {
         return false;
     }
 
@@ -285,7 +264,8 @@ bool ThermalErosion::erodeCellInPlace(int i, int j, float* data)
 {
     CellStencil stencil;
 
-    if (!buildCellStencil(i, j, data, stencil)) {
+    if (!buildCellStencil(i, j, data, stencil))
+    {
         return false;
     }
 
@@ -296,14 +276,12 @@ bool ThermalErosion::erodeCellInPlace(int i, int j, float* data)
 
     return true;
 }
-bool ThermalErosion::erodeCellToDeltaSerial(int i,
-                                            int j,
-                                            const float* src,
-                                            float* delta)
+bool ThermalErosion::erodeCellToDeltaSerial(int i, int j, const float* src, float* delta)
 {
     CellStencil stencil;
 
-    if (!buildCellStencil(i, j, src, stencil)) {
+    if (!buildCellStencil(i, j, src, stencil))
+    {
         return false;
     }
 
@@ -315,10 +293,7 @@ bool ThermalErosion::erodeCellToDeltaSerial(int i,
     return true;
 }
 
-int ThermalErosion::applyErosionRange(const float* src,
-                                      float* dst,
-                                      int startIndex,
-                                      int endIndex)
+int ThermalErosion::applyErosionRange(const float* src, float* dst, int startIndex, int endIndex)
 {
     int changes = 0;
 
@@ -327,7 +302,8 @@ int ThermalErosion::applyErosionRange(const float* src,
         int i, j;
         localIndexToCoords(localIndex, i, j);
 
-        if (erodeCell(i, j, src, dst)) {
+        if (erodeCell(i, j, src, dst))
+        {
             ++changes;
         }
     }
@@ -335,10 +311,7 @@ int ThermalErosion::applyErosionRange(const float* src,
     return changes;
 }
 
-int ThermalErosion::applyBlockedErosionRange(const float* src,
-                                             float* dst,
-                                             int startIndex,
-                                             int endIndex)
+int ThermalErosion::applyBlockedErosionRange(const float* src, float* dst, int startIndex, int endIndex)
 {
     const int W = m_width;
     const int H = m_height;
@@ -364,14 +337,16 @@ int ThermalErosion::applyBlockedErosionRange(const float* src,
                     const int innerJ = blockJ + dj;
                     const int localIndex = innerI * innerWidth + innerJ;
 
-                    if (localIndex < startIndex || localIndex >= endIndex) {
+                    if (localIndex < startIndex || localIndex >= endIndex)
+                    {
                         continue;
                     }
 
                     const int i = innerI + 1;
                     const int j = innerJ + 1;
 
-                    if (erodeCell(i, j, src, dst)) {
+                    if (erodeCell(i, j, src, dst))
+                    {
                         ++changes;
                     }
                 }
@@ -381,8 +356,7 @@ int ThermalErosion::applyBlockedErosionRange(const float* src,
 
     return changes;
 }
-int ThermalErosion::applyBlockedParallelErosionToDelta(const float* src,
-                                                       float* delta)
+int ThermalErosion::applyBlockedParallelErosionToDelta(const float* src, float* delta)
 {
     const int W = m_width;
     const int H = m_height;
@@ -391,13 +365,13 @@ int ThermalErosion::applyBlockedParallelErosionToDelta(const float* src,
 
     int changes = 0;
 
-    #pragma omp parallel for collapse(2) schedule(static) reduction(+:changes)
+#pragma omp parallel for collapse(2) schedule(static) reduction(+ : changes)
     for (int blockI = 0; blockI < innerHeight; blockI += BLOCK_SIZE)
     {
         for (int blockJ = 0; blockJ < innerWidth; blockJ += BLOCK_SIZE)
         {
             const int blockHeight = std::min(BLOCK_SIZE, innerHeight - blockI);
-            const int blockWidth  = std::min(BLOCK_SIZE, innerWidth - blockJ);
+            const int blockWidth = std::min(BLOCK_SIZE, innerWidth - blockJ);
 
             for (int di = 0; di < blockHeight; ++di)
             {
@@ -433,40 +407,44 @@ int ThermalErosion::applyBlockedParallelErosionToDelta(const float* src,
                         neighborI[k] = ni;
                         neighborJ[k] = nj;
 
-                        if (diff > talusAngle) {
+                        if (diff > talusAngle)
+                        {
                             totalDiff += diff;
                             ++validNeighbors;
                         }
                     }
 
-                    if (totalDiff <= 0.0f || validNeighbors <= 0) {
+                    if (totalDiff <= 0.0f || validNeighbors <= 0)
+                    {
                         continue;
                     }
 
                     float materialToMove = transferRate * (totalDiff / validNeighbors);
                     materialToMove = std::min(materialToMove, currentHeight * transferRate);
 
-                    #pragma omp atomic update
+#pragma omp atomic update
                     delta[center] -= materialToMove;
 
                     const float invTotalDiff = 1.0f / totalDiff;
 
                     for (int k = 0; k < mNeighborCount; ++k)
                     {
-                        if (diffs[k] > talusAngle) {
+                        if (diffs[k] > talusAngle)
+                        {
                             const float moveAmount = materialToMove * (diffs[k] * invTotalDiff);
 
-                            #pragma omp atomic update
+#pragma omp atomic update
                             delta[neighborIndices[k]] += moveAmount;
                         }
                     }
 
-                    #pragma omp critical
+#pragma omp critical
                     {
                         markPatchDirtyFromCell(i, j);
                         for (int k = 0; k < mNeighborCount; ++k)
                         {
-                            if (diffs[k] > talusAngle) {
+                            if (diffs[k] > talusAngle)
+                            {
                                 markPatchDirtyFromCell(neighborI[k], neighborJ[k]);
                             }
                         }
@@ -480,9 +458,7 @@ int ThermalErosion::applyBlockedParallelErosionToDelta(const float* src,
 
     return changes;
 }
-int ThermalErosion::applyCheckerboardErosionRange(const float* src,
-                                                  float* dst,
-                                                  int color)
+int ThermalErosion::applyCheckerboardErosionRange(const float* src, float* dst, int color)
 {
     int changes = 0;
 
@@ -490,11 +466,13 @@ int ThermalErosion::applyCheckerboardErosionRange(const float* src,
     {
         for (int j = 1; j < m_width - 1; ++j)
         {
-            if (((i + j) & 1) != color) {
+            if (((i + j) & 1) != color)
+            {
                 continue;
             }
 
-            if (erodeCell(i, j, src, dst)) {
+            if (erodeCell(i, j, src, dst))
+            {
                 ++changes;
             }
         }
@@ -502,9 +480,7 @@ int ThermalErosion::applyCheckerboardErosionRange(const float* src,
 
     return changes;
 }
-int ThermalErosion::applyBlockedCheckerboardErosionRange(const float* src,
-                                                         float* dst,
-                                                         int color)
+int ThermalErosion::applyBlockedCheckerboardErosionRange(const float* src, float* dst, int color)
 {
     const int W = m_width;
     const int H = m_height;
@@ -531,11 +507,13 @@ int ThermalErosion::applyBlockedCheckerboardErosionRange(const float* src,
                     const int innerJ = blockJ + dj;
                     const int j = innerJ + 1;
 
-                    if (((i + j) & 1) != color) {
+                    if (((i + j) & 1) != color)
+                    {
                         continue;
                     }
 
-                    if (erodeCell(i, j, src, dst)) {
+                    if (erodeCell(i, j, src, dst))
+                    {
                         ++changes;
                     }
                 }
@@ -547,16 +525,19 @@ int ThermalErosion::applyBlockedCheckerboardErosionRange(const float* src,
 }
 int ThermalErosion::stepCheckerboardPureTwoPhase()
 {
-    if (!m_data) {
+    if (!m_data)
+    {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
         return 0;
     }
 
-    if (m_width < 3 || m_height < 3) {
+    if (m_width < 3 || m_height < 3)
+    {
         return 0;
     }
 
-    if (mNeighborCount != 4) {
+    if (mNeighborCount != 4)
+    {
         std::cerr << "Warning: checkerboard scheduling is intended for four-neighbor mode.\n";
     }
 
@@ -580,16 +561,19 @@ int ThermalErosion::stepCheckerboardPureTwoPhase()
 }
 int ThermalErosion::stepBlockedCheckerboardPureTwoPhase()
 {
-    if (!m_data) {
+    if (!m_data)
+    {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
         return 0;
     }
 
-    if (m_width < 3 || m_height < 3) {
+    if (m_width < 3 || m_height < 3)
+    {
         return 0;
     }
 
-    if (mNeighborCount != 4) {
+    if (mNeighborCount != 4)
+    {
         std::cerr << "Warning: checkerboard scheduling is intended for four-neighbor mode.\n";
     }
 
@@ -612,8 +596,7 @@ int ThermalErosion::stepBlockedCheckerboardPureTwoPhase()
     return changes;
 }
 int ThermalErosion::applyBlockedParallelErosionToThreadLocalBuffers(
-    const float* src,
-    std::vector<std::vector<float>>& threadDeltas,
+    const float* src, std::vector<std::vector<float>>& threadDeltas,
     std::vector<std::vector<unsigned char>>& threadPatchMarked)
 {
     const int W = m_width;
@@ -623,7 +606,7 @@ int ThermalErosion::applyBlockedParallelErosionToThreadLocalBuffers(
 
     int changes = 0;
 
-    #pragma omp parallel for collapse(2) schedule(static) reduction(+:changes)
+#pragma omp parallel for collapse(2) schedule(static) reduction(+ : changes)
     for (int blockI = 0; blockI < innerHeight; blockI += BLOCK_SIZE)
     {
         for (int blockJ = 0; blockJ < innerWidth; blockJ += BLOCK_SIZE)
@@ -638,7 +621,7 @@ int ThermalErosion::applyBlockedParallelErosionToThreadLocalBuffers(
             std::vector<unsigned char>& localPatchMask = threadPatchMarked[tid];
 
             const int blockHeight = std::min(BLOCK_SIZE, innerHeight - blockI);
-            const int blockWidth  = std::min(BLOCK_SIZE, innerWidth - blockJ);
+            const int blockWidth = std::min(BLOCK_SIZE, innerWidth - blockJ);
 
             for (int di = 0; di < blockHeight; ++di)
             {
@@ -652,15 +635,14 @@ int ThermalErosion::applyBlockedParallelErosionToThreadLocalBuffers(
 
                     CellStencil stencil;
 
-                    if (!buildCellStencil(i, j, src, stencil)) {
+                    if (!buildCellStencil(i, j, src, stencil))
+                    {
                         continue;
                     }
 
                     const float materialToMove = computeMaterialToMove(stencil);
 
-                    applyTransfersToBuffer(stencil,
-                                           materialToMove,
-                                           localDelta.data());
+                    applyTransfersToBuffer(stencil, materialToMove, localDelta.data());
 
                     markPatchMaskFromStencil(i, j, stencil, localPatchMask);
 
@@ -680,11 +662,13 @@ int ThermalErosion::applyCheckerboardInPlaceColor(float* data, int color)
     {
         for (int j = 1; j < m_width - 1; ++j)
         {
-            if (((i + j) & 1) != color) {
+            if (((i + j) & 1) != color)
+            {
                 continue;
             }
 
-            if (erodeCellInPlace(i, j, data)) {
+            if (erodeCellInPlace(i, j, data))
+            {
                 ++changes;
             }
         }
@@ -694,16 +678,19 @@ int ThermalErosion::applyCheckerboardInPlaceColor(float* data, int color)
 }
 int ThermalErosion::stepCheckerboardInPlace()
 {
-    if (!m_data) {
+    if (!m_data)
+    {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
         return 0;
     }
 
-    if (m_width < 3 || m_height < 3) {
+    if (m_width < 3 || m_height < 3)
+    {
         return 0;
     }
 
-    if (mNeighborCount != 4) {
+    if (mNeighborCount != 4)
+    {
         std::cerr << "Warning: in-place checkerboard is intended for four-neighbor mode.\n";
     }
 
@@ -758,20 +745,21 @@ int ThermalErosion::step()
 
 int ThermalErosion::stepChunk(int maxCells)
 {
-    const int approxBudgetBlocks =
-        std::max(1, (maxCells + BLOCK_SIZE * BLOCK_SIZE - 1) / (BLOCK_SIZE * BLOCK_SIZE));
+    const int approxBudgetBlocks = std::max(1, (maxCells + BLOCK_SIZE * BLOCK_SIZE - 1) / (BLOCK_SIZE * BLOCK_SIZE));
 
     return stepBlockedPureTwoPhaseChunk(approxBudgetBlocks);
 }
 
 int ThermalErosion::stepPureTwoPhase()
 {
-    if (!m_data) {
+    if (!m_data)
+    {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
         return 0;
     }
 
-    if (m_width < 3 || m_height < 3) {
+    if (m_width < 3 || m_height < 3)
+    {
         return 0;
     }
 
@@ -782,10 +770,7 @@ int ThermalErosion::stepPureTwoPhase()
     std::vector<float> srcSnapshot = *m_data;
     std::vector<float> dst = srcSnapshot;
 
-    const int changes = applyErosionRange(srcSnapshot.data(),
-                                          dst.data(),
-                                          0,
-                                          totalInnerCells);
+    const int changes = applyErosionRange(srcSnapshot.data(), dst.data(), 0, totalInnerCells);
 
     *m_data = std::move(dst);
 
@@ -799,12 +784,14 @@ int ThermalErosion::stepPureTwoPhase()
 
 int ThermalErosion::stepBlockedPureTwoPhase()
 {
-    if (!m_data) {
+    if (!m_data)
+    {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
         return 0;
     }
 
-    if (m_width < 3 || m_height < 3) {
+    if (m_width < 3 || m_height < 3)
+    {
         return 0;
     }
 
@@ -815,10 +802,7 @@ int ThermalErosion::stepBlockedPureTwoPhase()
     std::vector<float> srcSnapshot = *m_data;
     std::vector<float> dst = srcSnapshot;
 
-    const int changes = applyBlockedErosionRange(srcSnapshot.data(),
-                                                 dst.data(),
-                                                 0,
-                                                 totalInnerCells);
+    const int changes = applyBlockedErosionRange(srcSnapshot.data(), dst.data(), 0, totalInnerCells);
 
     *m_data = std::move(dst);
 
@@ -831,12 +815,14 @@ int ThermalErosion::stepBlockedPureTwoPhase()
 }
 int ThermalErosion::stepBlockedParallelPureTwoPhase()
 {
-    if (!m_data) {
+    if (!m_data)
+    {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
         return 0;
     }
 
-    if (m_width < 3 || m_height < 3) {
+    if (m_width < 3 || m_height < 3)
+    {
         return 0;
     }
 
@@ -851,27 +837,20 @@ int ThermalErosion::stepBlockedParallelPureTwoPhase()
     const int numThreads = 1;
 #endif
 
-    std::vector<std::vector<float>> threadDeltas(
-        numThreads,
-        std::vector<float>(srcSnapshot.size(), 0.0f)
-    );
+    std::vector<std::vector<float>> threadDeltas(numThreads, std::vector<float>(srcSnapshot.size(), 0.0f));
 
-    std::vector<std::vector<unsigned char>> threadPatchMarked(
-        numThreads,
-        std::vector<unsigned char>(mNbPatchX * mNbPatchZ, 0)
-    );
+    std::vector<std::vector<unsigned char>> threadPatchMarked(numThreads,
+                                                              std::vector<unsigned char>(mNbPatchX * mNbPatchZ, 0));
 
-    const int changes = applyBlockedParallelErosionToThreadLocalBuffers(
-        srcSnapshot.data(),
-        threadDeltas,
-        threadPatchMarked
-    );
+    const int changes =
+        applyBlockedParallelErosionToThreadLocalBuffers(srcSnapshot.data(), threadDeltas, threadPatchMarked);
 
-    #pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static)
     for (std::ptrdiff_t idx = 0; idx < static_cast<std::ptrdiff_t>(dst.size()); ++idx)
     {
         float sum = 0.0f;
-        for (int t = 0; t < numThreads; ++t) {
+        for (int t = 0; t < numThreads; ++t)
+        {
             sum += threadDeltas[t][idx];
         }
         dst[idx] += sum;
@@ -882,13 +861,15 @@ int ThermalErosion::stepBlockedParallelPureTwoPhase()
         bool dirty = false;
         for (int t = 0; t < numThreads; ++t)
         {
-            if (threadPatchMarked[t][patchIdx]) {
+            if (threadPatchMarked[t][patchIdx])
+            {
                 dirty = true;
                 break;
             }
         }
 
-        if (dirty) {
+        if (dirty)
+        {
             mPatchMarked[patchIdx] = true;
             mDirtyPatchIndices.push_back(patchIdx);
         }
@@ -906,7 +887,8 @@ int ThermalErosion::stepBlockedParallelPureTwoPhase()
 
 int ThermalErosion::applyCheckerboardInPlaceColorParallelBuffered(float* data, int color)
 {
-    if (mNeighborCount != 4) {
+    if (mNeighborCount != 4)
+    {
         std::cerr << "Warning: checkerboard in-place parallel is intended for four-neighbor mode.\n";
     }
 
@@ -916,23 +898,16 @@ int ThermalErosion::applyCheckerboardInPlaceColorParallelBuffered(float* data, i
     const int numThreads = 1;
 #endif
 
-    const std::size_t dataSize =
-        static_cast<std::size_t>(m_width) * static_cast<std::size_t>(m_height);
+    const std::size_t dataSize = static_cast<std::size_t>(m_width) * static_cast<std::size_t>(m_height);
     const int numPatches = mNbPatchX * mNbPatchZ;
 
-    std::vector<std::vector<float>> threadDeltas(
-        numThreads,
-        std::vector<float>(dataSize, 0.0f)
-    );
+    std::vector<std::vector<float>> threadDeltas(numThreads, std::vector<float>(dataSize, 0.0f));
 
-    std::vector<std::vector<unsigned char>> threadPatchMasks(
-        numThreads,
-        std::vector<unsigned char>(numPatches, 0)
-    );
+    std::vector<std::vector<unsigned char>> threadPatchMasks(numThreads, std::vector<unsigned char>(numPatches, 0));
 
     int changes = 0;
 
-    #pragma omp parallel for reduction(+:changes) schedule(static)
+#pragma omp parallel for reduction(+ : changes) schedule(static)
     for (int i = 1; i < m_height - 1; ++i)
     {
 #ifdef _OPENMP
@@ -946,21 +921,21 @@ int ThermalErosion::applyCheckerboardInPlaceColorParallelBuffered(float* data, i
 
         for (int j = 1; j < m_width - 1; ++j)
         {
-            if (((i + j) & 1) != color) {
+            if (((i + j) & 1) != color)
+            {
                 continue;
             }
 
             CellStencil stencil;
 
-            if (!buildCellStencil(i, j, data, stencil)) {
+            if (!buildCellStencil(i, j, data, stencil))
+            {
                 continue;
             }
 
             const float materialToMove = computeMaterialToMove(stencil);
 
-            applyTransfersToBuffer(stencil,
-                                   materialToMove,
-                                   localDelta.data());
+            applyTransfersToBuffer(stencil, materialToMove, localDelta.data());
 
             markPatchMaskFromStencil(i, j, stencil, localPatchMask);
 
@@ -968,11 +943,12 @@ int ThermalErosion::applyCheckerboardInPlaceColorParallelBuffered(float* data, i
         }
     }
 
-    #pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static)
     for (std::ptrdiff_t idx = 0; idx < static_cast<std::ptrdiff_t>(dataSize); ++idx)
     {
         float sum = 0.0f;
-        for (int t = 0; t < numThreads; ++t) {
+        for (int t = 0; t < numThreads; ++t)
+        {
             sum += threadDeltas[t][idx];
         }
         data[idx] += sum;
@@ -983,13 +959,15 @@ int ThermalErosion::applyCheckerboardInPlaceColorParallelBuffered(float* data, i
         bool dirty = false;
         for (int t = 0; t < numThreads; ++t)
         {
-            if (threadPatchMasks[t][patchIdx]) {
+            if (threadPatchMasks[t][patchIdx])
+            {
                 dirty = true;
                 break;
             }
         }
 
-        if (dirty && !mPatchMarked[patchIdx]) {
+        if (dirty && !mPatchMarked[patchIdx])
+        {
             mPatchMarked[patchIdx] = true;
             mDirtyPatchIndices.push_back(patchIdx);
         }
@@ -999,16 +977,19 @@ int ThermalErosion::applyCheckerboardInPlaceColorParallelBuffered(float* data, i
 }
 int ThermalErosion::stepCheckerboardInPlaceParallel()
 {
-    if (!m_data) {
+    if (!m_data)
+    {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
         return 0;
     }
 
-    if (m_width < 3 || m_height < 3) {
+    if (m_width < 3 || m_height < 3)
+    {
         return 0;
     }
 
-    if (mNeighborCount != 4) {
+    if (mNeighborCount != 4)
+    {
         std::cerr << "Warning: parallel in-place checkerboard is intended for four-neighbor mode.\n";
     }
 
@@ -1028,10 +1009,7 @@ int ThermalErosion::stepCheckerboardInPlaceParallel()
     return changes;
 }
 
-int ThermalErosion::applyCheckerboardErosionLinearRange(const float* src,
-                                                        float* dst,
-                                                        int color,
-                                                        int startIndex,
+int ThermalErosion::applyCheckerboardErosionLinearRange(const float* src, float* dst, int color, int startIndex,
                                                         int endIndex)
 {
     int changes = 0;
@@ -1041,11 +1019,13 @@ int ThermalErosion::applyCheckerboardErosionLinearRange(const float* src,
         int i, j;
         localIndexToCoords(localIndex, i, j);
 
-        if (((i + j) & 1) != color) {
+        if (((i + j) & 1) != color)
+        {
             continue;
         }
 
-        if (erodeCell(i, j, src, dst)) {
+        if (erodeCell(i, j, src, dst))
+        {
             ++changes;
         }
     }
@@ -1053,10 +1033,7 @@ int ThermalErosion::applyCheckerboardErosionLinearRange(const float* src,
     return changes;
 }
 
-int ThermalErosion::applyCheckerboardInPlaceLinearRange(float* data,
-                                                        int color,
-                                                        int startIndex,
-                                                        int endIndex)
+int ThermalErosion::applyCheckerboardInPlaceLinearRange(float* data, int color, int startIndex, int endIndex)
 {
     int changes = 0;
 
@@ -1065,20 +1042,20 @@ int ThermalErosion::applyCheckerboardInPlaceLinearRange(float* data,
         int i, j;
         localIndexToCoords(localIndex, i, j);
 
-        if (((i + j) & 1) != color) {
+        if (((i + j) & 1) != color)
+        {
             continue;
         }
 
-        if (erodeCellInPlace(i, j, data)) {
+        if (erodeCellInPlace(i, j, data))
+        {
             ++changes;
         }
     }
 
     return changes;
 }
-int ThermalErosion::applyBlockedPureOnBlocks(const float* src,
-                                             float* dst,
-                                             const std::vector<BlockCoord>& blocks,
+int ThermalErosion::applyBlockedPureOnBlocks(const float* src, float* dst, const std::vector<BlockCoord>& blocks,
                                              int& processedCells)
 {
     const int innerWidth = m_width - 2;
@@ -1090,7 +1067,7 @@ int ThermalErosion::applyBlockedPureOnBlocks(const float* src,
     for (const BlockCoord& block : blocks)
     {
         const int blockHeight = std::min(BLOCK_SIZE, innerHeight - block.blockI);
-        const int blockWidth  = std::min(BLOCK_SIZE, innerWidth - block.blockJ);
+        const int blockWidth = std::min(BLOCK_SIZE, innerWidth - block.blockJ);
 
         processedCells += blockHeight * blockWidth;
 
@@ -1102,7 +1079,8 @@ int ThermalErosion::applyBlockedPureOnBlocks(const float* src,
             {
                 const int j = block.blockJ + dj + 1;
 
-                if (erodeCell(i, j, src, dst)) {
+                if (erodeCell(i, j, src, dst))
+                {
                     ++changes;
                 }
             }
@@ -1112,11 +1090,8 @@ int ThermalErosion::applyBlockedPureOnBlocks(const float* src,
     return changes;
 }
 
-int ThermalErosion::applyBlockedCheckerboardPureOnBlocks(const float* src,
-                                                         float* dst,
-                                                         int color,
-                                                         const std::vector<BlockCoord>& blocks,
-                                                         int& processedCells)
+int ThermalErosion::applyBlockedCheckerboardPureOnBlocks(const float* src, float* dst, int color,
+                                                         const std::vector<BlockCoord>& blocks, int& processedCells)
 {
     const int innerWidth = m_width - 2;
     const int innerHeight = m_height - 2;
@@ -1127,7 +1102,7 @@ int ThermalErosion::applyBlockedCheckerboardPureOnBlocks(const float* src,
     for (const BlockCoord& block : blocks)
     {
         const int blockHeight = std::min(BLOCK_SIZE, innerHeight - block.blockI);
-        const int blockWidth  = std::min(BLOCK_SIZE, innerWidth - block.blockJ);
+        const int blockWidth = std::min(BLOCK_SIZE, innerWidth - block.blockJ);
 
         processedCells += blockHeight * blockWidth;
 
@@ -1139,11 +1114,13 @@ int ThermalErosion::applyBlockedCheckerboardPureOnBlocks(const float* src,
             {
                 const int j = block.blockJ + dj + 1;
 
-                if (((i + j) & 1) != color) {
+                if (((i + j) & 1) != color)
+                {
                     continue;
                 }
 
-                if (erodeCell(i, j, src, dst)) {
+                if (erodeCell(i, j, src, dst))
+                {
                     ++changes;
                 }
             }
@@ -1154,11 +1131,8 @@ int ThermalErosion::applyBlockedCheckerboardPureOnBlocks(const float* src,
 }
 
 int ThermalErosion::applyBlockedParallelOnBlocksToThreadLocalBuffers(
-    const float* src,
-    const std::vector<BlockCoord>& blocks,
-    std::vector<std::vector<float>>& threadDeltas,
-    std::vector<std::vector<unsigned char>>& threadPatchMarked,
-    int& processedCells)
+    const float* src, const std::vector<BlockCoord>& blocks, std::vector<std::vector<float>>& threadDeltas,
+    std::vector<std::vector<unsigned char>>& threadPatchMarked, int& processedCells)
 {
     const int innerWidth = m_width - 2;
     const int innerHeight = m_height - 2;
@@ -1166,7 +1140,7 @@ int ThermalErosion::applyBlockedParallelOnBlocksToThreadLocalBuffers(
     int changes = 0;
     processedCells = 0;
 
-    #pragma omp parallel for schedule(static) reduction(+:changes, processedCells)
+#pragma omp parallel for schedule(static) reduction(+ : changes, processedCells)
     for (std::ptrdiff_t b = 0; b < static_cast<std::ptrdiff_t>(blocks.size()); ++b)
     {
 #ifdef _OPENMP
@@ -1181,7 +1155,7 @@ int ThermalErosion::applyBlockedParallelOnBlocksToThreadLocalBuffers(
         const BlockCoord& block = blocks[b];
 
         const int blockHeight = std::min(BLOCK_SIZE, innerHeight - block.blockI);
-        const int blockWidth  = std::min(BLOCK_SIZE, innerWidth - block.blockJ);
+        const int blockWidth = std::min(BLOCK_SIZE, innerWidth - block.blockJ);
 
         processedCells += blockHeight * blockWidth;
 
@@ -1195,15 +1169,14 @@ int ThermalErosion::applyBlockedParallelOnBlocksToThreadLocalBuffers(
 
                 CellStencil stencil;
 
-                if (!buildCellStencil(i, j, src, stencil)) {
+                if (!buildCellStencil(i, j, src, stencil))
+                {
                     continue;
                 }
 
                 const float materialToMove = computeMaterialToMove(stencil);
 
-                applyTransfersToBuffer(stencil,
-                                       materialToMove,
-                                       localDelta.data());
+                applyTransfersToBuffer(stencil, materialToMove, localDelta.data());
 
                 markPatchMaskFromStencil(i, j, stencil, localPatchMask);
 
@@ -1215,13 +1188,12 @@ int ThermalErosion::applyBlockedParallelOnBlocksToThreadLocalBuffers(
     return changes;
 }
 
-int ThermalErosion::applyCheckerboardInPlaceParallelOnBlocksBuffered(
-    float* data,
-    int color,
-    const std::vector<BlockCoord>& blocks,
-    int& processedCells)
+int ThermalErosion::applyCheckerboardInPlaceParallelOnBlocksBuffered(float* data, int color,
+                                                                     const std::vector<BlockCoord>& blocks,
+                                                                     int& processedCells)
 {
-    if (mNeighborCount != 4) {
+    if (mNeighborCount != 4)
+    {
         std::cerr << "Warning: checkerboard in-place parallel is intended for four-neighbor mode.\n";
     }
 
@@ -1231,19 +1203,12 @@ int ThermalErosion::applyCheckerboardInPlaceParallelOnBlocksBuffered(
     const int numThreads = 1;
 #endif
 
-    const std::size_t dataSize =
-        static_cast<std::size_t>(m_width) * static_cast<std::size_t>(m_height);
+    const std::size_t dataSize = static_cast<std::size_t>(m_width) * static_cast<std::size_t>(m_height);
     const int numPatches = mNbPatchX * mNbPatchZ;
 
-    std::vector<std::vector<float>> threadDeltas(
-        numThreads,
-        std::vector<float>(dataSize, 0.0f)
-    );
+    std::vector<std::vector<float>> threadDeltas(numThreads, std::vector<float>(dataSize, 0.0f));
 
-    std::vector<std::vector<unsigned char>> threadPatchMasks(
-        numThreads,
-        std::vector<unsigned char>(numPatches, 0)
-    );
+    std::vector<std::vector<unsigned char>> threadPatchMasks(numThreads, std::vector<unsigned char>(numPatches, 0));
 
     const int innerWidth = m_width - 2;
     const int innerHeight = m_height - 2;
@@ -1251,7 +1216,7 @@ int ThermalErosion::applyCheckerboardInPlaceParallelOnBlocksBuffered(
     int changes = 0;
     processedCells = 0;
 
-    #pragma omp parallel for schedule(static) reduction(+:changes, processedCells)
+#pragma omp parallel for schedule(static) reduction(+ : changes, processedCells)
     for (std::ptrdiff_t b = 0; b < static_cast<std::ptrdiff_t>(blocks.size()); ++b)
     {
 #ifdef _OPENMP
@@ -1266,7 +1231,7 @@ int ThermalErosion::applyCheckerboardInPlaceParallelOnBlocksBuffered(
         const BlockCoord& block = blocks[b];
 
         const int blockHeight = std::min(BLOCK_SIZE, innerHeight - block.blockI);
-        const int blockWidth  = std::min(BLOCK_SIZE, innerWidth - block.blockJ);
+        const int blockWidth = std::min(BLOCK_SIZE, innerWidth - block.blockJ);
 
         processedCells += blockHeight * blockWidth;
 
@@ -1278,21 +1243,21 @@ int ThermalErosion::applyCheckerboardInPlaceParallelOnBlocksBuffered(
             {
                 const int j = block.blockJ + dj + 1;
 
-                if (((i + j) & 1) != color) {
+                if (((i + j) & 1) != color)
+                {
                     continue;
                 }
 
                 CellStencil stencil;
 
-                if (!buildCellStencil(i, j, data, stencil)) {
+                if (!buildCellStencil(i, j, data, stencil))
+                {
                     continue;
                 }
 
                 const float materialToMove = computeMaterialToMove(stencil);
 
-                applyTransfersToBuffer(stencil,
-                                       materialToMove,
-                                       localDelta.data());
+                applyTransfersToBuffer(stencil, materialToMove, localDelta.data());
 
                 markPatchMaskFromStencil(i, j, stencil, localPatchMask);
 
@@ -1301,11 +1266,12 @@ int ThermalErosion::applyCheckerboardInPlaceParallelOnBlocksBuffered(
         }
     }
 
-    #pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static)
     for (std::ptrdiff_t idx = 0; idx < static_cast<std::ptrdiff_t>(dataSize); ++idx)
     {
         float sum = 0.0f;
-        for (int t = 0; t < numThreads; ++t) {
+        for (int t = 0; t < numThreads; ++t)
+        {
             sum += threadDeltas[t][idx];
         }
         data[idx] += sum;
@@ -1316,13 +1282,15 @@ int ThermalErosion::applyCheckerboardInPlaceParallelOnBlocksBuffered(
         bool dirty = false;
         for (int t = 0; t < numThreads; ++t)
         {
-            if (threadPatchMasks[t][patchIdx]) {
+            if (threadPatchMasks[t][patchIdx])
+            {
                 dirty = true;
                 break;
             }
         }
 
-        if (dirty && !mPatchMarked[patchIdx]) {
+        if (dirty && !mPatchMarked[patchIdx])
+        {
             mPatchMarked[patchIdx] = true;
             mDirtyPatchIndices.push_back(patchIdx);
         }
@@ -1332,16 +1300,19 @@ int ThermalErosion::applyCheckerboardInPlaceParallelOnBlocksBuffered(
 }
 int ThermalErosion::stepPureTwoPhaseChunk(int budgetCells)
 {
-    if (!m_data) {
+    if (!m_data)
+    {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
         return 0;
     }
 
-    if (m_width < 3 || m_height < 3 || budgetCells <= 0) {
+    if (m_width < 3 || m_height < 3 || budgetCells <= 0)
+    {
         return 0;
     }
 
-    if (!mChunkState.active || mChunkState.variant != ChunkVariant::PureTwoPhase) {
+    if (!mChunkState.active || mChunkState.variant != ChunkVariant::PureTwoPhase)
+    {
         beginChunkIteration(ChunkVariant::PureTwoPhase);
     }
 
@@ -1350,22 +1321,19 @@ int ThermalErosion::stepPureTwoPhaseChunk(int budgetCells)
     const int startIndex = mChunkState.nextLinearIndex;
     const int endIndex = std::min(startIndex + budgetCells, totalInnerCells);
 
-    const int changes = applyErosionRange(
-        mChunkState.srcSnapshot.data(),
-        m_workingData.data(),
-        startIndex,
-        endIndex
-    );
+    const int changes = applyErosionRange(mChunkState.srcSnapshot.data(), m_workingData.data(), startIndex, endIndex);
 
     mChunkState.nextLinearIndex = endIndex;
     mCurrentIndex = endIndex;
 
     mCellsProcessedSinceLastCommit += (endIndex - startIndex);
-    if (mCellsProcessedSinceLastCommit >= mCommitThreshold) {
+    if (mCellsProcessedSinceLastCommit >= mCommitThreshold)
+    {
         mNeedsVisualUpdate = true;
     }
 
-    if (mChunkState.nextLinearIndex >= totalInnerCells) {
+    if (mChunkState.nextLinearIndex >= totalInnerCells)
+    {
         finalizeChunkIteration();
     }
 
@@ -1374,38 +1342,40 @@ int ThermalErosion::stepPureTwoPhaseChunk(int budgetCells)
 
 int ThermalErosion::stepBlockedPureTwoPhaseChunk(int budgetBlocks)
 {
-    if (!m_data) {
+    if (!m_data)
+    {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
         return 0;
     }
 
-    if (m_width < 3 || m_height < 3 || budgetBlocks <= 0) {
+    if (m_width < 3 || m_height < 3 || budgetBlocks <= 0)
+    {
         return 0;
     }
 
-    if (!mChunkState.active || mChunkState.variant != ChunkVariant::BlockedPureTwoPhase) {
+    if (!mChunkState.active || mChunkState.variant != ChunkVariant::BlockedPureTwoPhase)
+    {
         beginChunkIteration(ChunkVariant::BlockedPureTwoPhase);
     }
 
     std::vector<BlockCoord> blocks;
-    if (collectNextBlocks(budgetBlocks, blocks) == 0) {
+    if (collectNextBlocks(budgetBlocks, blocks) == 0)
+    {
         return 0;
     }
 
     int processedCells = 0;
-    const int changes = applyBlockedPureOnBlocks(
-        mChunkState.srcSnapshot.data(),
-        m_workingData.data(),
-        blocks,
-        processedCells
-    );
+    const int changes =
+        applyBlockedPureOnBlocks(mChunkState.srcSnapshot.data(), m_workingData.data(), blocks, processedCells);
 
     mCellsProcessedSinceLastCommit += processedCells;
-    if (mCellsProcessedSinceLastCommit >= mCommitThreshold) {
+    if (mCellsProcessedSinceLastCommit >= mCommitThreshold)
+    {
         mNeedsVisualUpdate = true;
     }
 
-    if (isBlockTraversalFinished()) {
+    if (isBlockTraversalFinished())
+    {
         finalizeChunkIteration();
     }
 
@@ -1414,16 +1384,19 @@ int ThermalErosion::stepBlockedPureTwoPhaseChunk(int budgetBlocks)
 
 int ThermalErosion::stepBlockedParallelPureTwoPhaseChunk(int budgetBlocks)
 {
-    if (!m_data) {
+    if (!m_data)
+    {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
         return 0;
     }
 
-    if (m_width < 3 || m_height < 3 || budgetBlocks <= 0) {
+    if (m_width < 3 || m_height < 3 || budgetBlocks <= 0)
+    {
         return 0;
     }
 
-    if (!mChunkState.active || mChunkState.variant != ChunkVariant::BlockedParallelPureTwoPhase) {
+    if (!mChunkState.active || mChunkState.variant != ChunkVariant::BlockedParallelPureTwoPhase)
+    {
         beginChunkIteration(ChunkVariant::BlockedParallelPureTwoPhase);
     }
 
@@ -1434,36 +1407,26 @@ int ThermalErosion::stepBlockedParallelPureTwoPhaseChunk(int budgetBlocks)
 #endif
 
     std::vector<BlockCoord> blocks;
-    if (collectNextBlocks(budgetBlocks, blocks) == 0) {
+    if (collectNextBlocks(budgetBlocks, blocks) == 0)
+    {
         return 0;
     }
 
-    std::vector<std::vector<float>> threadDeltas(
-        numThreads,
-        std::vector<float>(mChunkState.srcSnapshot.size(), 0.0f)
-    );
+    std::vector<std::vector<float>> threadDeltas(numThreads, std::vector<float>(mChunkState.srcSnapshot.size(), 0.0f));
 
-    std::vector<std::vector<unsigned char>> threadPatchMarked(
-        numThreads,
-        std::vector<unsigned char>(mNbPatchX * mNbPatchZ, 0)
-    );
+    std::vector<std::vector<unsigned char>> threadPatchMarked(numThreads,
+                                                              std::vector<unsigned char>(mNbPatchX * mNbPatchZ, 0));
 
     int processedCells = 0;
     const int changes = applyBlockedParallelOnBlocksToThreadLocalBuffers(
-        mChunkState.srcSnapshot.data(),
-        blocks,
-        threadDeltas,
-        threadPatchMarked,
-        processedCells
-    );
+        mChunkState.srcSnapshot.data(), blocks, threadDeltas, threadPatchMarked, processedCells);
 
-    #pragma omp parallel for schedule(static)
-    for (std::ptrdiff_t idx = 0;
-         idx < static_cast<std::ptrdiff_t>(m_workingData.size());
-         ++idx)
+#pragma omp parallel for schedule(static)
+    for (std::ptrdiff_t idx = 0; idx < static_cast<std::ptrdiff_t>(m_workingData.size()); ++idx)
     {
         float sum = 0.0f;
-        for (int t = 0; t < numThreads; ++t) {
+        for (int t = 0; t < numThreads; ++t)
+        {
             sum += threadDeltas[t][idx];
         }
         m_workingData[idx] += sum;
@@ -1474,24 +1437,28 @@ int ThermalErosion::stepBlockedParallelPureTwoPhaseChunk(int budgetBlocks)
         bool dirty = false;
         for (int t = 0; t < numThreads; ++t)
         {
-            if (threadPatchMarked[t][patchIdx]) {
+            if (threadPatchMarked[t][patchIdx])
+            {
                 dirty = true;
                 break;
             }
         }
 
-        if (dirty && !mPatchMarked[patchIdx]) {
+        if (dirty && !mPatchMarked[patchIdx])
+        {
             mPatchMarked[patchIdx] = true;
             mDirtyPatchIndices.push_back(patchIdx);
         }
     }
 
     mCellsProcessedSinceLastCommit += processedCells;
-    if (mCellsProcessedSinceLastCommit >= mCommitThreshold) {
+    if (mCellsProcessedSinceLastCommit >= mCommitThreshold)
+    {
         mNeedsVisualUpdate = true;
     }
 
-    if (isBlockTraversalFinished()) {
+    if (isBlockTraversalFinished())
+    {
         finalizeChunkIteration();
     }
 
@@ -1500,16 +1467,19 @@ int ThermalErosion::stepBlockedParallelPureTwoPhaseChunk(int budgetBlocks)
 
 int ThermalErosion::stepCheckerboardPureTwoPhaseChunk(int budgetCells)
 {
-    if (!m_data) {
+    if (!m_data)
+    {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
         return 0;
     }
 
-    if (m_width < 3 || m_height < 3 || budgetCells <= 0) {
+    if (m_width < 3 || m_height < 3 || budgetCells <= 0)
+    {
         return 0;
     }
 
-    if (!mChunkState.active || mChunkState.variant != ChunkVariant::CheckerboardPureTwoPhase) {
+    if (!mChunkState.active || mChunkState.variant != ChunkVariant::CheckerboardPureTwoPhase)
+    {
         beginChunkIteration(ChunkVariant::CheckerboardPureTwoPhase);
     }
 
@@ -1518,25 +1488,22 @@ int ThermalErosion::stepCheckerboardPureTwoPhaseChunk(int budgetCells)
     const int startIndex = mChunkState.nextLinearIndex;
     const int endIndex = std::min(startIndex + budgetCells, totalInnerCells);
 
-    const int changes = applyCheckerboardErosionLinearRange(
-        mChunkState.srcSnapshot.data(),
-        m_workingData.data(),
-        mChunkState.phase,
-        startIndex,
-        endIndex
-    );
+    const int changes = applyCheckerboardErosionLinearRange(mChunkState.srcSnapshot.data(), m_workingData.data(),
+                                                            mChunkState.phase, startIndex, endIndex);
 
     mChunkState.nextLinearIndex = endIndex;
     mCurrentIndex = endIndex;
 
     mCellsProcessedSinceLastCommit += (endIndex - startIndex);
-    if (mCellsProcessedSinceLastCommit >= mCommitThreshold) {
+    if (mCellsProcessedSinceLastCommit >= mCommitThreshold)
+    {
         mNeedsVisualUpdate = true;
     }
 
     if (mChunkState.nextLinearIndex >= totalInnerCells)
     {
-        if (!advanceCheckerboardPhase()) {
+        if (!advanceCheckerboardPhase())
+        {
             finalizeChunkIteration();
         }
     }
@@ -1546,41 +1513,42 @@ int ThermalErosion::stepCheckerboardPureTwoPhaseChunk(int budgetCells)
 
 int ThermalErosion::stepBlockedCheckerboardPureTwoPhaseChunk(int budgetBlocks)
 {
-    if (!m_data) {
+    if (!m_data)
+    {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
         return 0;
     }
 
-    if (m_width < 3 || m_height < 3 || budgetBlocks <= 0) {
+    if (m_width < 3 || m_height < 3 || budgetBlocks <= 0)
+    {
         return 0;
     }
 
-    if (!mChunkState.active || mChunkState.variant != ChunkVariant::BlockedCheckerboardPureTwoPhase) {
+    if (!mChunkState.active || mChunkState.variant != ChunkVariant::BlockedCheckerboardPureTwoPhase)
+    {
         beginChunkIteration(ChunkVariant::BlockedCheckerboardPureTwoPhase);
     }
 
     std::vector<BlockCoord> blocks;
-    if (collectNextBlocks(budgetBlocks, blocks) == 0) {
+    if (collectNextBlocks(budgetBlocks, blocks) == 0)
+    {
         return 0;
     }
 
     int processedCells = 0;
-    const int changes = applyBlockedCheckerboardPureOnBlocks(
-        mChunkState.srcSnapshot.data(),
-        m_workingData.data(),
-        mChunkState.phase,
-        blocks,
-        processedCells
-    );
+    const int changes = applyBlockedCheckerboardPureOnBlocks(mChunkState.srcSnapshot.data(), m_workingData.data(),
+                                                             mChunkState.phase, blocks, processedCells);
 
     mCellsProcessedSinceLastCommit += processedCells;
-    if (mCellsProcessedSinceLastCommit >= mCommitThreshold) {
+    if (mCellsProcessedSinceLastCommit >= mCommitThreshold)
+    {
         mNeedsVisualUpdate = true;
     }
 
     if (isBlockTraversalFinished())
     {
-        if (!advanceCheckerboardPhase()) {
+        if (!advanceCheckerboardPhase())
+        {
             finalizeChunkIteration();
         }
     }
@@ -1590,16 +1558,19 @@ int ThermalErosion::stepBlockedCheckerboardPureTwoPhaseChunk(int budgetBlocks)
 
 int ThermalErosion::stepCheckerboardInPlaceChunk(int budgetCells)
 {
-    if (!m_data) {
+    if (!m_data)
+    {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
         return 0;
     }
 
-    if (m_width < 3 || m_height < 3 || budgetCells <= 0) {
+    if (m_width < 3 || m_height < 3 || budgetCells <= 0)
+    {
         return 0;
     }
 
-    if (!mChunkState.active || mChunkState.variant != ChunkVariant::CheckerboardInPlace) {
+    if (!mChunkState.active || mChunkState.variant != ChunkVariant::CheckerboardInPlace)
+    {
         beginChunkIteration(ChunkVariant::CheckerboardInPlace);
     }
 
@@ -1608,24 +1579,22 @@ int ThermalErosion::stepCheckerboardInPlaceChunk(int budgetCells)
     const int startIndex = mChunkState.nextLinearIndex;
     const int endIndex = std::min(startIndex + budgetCells, totalInnerCells);
 
-    const int changes = applyCheckerboardInPlaceLinearRange(
-        m_workingData.data(),
-        mChunkState.phase,
-        startIndex,
-        endIndex
-    );
+    const int changes =
+        applyCheckerboardInPlaceLinearRange(m_workingData.data(), mChunkState.phase, startIndex, endIndex);
 
     mChunkState.nextLinearIndex = endIndex;
     mCurrentIndex = endIndex;
 
     mCellsProcessedSinceLastCommit += (endIndex - startIndex);
-    if (mCellsProcessedSinceLastCommit >= mCommitThreshold) {
+    if (mCellsProcessedSinceLastCommit >= mCommitThreshold)
+    {
         mNeedsVisualUpdate = true;
     }
 
     if (mChunkState.nextLinearIndex >= totalInnerCells)
     {
-        if (!advanceCheckerboardPhase()) {
+        if (!advanceCheckerboardPhase())
+        {
             finalizeChunkIteration();
         }
     }
@@ -1635,40 +1604,42 @@ int ThermalErosion::stepCheckerboardInPlaceChunk(int budgetCells)
 
 int ThermalErosion::stepCheckerboardInPlaceParallelChunk(int budgetBlocks)
 {
-    if (!m_data) {
+    if (!m_data)
+    {
         std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
         return 0;
     }
 
-    if (m_width < 3 || m_height < 3 || budgetBlocks <= 0) {
+    if (m_width < 3 || m_height < 3 || budgetBlocks <= 0)
+    {
         return 0;
     }
 
-    if (!mChunkState.active || mChunkState.variant != ChunkVariant::CheckerboardInPlaceParallel) {
+    if (!mChunkState.active || mChunkState.variant != ChunkVariant::CheckerboardInPlaceParallel)
+    {
         beginChunkIteration(ChunkVariant::CheckerboardInPlaceParallel);
     }
 
     std::vector<BlockCoord> blocks;
-    if (collectNextBlocks(budgetBlocks, blocks) == 0) {
+    if (collectNextBlocks(budgetBlocks, blocks) == 0)
+    {
         return 0;
     }
 
     int processedCells = 0;
-    const int changes = applyCheckerboardInPlaceParallelOnBlocksBuffered(
-        m_workingData.data(),
-        mChunkState.phase,
-        blocks,
-        processedCells
-    );
+    const int changes = applyCheckerboardInPlaceParallelOnBlocksBuffered(m_workingData.data(), mChunkState.phase,
+                                                                         blocks, processedCells);
 
     mCellsProcessedSinceLastCommit += processedCells;
-    if (mCellsProcessedSinceLastCommit >= mCommitThreshold) {
+    if (mCellsProcessedSinceLastCommit >= mCommitThreshold)
+    {
         mNeedsVisualUpdate = true;
     }
 
     if (isBlockTraversalFinished())
     {
-        if (!advanceCheckerboardPhase()) {
+        if (!advanceCheckerboardPhase())
+        {
             finalizeChunkIteration();
         }
     }

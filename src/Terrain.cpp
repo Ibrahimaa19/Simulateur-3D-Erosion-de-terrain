@@ -1,15 +1,15 @@
 #include "Terrain.hpp"
 
-#include "RendererManager.hpp"
-#include "ThermalErosion.hpp"
-#include <fstream>
-#include <omp.h>
+#include "stb_image.hpp"
 
-void Terrain::loadTerrain(const char *imagePath, float yFactor, float xzFactor)
+#include <algorithm>
+#include <iostream>
+
+void Terrain::loadTerrain(const char* imagePath, float yFactor, float xzFactor)
 {
     int t_channels;
 
-    unsigned char *image = stbi_load(imagePath, &this->mWidth, &this->mHeight, &t_channels, 1);
+    unsigned char* image = stbi_load(imagePath, &this->mWidth, &this->mHeight, &t_channels, 1);
 
     if (image)
     {
@@ -18,6 +18,7 @@ void Terrain::loadTerrain(const char *imagePath, float yFactor, float xzFactor)
     else
     {
         std::cout << "Failed to load texture" << std::endl;
+        return;
     }
 
     this->mData.resize(mHeight * mWidth);
@@ -35,31 +36,7 @@ void Terrain::loadTerrain(const char *imagePath, float yFactor, float xzFactor)
     this->mMaxHeight = *std::max_element(mData.begin(), mData.end());
     this->mMinHeight = *std::min_element(mData.begin(), mData.end());
 
-    this->mRenderer = (std::make_unique<RendererManager>(this));
-
     stbi_image_free(image);
-
-    createPatches();
-}
-
-void Terrain::createPatches()
-{
-    const int nbPatchX = (mWidth  + PATCH_SIZE - 1) / PATCH_SIZE;
-    const int nbPatchZ = (mHeight + PATCH_SIZE - 1) / PATCH_SIZE;
-
-    std::cout << "nb_patch_x : " << nbPatchX
-              << " ,nb_patch_z : " << nbPatchZ << std::endl;
-
-    mPatches.clear();
-    mPatches.reserve(nbPatchX * nbPatchZ);
-
-    for (int i = 0; i < nbPatchX; ++i) {
-        for (int j = 0; j < nbPatchZ; ++j) {
-            auto p = std::make_unique<Patch>();
-            p->setPatch(i, j, mXzFactor, nbPatchX, nbPatchZ, mTexture);
-            mPatches.push_back(std::move(p));
-        }
-    }
 }
 
 bool Terrain::isInside(int i, int j) const
@@ -72,121 +49,7 @@ void Terrain::setData(int i, float value)
     this->mData[i] += value;
 }
 
-std::vector<float> *Terrain::getData()
+std::vector<float>* Terrain::getData()
 {
     return &(this->mData);
-}
-
-void Terrain::loadVerticesLod()
-{
-    for (int i = 0; i < mPatches.size(); ++i)
-    {
-        mPatches[i]->generateLodVertices(mData, mWidth, mHeight);
-    }
-}
-
-void Terrain::loadIndicesLod()
-{
-    for (int i = 0; i < mPatches.size(); ++i)
-    {
-        mPatches[i]->generateLodIndices(mData, mWidth, mHeight);
-    }
-}
-
-void Terrain::setupTerrainLod(GLuint &VAO, GLuint &VBO, GLuint &EBO)
-{
-    this->loadIndicesLod();
-    this->loadVerticesLod();
-
-    for (int i = 0; i < mPatches.size(); ++i)
-    {
-        mPatches[i]->createBuffersGL();
-    }
-}
-
-Frustrum &Terrain::getFrustrum()
-{
-    return this->mFrustrum;
-}
-
-std::vector<std::unique_ptr<Patch>> &Terrain::getPatches()
-{
-    return this->mPatches;
-}
-
-RendererManager *Terrain::getRendererManager()
-{
-    return mRenderer.get();
-}
-
-void Terrain::setRenderer(std::unique_ptr<RendererManager> renderer)
-{
-    mRenderer = std::move(renderer);
-    if (mRenderer)
-    {
-        mRenderer->setTerrain(this);
-    }
-}
-
-void Terrain::initTexture()
-{
-    this->mTexture = new Texture();
-    mTexture->generateRegion(mMinHeight,mMaxHeight);
-
-    mTexture->loadTile("../src/texture/IMGP5525_seamless.jpg",0);
-    mTexture->loadTile("../src/texture/IMGP5487_seamless.jpg",1);
-    mTexture->loadTile("../src/texture/grass.jpg",2);
-    mTexture->loadTile("../src/texture/water.jpg",3);
-}
-
-GLuint Terrain::getTextureId()
-{
-    return this->mTextureID;
-}
-
-Texture* Terrain::getTexture()
-{
-    return this->mTexture;
-}
-
-void Terrain::updateVerticesGpuLod(const std::vector<int>& dirtyPatchIndices)
-{
-    std::vector<int> sortedDirty = dirtyPatchIndices;
-    std::sort(sortedDirty.begin(), sortedDirty.end());
-
-    const int count = static_cast<int>(sortedDirty.size());
-
-    #pragma omp parallel for schedule(static)
-    for (int k = 0; k < count; ++k)
-    {
-        int idx = sortedDirty[k];
-        if (idx >= 0 && idx < static_cast<int>(mPatches.size()))
-        {
-            mPatches[idx]->generateLodVertices(mData, mWidth, mHeight);
-        }
-    }
-
-    for (int k = 0; k < count; ++k)
-    {
-        int idx = sortedDirty[k];
-        if (idx >= 0 && idx < static_cast<int>(mPatches.size()))
-        {
-            mPatches[idx]->uploadLodToGpu();
-        }
-    }
-}
-void Terrain::updateVerticesGpuLod()
-{
-    const int count = static_cast<int>(mPatches.size());
-
-    #pragma omp parallel for schedule(static)
-    for (int i = 0; i < count; ++i)
-    {
-        mPatches[i]->generateLodVertices(mData, mWidth, mHeight);
-    }
-
-    for (int i = 0; i < count; ++i)
-    {
-        mPatches[i]->uploadLodToGpu();
-    }
 }

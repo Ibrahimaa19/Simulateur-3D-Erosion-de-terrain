@@ -1,102 +1,192 @@
-cmake_minimum_required(VERSION 3.14)
-project(erosion)
+cmake_minimum_required(VERSION 3.16)
+project(erosion LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(OpenGL REQUIRED)
-find_package(GLEW REQUIRED)
-find_package(glfw3 REQUIRED)
-find_package(glm REQUIRED)
+option(EROSION_ENABLE_RENDERING "Build the OpenGL/GLFW/ImGui renderer" ON)
+option(EROSION_ENABLE_MPI "Build MPI execution mode" ON)
+option(EROSION_ENABLE_TESTS "Build dependency-free core tests" ON)
+option(EROSION_NATIVE_ARCH "Enable -march=native for local benchmarking" OFF)
+
 find_package(OpenMP REQUIRED)
 
-find_package(MPI REQUIRED)
-
-# Flags d'optimisation
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native -ffast-math -funroll-loops")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O3 -march=native -fopt-info-vec-all=report.txt -ffast-math -funroll-loops")
-
-include(FetchContent)
-
-message(STATUS "Téléchargement et configuration de ImGui...")
-
-FetchContent_Declare(
-    imgui
-    GIT_REPOSITORY https://github.com/ocornut/imgui.git
-    GIT_TAG        v1.90.4
-)
-FetchContent_MakeAvailable(imgui)
-
-add_library(imgui_lib STATIC
-    ${imgui_SOURCE_DIR}/imgui.cpp
-    ${imgui_SOURCE_DIR}/imgui_draw.cpp
-    ${imgui_SOURCE_DIR}/imgui_tables.cpp
-    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-    ${imgui_SOURCE_DIR}/imgui_demo.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+add_library(erosion_core STATIC
+    src/Terrain.cpp
+    src/ThermalErosion.cpp
+    src/FaultFormationTerrain.cpp
+    src/MidpointDisplacement.cpp
+    src/PerlinNoiseTerrain.cpp
+    src/ValidationTest.cpp
+    src/stb_impl.cpp
 )
 
-target_include_directories(imgui_lib PUBLIC
-    ${imgui_SOURCE_DIR}
-    ${imgui_SOURCE_DIR}/backends
+target_include_directories(erosion_core
+    PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
 )
 
-target_link_libraries(imgui_lib PUBLIC
-    glfw
-    GLEW::GLEW
-    OpenGL::GL
+target_link_libraries(erosion_core
+    PUBLIC
+        OpenMP::OpenMP_CXX
 )
 
-include_directories(${PROJECT_SOURCE_DIR}/include)
-
-set(SOURCE_FILES
-    ${PROJECT_SOURCE_DIR}/src/main.cpp
-    ${PROJECT_SOURCE_DIR}/src/Camera.cpp
-    ${PROJECT_SOURCE_DIR}/src/Shader.cpp
-    ${PROJECT_SOURCE_DIR}/src/Terrain.cpp
-    ${PROJECT_SOURCE_DIR}/src/ThermalErosion.cpp
-    ${PROJECT_SOURCE_DIR}/src/Gui.cpp
-    ${PROJECT_SOURCE_DIR}/src/TerrainApp.cpp
-    ${PROJECT_SOURCE_DIR}/src/FaultFormationTerrain.cpp
-    ${PROJECT_SOURCE_DIR}/src/MidpointDisplacement.cpp
-    ${PROJECT_SOURCE_DIR}/src/PerlinNoiseTerrain.cpp
-    ${PROJECT_SOURCE_DIR}/src/ValidationTest.cpp
-    ${PROJECT_SOURCE_DIR}/src/Frustrum.cpp
-    ${PROJECT_SOURCE_DIR}/src/Patch.cpp
-    ${PROJECT_SOURCE_DIR}/src/RendererManager.cpp
-    ${PROJECT_SOURCE_DIR}/src/Texture.cpp
+target_compile_options(erosion_core
+    PRIVATE
+        $<$<CONFIG:Release>:-O3>
+        $<$<CONFIG:RelWithDebInfo>:-O3>
 )
 
-add_executable(${PROJECT_NAME} ${SOURCE_FILES})
+if(EROSION_NATIVE_ARCH)
+    target_compile_options(erosion_core PRIVATE -march=native)
+endif()
+
+add_executable(${PROJECT_NAME} src/main.cpp)
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
-        imgui_lib
-        OpenGL::GL
-        GLEW::GLEW
-        glfw
-        OpenMP::OpenMP_CXX
-        ${MPI_CXX_LIBRARIES}
+        erosion_core
 )
 
-target_include_directories(${PROJECT_NAME}
+target_compile_definitions(${PROJECT_NAME}
     PRIVATE
-        ${PROJECT_SOURCE_DIR}/src
-        ${PROJECT_SOURCE_DIR}/include
-        ${GLEW_INCLUDE_DIRS}
-        ${GLFW_INCLUDE_DIRS}
-        ${GLM_INCLUDE_DIRS}
-        ${MPI_CXX_INCLUDE_DIRS}
+        EROSION_ENABLE_RENDERING=$<BOOL:${EROSION_ENABLE_RENDERING}>
+        EROSION_ENABLE_MPI=$<BOOL:${EROSION_ENABLE_MPI}>
 )
 
-add_definitions(-DGLEW_STATIC)
+if(EROSION_ENABLE_MPI)
+    find_program(EROSION_MPI_CXX_COMPILER NAMES mpicxx mpiCC mpic++)
+    if(NOT EROSION_MPI_CXX_COMPILER)
+        message(FATAL_ERROR "EROSION_ENABLE_MPI=ON mais aucun wrapper MPI C++ (mpicxx/mpiCC/mpic++) n'a été trouvé")
+    endif()
 
-FetchContent_Declare(
-    googletest
-    URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
-)
+    execute_process(
+        COMMAND ${EROSION_MPI_CXX_COMPILER} --showme:compile
+        OUTPUT_VARIABLE EROSION_MPI_COMPILE_FLAGS
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE EROSION_MPI_SHOWME_COMPILE_RESULT
+    )
+    execute_process(
+        COMMAND ${EROSION_MPI_CXX_COMPILER} --showme:link
+        OUTPUT_VARIABLE EROSION_MPI_LINK_FLAGS
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE EROSION_MPI_SHOWME_LINK_RESULT
+    )
 
-FetchContent_MakeAvailable(googletest)
-enable_testing()
-add_subdirectory(tests)
+    if(NOT EROSION_MPI_SHOWME_COMPILE_RESULT EQUAL 0 OR NOT EROSION_MPI_SHOWME_LINK_RESULT EQUAL 0)
+        execute_process(
+            COMMAND ${EROSION_MPI_CXX_COMPILER} -show
+            OUTPUT_VARIABLE EROSION_MPI_COMBINED_FLAGS
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+        set(EROSION_MPI_COMPILE_FLAGS "${EROSION_MPI_COMBINED_FLAGS}")
+        set(EROSION_MPI_LINK_FLAGS "${EROSION_MPI_COMBINED_FLAGS}")
+    endif()
+
+    separate_arguments(EROSION_MPI_COMPILE_ARGS UNIX_COMMAND "${EROSION_MPI_COMPILE_FLAGS}")
+    separate_arguments(EROSION_MPI_LINK_ARGS UNIX_COMMAND "${EROSION_MPI_LINK_FLAGS}")
+
+    foreach(arg IN LISTS EROSION_MPI_COMPILE_ARGS)
+        if(arg MATCHES "^-I(.+)$")
+            target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_MATCH_1}")
+        elseif(NOT arg MATCHES "^${EROSION_MPI_CXX_COMPILER}$" AND NOT arg MATCHES ".*(g\\+\\+|c\\+\\+|clang\\+\\+)$")
+            target_compile_options(${PROJECT_NAME} PRIVATE "${arg}")
+        endif()
+    endforeach()
+
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${EROSION_MPI_LINK_ARGS})
+endif()
+
+if(EROSION_ENABLE_RENDERING)
+    find_package(OpenGL REQUIRED)
+    find_package(GLEW REQUIRED)
+    find_package(glfw3 REQUIRED)
+    find_path(GLM_INCLUDE_DIR glm/glm.hpp REQUIRED)
+
+    include(FetchContent)
+
+    message(STATUS "Configuration de ImGui pour le rendu interactif")
+    FetchContent_Declare(
+        imgui
+        GIT_REPOSITORY https://github.com/ocornut/imgui.git
+        GIT_TAG        v1.90.4
+    )
+    FetchContent_MakeAvailable(imgui)
+
+    add_library(imgui_lib STATIC
+        ${imgui_SOURCE_DIR}/imgui.cpp
+        ${imgui_SOURCE_DIR}/imgui_draw.cpp
+        ${imgui_SOURCE_DIR}/imgui_tables.cpp
+        ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+        ${imgui_SOURCE_DIR}/imgui_demo.cpp
+        ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+        ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+    )
+
+    target_include_directories(imgui_lib
+        PUBLIC
+            ${imgui_SOURCE_DIR}
+            ${imgui_SOURCE_DIR}/backends
+    )
+
+    target_link_libraries(imgui_lib
+        PUBLIC
+            glfw
+            GLEW::GLEW
+            OpenGL::GL
+    )
+
+    target_sources(${PROJECT_NAME}
+        PRIVATE
+            src/Camera.cpp
+            src/Shader.cpp
+            src/Gui.cpp
+            src/TerrainApp.cpp
+            src/Frustrum.cpp
+            src/Patch.cpp
+            src/RendererManager.cpp
+            src/Texture.cpp
+    )
+
+    target_link_libraries(${PROJECT_NAME}
+        PRIVATE
+            imgui_lib
+            OpenGL::GL
+            GLEW::GLEW
+            glfw
+    )
+
+    target_include_directories(${PROJECT_NAME} PRIVATE ${GLM_INCLUDE_DIR})
+
+    target_compile_definitions(${PROJECT_NAME} PRIVATE GLEW_STATIC)
+endif()
+
+if(EROSION_ENABLE_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
+find_program(CLANG_FORMAT_EXE NAMES clang-format)
+if(CLANG_FORMAT_EXE)
+    file(GLOB_RECURSE EROSION_FORMAT_FILES CONFIGURE_DEPENDS
+        ${PROJECT_SOURCE_DIR}/include/*.hpp
+        ${PROJECT_SOURCE_DIR}/src/*.cpp
+        ${PROJECT_SOURCE_DIR}/tests/*.cpp
+        ${PROJECT_SOURCE_DIR}/tests/*.hpp
+    )
+    list(FILTER EROSION_FORMAT_FILES EXCLUDE REGEX ".*/include/stb_image\\.hpp$")
+
+    add_custom_target(format
+        COMMAND ${CLANG_FORMAT_EXE} -i ${EROSION_FORMAT_FILES}
+        COMMENT "Formatting C++ sources with clang-format"
+    )
+
+    add_custom_target(format-check
+        COMMAND ${CLANG_FORMAT_EXE} --dry-run --Werror ${EROSION_FORMAT_FILES}
+        COMMENT "Checking C++ formatting with clang-format"
+    )
+endif()

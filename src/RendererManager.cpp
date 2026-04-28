@@ -1,64 +1,137 @@
 #include "RendererManager.hpp"
 
-RendererManager::RendererManager(Terrain *terrain)
+#include <algorithm>
+#include <iostream>
+#include <omp.h>
+
+RendererManager::RendererManager(Terrain* terrain)
 {
-    this->mTerrain = terrain;
-    this->mFrustrum = new Frustrum;
-    this->mLodIsOn = true;
+    setTerrain(terrain);
 }
 
-RendererManager::~RendererManager()
+void RendererManager::setTerrain(Terrain* terrain)
 {
-    delete mFrustrum;
+    mTerrain = terrain;
+    mPatches.clear();
 }
 
-void RendererManager::renderLod(const glm::vec3 &cameraPos, glm::mat4 &projection, glm::mat4 &view)
+void RendererManager::createPatches()
 {
+    if (!mTerrain)
+        return;
 
+    const int width = mTerrain->getTerrainWidth();
+    const int height = mTerrain->getTerrainHeight();
+    const int nbPatchX = (width + kTerrainPatchSize - 1) / kTerrainPatchSize;
+    const int nbPatchZ = (height + kTerrainPatchSize - 1) / kTerrainPatchSize;
+
+    std::cout << "nb_patch_x : " << nbPatchX << " ,nb_patch_z : " << nbPatchZ << std::endl;
+
+    mPatches.clear();
+    mPatches.reserve(nbPatchX * nbPatchZ);
+
+    for (int i = 0; i < nbPatchX; ++i)
+    {
+        for (int j = 0; j < nbPatchZ; ++j)
+        {
+            auto patch = std::make_unique<Patch>();
+            patch->setPatch(i, j, mTerrain->getXzFactor(), nbPatchX, nbPatchZ, mTexture.get());
+            mPatches.push_back(std::move(patch));
+        }
+    }
+}
+
+void RendererManager::loadVerticesLod()
+{
+    if (!mTerrain)
+        return;
+
+    std::vector<float>* data = mTerrain->getData();
+    for (auto& patch : mPatches)
+    {
+        patch->generateLodVertices(*data, mTerrain->getTerrainWidth(), mTerrain->getTerrainHeight());
+    }
+}
+
+void RendererManager::loadIndicesLod()
+{
+    if (!mTerrain)
+        return;
+
+    std::vector<float>* data = mTerrain->getData();
+    for (auto& patch : mPatches)
+    {
+        patch->generateLodIndices(*data, mTerrain->getTerrainWidth(), mTerrain->getTerrainHeight());
+    }
+}
+
+void RendererManager::initTexture()
+{
+    if (!mTerrain)
+        return;
+
+    mTexture = std::make_unique<Texture>();
+    mTexture->generateRegion(mTerrain->getMinHeight(), mTerrain->getMaxHeight());
+
+    mTexture->loadTile("../src/texture/IMGP5525_seamless.jpg", 0);
+    mTexture->loadTile("../src/texture/IMGP5487_seamless.jpg", 1);
+    mTexture->loadTile("../src/texture/grass.jpg", 2);
+    mTexture->loadTile("../src/texture/water.jpg", 3);
+}
+
+void RendererManager::setupTerrainLod(unsigned int& vao, unsigned int& vbo, unsigned int& ebo)
+{
+    (void)vao;
+    (void)vbo;
+    (void)ebo;
+
+    if (!mTerrain)
+        return;
+
+    if (!mTexture)
+        initTexture();
+
+    createPatches();
+    loadIndicesLod();
+    loadVerticesLod();
+
+    for (auto& patch : mPatches)
+    {
+        patch->createBuffersGL();
+    }
+}
+
+void RendererManager::renderLod(const glm::vec3& cameraPos, glm::mat4& projection, glm::mat4& view)
+{
     if (!mTerrain)
     {
         std::cerr << "Erreur: RendererManager::mTerrain is null!" << std::endl;
         return;
     }
 
-    if (!mFrustrum)
-    {
-        std::cerr << "Erreur: RendererManager::mFrustrum is null!" << std::endl;
-        return;
-    }
-
-    std::vector<std::unique_ptr<Patch>> &patches = mTerrain->getPatches();
-    mFrustrum->updateFrustum(projection, view);
+    mFrustrum.updateFrustum(projection, view);
 
     if (mLodIsOn)
     {
-        int temp = 0;
-        for (int i = 0; i < patches.size(); ++i)
+        for (auto& patch : mPatches)
         {
-            temp = patches[i]->chooseLod(cameraPos, mFrustrum);
-            patches[i]->setLodLevel(temp);
+            patch->setLodLevel(patch->chooseLod(cameraPos, &mFrustrum));
         }
 
-        int patchRendered = 0;
-        for (int i = 0; i < patches.size(); ++i)
+        for (auto& patch : mPatches)
         {
-            if (patches[i]->getLodLevel() != -1)
+            if (patch->getLodLevel() != -1)
             {
-                patches[i]->render();
-                patchRendered++;
+                patch->render();
             }
-                
-            
         }
-
-        //std::cout << "patch rendered: " << patchRendered << "/" << patches.size() << std::endl;
     }
     else
     {
-        for (int i = 0; i < patches.size(); ++i)
+        for (auto& patch : mPatches)
         {
-            patches[i]->setLodLevel(0);
-            patches[i]->render();
+            patch->setLodLevel(0);
+            patch->render();
         }
     }
 }
@@ -67,29 +140,26 @@ void RendererManager::correctLod()
 {
     bool changed;
     int temp = 0;
-    std::vector<std::unique_ptr<Patch>> &patches = mTerrain->getPatches();
 
     do
     {
         changed = false;
 
-        for (int i = 0; i < patches.size(); ++i)
+        for (auto& patch : mPatches)
         {
-
-            for (int j = 0; j < patches[i]->getNeighbors().size(); ++j)
+            for (int j = 0; j < static_cast<int>(patch->getNeighbors().size()); ++j)
             {
-
-                if (patches[i]->getLodLevel() > patches[i]->getNeighborLodLevel(j) + 1)
+                if (patch->getLodLevel() > patch->getNeighborLodLevel(j) + 1)
                 {
-                    temp = patches[i]->getNeighborLodLevel(j) + 1;
-                    patches[i]->setLodLevel(temp);
+                    temp = patch->getNeighborLodLevel(j) + 1;
+                    patch->setLodLevel(temp);
                     changed = true;
                 }
 
-                if (patches[i]->getNeighborLodLevel(j) > patches[i]->getLodLevel() + 1)
+                if (patch->getNeighborLodLevel(j) > patch->getLodLevel() + 1)
                 {
-                    temp = patches[i]->getLodLevel() + 1;
-                    patches[i]->getNeighbors()[j]->setLodLevel(temp);
+                    temp = patch->getLodLevel() + 1;
+                    patch->getNeighbors()[j]->setLodLevel(temp);
                     changed = true;
                 }
             }
@@ -100,10 +170,66 @@ void RendererManager::correctLod()
 
 void RendererManager::activateLod()
 {
-    this->mLodIsOn = !this->mLodIsOn;
+    mLodIsOn = !mLodIsOn;
 }
 
-void RendererManager::setTerrain(Terrain *terrain)
+Texture* RendererManager::getTexture()
 {
-    this->mTerrain = terrain;
+    return mTexture.get();
+}
+
+std::vector<std::unique_ptr<Patch>>& RendererManager::getPatches()
+{
+    return mPatches;
+}
+
+void RendererManager::updateVerticesGpuLod(const std::vector<int>& dirtyPatchIndices)
+{
+    if (!mTerrain)
+        return;
+
+    std::vector<int> sortedDirty = dirtyPatchIndices;
+    std::sort(sortedDirty.begin(), sortedDirty.end());
+
+    std::vector<float>* data = mTerrain->getData();
+    const int count = static_cast<int>(sortedDirty.size());
+
+#pragma omp parallel for schedule(static)
+    for (int k = 0; k < count; ++k)
+    {
+        const int idx = sortedDirty[k];
+        if (idx >= 0 && idx < static_cast<int>(mPatches.size()))
+        {
+            mPatches[idx]->generateLodVertices(*data, mTerrain->getTerrainWidth(), mTerrain->getTerrainHeight());
+        }
+    }
+
+    for (int k = 0; k < count; ++k)
+    {
+        const int idx = sortedDirty[k];
+        if (idx >= 0 && idx < static_cast<int>(mPatches.size()))
+        {
+            mPatches[idx]->uploadLodToGpu();
+        }
+    }
+}
+
+void RendererManager::updateVerticesGpuLod()
+{
+    if (!mTerrain)
+        return;
+
+    std::vector<float>* data = mTerrain->getData();
+    const int count = static_cast<int>(mPatches.size());
+
+#pragma omp parallel for schedule(static)
+    for (int i = 0; i < count; ++i)
+    {
+        mPatches[i]->generateLodVertices(*data, mTerrain->getTerrainWidth(), mTerrain->getTerrainHeight());
+    }
+
+    for (auto& patch : mPatches)
+    {
+        patch->uploadLodToGpu();
+    }
 }

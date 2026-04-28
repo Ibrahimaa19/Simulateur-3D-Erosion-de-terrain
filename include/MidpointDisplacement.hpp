@@ -1,6 +1,5 @@
 #pragma once
 #include "Terrain.hpp"
-#include "RendererManager.hpp"
 
 /**
  * @class MidpointDisplacement
@@ -12,7 +11,7 @@
  */
 class MidpointDisplacement : public Terrain
 {
-public:
+  public:
     /**
      * @brief Default constructor.
      *
@@ -33,9 +32,10 @@ public:
      * @param scale Scale factor applied to the XZ plane (default = 1.0f, interval >0).
      * @param roughness Controls the roughness of the terrain (default = 1, interval >0).
      */
-    void CreateMidpointDisplacement(int size, float minHeight, float maxHeight, float scale = 1.0f, float roughness = 1);
+    void CreateMidpointDisplacement(int size, float minHeight, float maxHeight, float scale = 1.0f,
+                                    float roughness = 1);
 
-private:
+  private:
     /**
      * @brief Internal recursive implementation of the midpoint displacement algorithm.
      *

@@ -1,15 +1,16 @@
 #pragma once
 
 #include "Terrain.hpp"
-#include <memory>
-#include <cmath>
-#include <vector>
-#include <iostream>
+#include "TerrainConstants.hpp"
 #include <algorithm>
+#include <cmath>
+#include <iostream>
+#include <memory>
+#include <vector>
 
 class ThermalErosion
 {
-public:
+  public:
     struct NeighborOffset
     {
         int di;
@@ -66,24 +67,29 @@ public:
 
     ThermalErosion();
 
-    void loadTerrainInfo(std::unique_ptr<Terrain>& terrain) {
-        m_data   = terrain->getData();
-        m_height = terrain->getTerrainHeight();
-        m_width  = terrain->getTerrainWidth();
+    void loadTerrainInfo(Terrain& terrain)
+    {
+        m_data = terrain.getData();
+        m_height = terrain.getTerrainHeight();
+        m_width = terrain.getTerrainWidth();
 
-        mNbPatchX = (m_width + PATCH_SIZE - 1) / PATCH_SIZE;
-        mNbPatchZ = (m_height + PATCH_SIZE - 1) / PATCH_SIZE;
+        mNbPatchX = (m_width + kTerrainPatchSize - 1) / kTerrainPatchSize;
+        mNbPatchZ = (m_height + kTerrainPatchSize - 1) / kTerrainPatchSize;
 
         mPatchMarked.resize(mNbPatchX * mNbPatchZ, false);
         resetProgress();
     }
 
-    void setTalusAngle(float angle) {
+    void setTalusAngle(float angle)
+    {
         const float PI = 3.14159265f;
         talusAngle = std::tan(angle * PI / 180.0f);
     }
 
-    void setTransferRate(float c) { transferRate = c; }
+    void setTransferRate(float c)
+    {
+        transferRate = c;
+    }
 
     void useEightNeighbors();
     void useFourNeighbors();
@@ -109,11 +115,17 @@ public:
 
     void resetProgress();
 
-    bool isIterationFinished() const { return mIterationFinished; }
+    bool isIterationFinished() const
+    {
+        return mIterationFinished;
+    }
     bool needsVisualUpdate() const;
     void commitWorkingData();
 
-    const std::vector<int>& getDirtyPatchIndices() const { return mDirtyPatchIndices; }
+    const std::vector<int>& getDirtyPatchIndices() const
+    {
+        return mDirtyPatchIndices;
+    }
 
     void clearDirtyPatchIndices()
     {
@@ -123,7 +135,7 @@ public:
         mDirtyPatchIndices.clear();
     }
 
-private:
+  private:
     static constexpr int BLOCK_SIZE = 32;
 
     std::vector<float>* m_data = nullptr;
@@ -156,7 +168,7 @@ private:
     static const NeighborOffset kNeighbors8[8];
     static const NeighborOffset kNeighbors4[4];
 
-private:
+  private:
     inline int toIndex(int i, int j) const;
     inline void localIndexToCoords(int localIndex, int& i, int& j) const;
 
@@ -167,48 +179,31 @@ private:
     bool erodeCellInPlace(int i, int j, float* data);
     bool erodeCellToDeltaSerial(int i, int j, const float* src, float* delta);
 
-    int applyErosionRange(const float* src,
-                          float* dst,
-                          int startIndex,
-                          int endIndex);
+    int applyErosionRange(const float* src, float* dst, int startIndex, int endIndex);
 
-    int applyBlockedErosionRange(const float* src,
-                                 float* dst,
-                                 int startIndex,
-                                 int endIndex);
+    int applyBlockedErosionRange(const float* src, float* dst, int startIndex, int endIndex);
 
-    int applyCheckerboardErosionRange(const float* src,
-                                      float* dst,
-                                      int color);
+    int applyCheckerboardErosionRange(const float* src, float* dst, int color);
 
-    int applyBlockedCheckerboardErosionRange(const float* src,
-                                             float* dst,
-                                             int color);
+    int applyBlockedCheckerboardErosionRange(const float* src, float* dst, int color);
 
     int applyCheckerboardInPlaceColor(float* data, int color);
 
-    int applyBlockedParallelErosionToDelta(const float* src,
-                                           float* delta);
+    int applyBlockedParallelErosionToDelta(const float* src, float* delta);
 
-    int applyBlockedParallelErosionToThreadLocalBuffers(
-        const float* src,
-        std::vector<std::vector<float>>& threadDeltas,
-        std::vector<std::vector<unsigned char>>& threadPatchMarked);
+    int applyBlockedParallelErosionToThreadLocalBuffers(const float* src, std::vector<std::vector<float>>& threadDeltas,
+                                                        std::vector<std::vector<unsigned char>>& threadPatchMarked);
 
     int applyCheckerboardInPlaceColorParallelBuffered(float* data, int color);
 
     bool buildCellStencil(int i, int j, const float* src, CellStencil& stencil) const;
     float computeMaterialToMove(const CellStencil& stencil) const;
 
-    void applyTransfersToBuffer(const CellStencil& stencil,
-                                float materialToMove,
-                                float* dst);
+    void applyTransfersToBuffer(const CellStencil& stencil, float materialToMove, float* dst);
 
     void markDirtyFromStencil(int i, int j, const CellStencil& stencil);
 
-    void markPatchMaskFromStencil(int i,
-                                  int j,
-                                  const CellStencil& stencil,
+    void markPatchMaskFromStencil(int i, int j, const CellStencil& stencil,
                                   std::vector<unsigned char>& patchMask) const;
 
     void resetChunkState();
@@ -218,38 +213,21 @@ private:
     bool isBlockTraversalFinished() const;
     void finalizeChunkIteration();
 
-    int applyCheckerboardErosionLinearRange(const float* src,
-                                            float* dst,
-                                            int color,
-                                            int startIndex,
-                                            int endIndex);
+    int applyCheckerboardErosionLinearRange(const float* src, float* dst, int color, int startIndex, int endIndex);
 
-    int applyCheckerboardInPlaceLinearRange(float* data,
-                                            int color,
-                                            int startIndex,
-                                            int endIndex);
+    int applyCheckerboardInPlaceLinearRange(float* data, int color, int startIndex, int endIndex);
 
-    int applyBlockedPureOnBlocks(const float* src,
-                                 float* dst,
-                                 const std::vector<BlockCoord>& blocks,
+    int applyBlockedPureOnBlocks(const float* src, float* dst, const std::vector<BlockCoord>& blocks,
                                  int& processedCells);
 
-    int applyBlockedCheckerboardPureOnBlocks(const float* src,
-                                             float* dst,
-                                             int color,
-                                             const std::vector<BlockCoord>& blocks,
-                                             int& processedCells);
+    int applyBlockedCheckerboardPureOnBlocks(const float* src, float* dst, int color,
+                                             const std::vector<BlockCoord>& blocks, int& processedCells);
 
-    int applyBlockedParallelOnBlocksToThreadLocalBuffers(
-        const float* src,
-        const std::vector<BlockCoord>& blocks,
-        std::vector<std::vector<float>>& threadDeltas,
-        std::vector<std::vector<unsigned char>>& threadPatchMarked,
-        int& processedCells);
+    int applyBlockedParallelOnBlocksToThreadLocalBuffers(const float* src, const std::vector<BlockCoord>& blocks,
+                                                         std::vector<std::vector<float>>& threadDeltas,
+                                                         std::vector<std::vector<unsigned char>>& threadPatchMarked,
+                                                         int& processedCells);
 
-    int applyCheckerboardInPlaceParallelOnBlocksBuffered(
-        float* data,
-        int color,
-        const std::vector<BlockCoord>& blocks,
-        int& processedCells);
+    int applyCheckerboardInPlaceParallelOnBlocksBuffered(float* data, int color, const std::vector<BlockCoord>& blocks,
+                                                         int& processedCells);
 };
