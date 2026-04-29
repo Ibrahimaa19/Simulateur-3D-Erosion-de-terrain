@@ -56,49 +56,12 @@ target_compile_definitions(${PROJECT_NAME}
 )
 
 if(EROSION_ENABLE_MPI)
-    find_program(EROSION_MPI_CXX_COMPILER NAMES mpicxx mpiCC mpic++)
-    if(NOT EROSION_MPI_CXX_COMPILER)
-        message(FATAL_ERROR "EROSION_ENABLE_MPI=ON mais aucun wrapper MPI C++ (mpicxx/mpiCC/mpic++) n'a été trouvé")
-    endif()
+    find_package(MPI REQUIRED COMPONENTS CXX)
 
-    execute_process(
-        COMMAND ${EROSION_MPI_CXX_COMPILER} --showme:compile
-        OUTPUT_VARIABLE EROSION_MPI_COMPILE_FLAGS
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        ERROR_QUIET
-        RESULT_VARIABLE EROSION_MPI_SHOWME_COMPILE_RESULT
+    target_link_libraries(${PROJECT_NAME}
+        PRIVATE
+            MPI::MPI_CXX
     )
-    execute_process(
-        COMMAND ${EROSION_MPI_CXX_COMPILER} --showme:link
-        OUTPUT_VARIABLE EROSION_MPI_LINK_FLAGS
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        ERROR_QUIET
-        RESULT_VARIABLE EROSION_MPI_SHOWME_LINK_RESULT
-    )
-
-    if(NOT EROSION_MPI_SHOWME_COMPILE_RESULT EQUAL 0 OR NOT EROSION_MPI_SHOWME_LINK_RESULT EQUAL 0)
-        execute_process(
-            COMMAND ${EROSION_MPI_CXX_COMPILER} -show
-            OUTPUT_VARIABLE EROSION_MPI_COMBINED_FLAGS
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-            ERROR_QUIET
-        )
-        set(EROSION_MPI_COMPILE_FLAGS "${EROSION_MPI_COMBINED_FLAGS}")
-        set(EROSION_MPI_LINK_FLAGS "${EROSION_MPI_COMBINED_FLAGS}")
-    endif()
-
-    separate_arguments(EROSION_MPI_COMPILE_ARGS UNIX_COMMAND "${EROSION_MPI_COMPILE_FLAGS}")
-    separate_arguments(EROSION_MPI_LINK_ARGS UNIX_COMMAND "${EROSION_MPI_LINK_FLAGS}")
-
-    foreach(arg IN LISTS EROSION_MPI_COMPILE_ARGS)
-        if(arg MATCHES "^-I(.+)$")
-            target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_MATCH_1}")
-        elseif(NOT arg MATCHES "^${EROSION_MPI_CXX_COMPILER}$" AND NOT arg MATCHES ".*(g\\+\\+|c\\+\\+|clang\\+\\+)$")
-            target_compile_options(${PROJECT_NAME} PRIVATE "${arg}")
-        endif()
-    endforeach()
-
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${EROSION_MPI_LINK_ARGS})
 endif()
 
 if(EROSION_ENABLE_RENDERING)
