@@ -142,6 +142,16 @@ void RendererManager::setupTerrainLod(unsigned int& vao, unsigned int& vbo, unsi
     }
 }
 
+void RendererManager::setupTerrainLodCpuOnly()
+{
+    if (!mTerrain)
+        return;
+
+    createPatches();
+    loadIndicesLod();
+    loadVerticesLod();
+}
+
 void RendererManager::renderLod(const glm::vec3& cameraPos, glm::mat4& projection, glm::mat4& view)
 {
     if (!mTerrain)
@@ -228,6 +238,11 @@ void RendererManager::activateLod()
     mLodIsOn = !mLodIsOn;
 }
 
+void RendererManager::setLodEnabled(bool enabled)
+{
+    mLodIsOn = enabled;
+}
+
 Texture* RendererManager::getTexture()
 {
     return mTexture.get();
@@ -236,6 +251,96 @@ Texture* RendererManager::getTexture()
 std::vector<std::unique_ptr<Patch>>& RendererManager::getPatches()
 {
     return mPatches;
+}
+
+RenderBenchmarkStats RendererManager::collectRenderStats(const glm::vec3& cameraPos, glm::mat4& projection,
+                                                         glm::mat4& view, bool lodEnabled, bool cullingEnabled)
+{
+    RenderBenchmarkStats stats;
+    stats.totalPatches = mPatches.size();
+
+    if (!mTerrain)
+    {
+        return stats;
+    }
+
+    if (cullingEnabled)
+    {
+        mFrustrum.updateFrustum(projection, view);
+    }
+
+    for (auto& patch : mPatches)
+    {
+        int lodLevel = 0;
+        if (lodEnabled && cullingEnabled)
+        {
+            lodLevel = patch->chooseLod(cameraPos, &mFrustrum);
+        }
+        else if (lodEnabled)
+        {
+            lodLevel = patch->chooseLodNoCulling(cameraPos);
+        }
+        else if (cullingEnabled)
+        {
+            lodLevel = patch->chooseLod(cameraPos, &mFrustrum) == -1 ? -1 : 0;
+        }
+
+        patch->setLodLevel(lodLevel);
+    }
+
+    if (lodEnabled)
+    {
+        correctLod();
+    }
+
+    for (auto& patch : mPatches)
+    {
+        const int lodLevel = patch->getLodLevel();
+        if (lodLevel != -1)
+        {
+            ++stats.visiblePatches;
+            stats.triangles += patch->getTriangleCount(lodLevel);
+        }
+    }
+
+    return stats;
+}
+
+void RendererManager::updateVerticesCpuLod(const std::vector<int>& dirtyPatchIndices)
+{
+    if (!mTerrain)
+        return;
+
+    std::vector<int> sortedDirty = dirtyPatchIndices;
+    std::sort(sortedDirty.begin(), sortedDirty.end());
+
+    std::vector<float>* data = mTerrain->getData();
+    const int count = static_cast<int>(sortedDirty.size());
+
+#pragma omp parallel for schedule(static)
+    for (int k = 0; k < count; ++k)
+    {
+        const int idx = sortedDirty[k];
+        if (idx >= 0 && idx < static_cast<int>(mPatches.size()))
+        {
+            mPatches[idx]->generateLodVertices(*data, mTerrain->getTerrainWidth(), mTerrain->getTerrainHeight());
+        }
+    }
+}
+
+void RendererManager::updateVerticesCpuLod()
+{
+    if (!mTerrain)
+        return;
+
+    std::vector<float>* data = mTerrain->getData();
+    const int count = static_cast<int>(mPatches.size());
+
+#pragma omp parallel for schedule(static)
+    for (int i = 0; i < count; ++i)
+    {
+        mPatches[i]->generateLodVertices(*data, mTerrain->getTerrainWidth(), mTerrain->getTerrainHeight());
+    }
 }
 
 void RendererManager::updateVerticesGpuLod(const std::vector<int>& dirtyPatchIndices)

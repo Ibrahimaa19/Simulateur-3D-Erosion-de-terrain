@@ -2,6 +2,30 @@
 
 #include <cstddef>
 
+namespace
+{
+int lodFromDistance(float distance)
+{
+    if (distance < 500.f)
+    {
+        return 0;
+    }
+    if (distance < 700.f)
+    {
+        return 1;
+    }
+    if (distance < 850.f)
+    {
+        return 2;
+    }
+    if (distance < 950.f)
+    {
+        return 3;
+    }
+    return 4;
+}
+} // namespace
+
 void Patch::setPatch(unsigned int x, unsigned int z, float xzFactor, unsigned int nbPatchX, unsigned int nbPatchZ,
                      Texture* texture)
 {
@@ -214,31 +238,37 @@ int Patch::chooseLod(glm::vec3 cameraPos, Frustrum* frustrum)
 
     float distance = glm::distance(cameraPos, centre);
 
-    if (distance < 500.f)
-    {
-        return 0;
-    }
-    else if (distance < 700.f)
-    {
-        return 1;
-    }
-    else if (distance < 850.f)
-    {
-        return 2;
-    }
-    else if (distance < 950.f)
-    {
-        return 3;
-    }
-    else
-    {
-        return 4;
-    }
+    return lodFromDistance(distance);
+}
+
+int Patch::chooseLodNoCulling(glm::vec3 cameraPos) const
+{
+    float centreX = (mPatchX * kTerrainPatchSize + kTerrainPatchSize * 0.5f) / mXzFactor;
+    float centreZ = (mPatchZ * kTerrainPatchSize + kTerrainPatchSize * 0.5f) / mXzFactor;
+    float hauteurMoyenne = 0.5f;
+
+    const glm::vec3 centre(centreX, hauteurMoyenne, centreZ);
+    return lodFromDistance(glm::distance(cameraPos, centre));
 }
 
 int Patch::getLodLevel() const
 {
     return this->mLodLevel;
+}
+
+std::size_t Patch::getIndexCount(int lodLevel) const
+{
+    if (lodLevel < 0 || lodLevel >= 5)
+    {
+        return 0;
+    }
+
+    return mLod[lodLevel].indices.size();
+}
+
+std::size_t Patch::getTriangleCount(int lodLevel) const
+{
+    return getIndexCount(lodLevel) / 3;
 }
 
 void Patch::setLodLevel(int level)

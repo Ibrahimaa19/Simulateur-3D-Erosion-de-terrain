@@ -6,6 +6,7 @@
 #include "Texture.hpp"
 #include <GL/glew.h>
 #include <algorithm>
+#include <cstddef>
 #include <iostream>
 #include <vector>
 
@@ -179,12 +180,15 @@ class Patch
      * 2. Distance caméra-patch
      */
     int chooseLod(glm::vec3 cameraPos, Frustrum* frustrum);
+    int chooseLodNoCulling(glm::vec3 cameraPos) const;
 
     /**
      * @brief Retourne le niveau LOD actuel
      * @return Niveau LOD courant
      */
     int getLodLevel() const;
+    std::size_t getIndexCount(int lodLevel) const;
+    std::size_t getTriangleCount(int lodLevel) const;
 
     /**
      * @brief Définit le niveau LOD actuel

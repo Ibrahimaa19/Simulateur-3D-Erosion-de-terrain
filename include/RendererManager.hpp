@@ -6,9 +6,17 @@
 #include "Terrain.hpp"
 #include "Texture.hpp"
 
+#include <cstddef>
 #include <glm/glm.hpp>
 #include <memory>
 #include <vector>
+
+struct RenderBenchmarkStats
+{
+    std::size_t visiblePatches = 0;
+    std::size_t totalPatches = 0;
+    std::size_t triangles = 0;
+};
 
 /**
  * @brief Gère toutes les ressources de rendu associées à un Terrain CPU.
@@ -41,12 +49,18 @@ class RendererManager
     ~RendererManager() = default;
 
     void renderLod(const glm::vec3& cameraPos, glm::mat4& projection, glm::mat4& view);
+    RenderBenchmarkStats collectRenderStats(const glm::vec3& cameraPos, glm::mat4& projection, glm::mat4& view,
+                                            bool lodEnabled, bool cullingEnabled);
 
     void activateLod();
+    void setLodEnabled(bool enabled);
     void setTerrain(Terrain* terrain);
 
     void initTexture();
     void setupTerrainLod(unsigned int& vao, unsigned int& vbo, unsigned int& ebo);
+    void setupTerrainLodCpuOnly();
+    void updateVerticesCpuLod();
+    void updateVerticesCpuLod(const std::vector<int>& dirtyPatchIndices);
     void updateVerticesGpuLod();
     void updateVerticesGpuLod(const std::vector<int>& dirtyPatchIndices);
 

@@ -1,3 +1,4 @@
+#include "BenchmarkStats.hpp"
 #include "PerlinNoiseTerrain.hpp"
 #include "Terrain.hpp"
 #include "ThermalErosion.hpp"
@@ -70,6 +71,14 @@ int main()
 
     const std::vector<int>& dirtyPatches = boundaryErosion.getDirtyPatchIndices();
     assert(std::find(dirtyPatches.begin(), dirtyPatches.end(), 0) != dirtyPatches.end());
+
+    const BenchmarkSummaryStats stats = computeBenchmarkSummaryStats({1.0, 2.0, 3.0, 4.0, 5.0});
+    assert(stats.n == 5);
+    assert(std::fabs(stats.mean - 3.0) < 1e-9);
+    assert(std::fabs(stats.median - 3.0) < 1e-9);
+    assert(std::fabs(stats.stddev - std::sqrt(2.5)) < 1e-9);
+    assert(std::fabs(stats.p05 - 1.2) < 1e-9);
+    assert(std::fabs(stats.p95 - 4.8) < 1e-9);
 
     return 0;
 }

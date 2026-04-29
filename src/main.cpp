@@ -1,3 +1,4 @@
+#include "Benchmark.hpp"
 #include "FaultFormationTerrain.hpp"
 #include "MidpointDisplacement.hpp"
 #include "PerlinNoiseTerrain.hpp"
@@ -9,7 +10,7 @@
 #endif
 
 #if EROSION_ENABLE_MPI
-#include "Mpi.hpp"
+int lauchMPI(int argc, char* argv[]);
 #endif
 
 #include <cmath>
@@ -23,7 +24,8 @@ enum class State
 {
     Render,
     Test,
-    MPI
+    MPI,
+    Bench
 };
 
 enum class Heightmap
@@ -37,10 +39,7 @@ enum class Heightmap
 namespace
 {
 const std::map<std::string, State> kStates{
-    {"render", State::Render},
-    {"test", State::Test},
-    {"MPI", State::MPI},
-    {"mpi", State::MPI},
+    {"render", State::Render}, {"test", State::Test}, {"MPI", State::MPI}, {"mpi", State::MPI}, {"bench", State::Bench},
 };
 
 const std::map<std::string, Heightmap> kHeightmaps{
@@ -55,6 +54,7 @@ void printUsage(const char* program)
     std::cerr << "Usage: " << program << " render\n";
     std::cerr << "Usage: " << program << " test <typeTerrain> <steps>\n";
     std::cerr << "Usage: " << program << " MPI <typeTerrain> <width> <height> <steps>\n";
+    std::cerr << "Usage: " << program << " bench <erosion|render|interaction|mpi> [options]\n";
     std::cerr << "<typeTerrain> : loadHeightmap | faultFormation | midpointDisplacement | perlinNoise\n";
 }
 
@@ -174,6 +174,11 @@ int main(int argc, char* argv[])
         std::cerr << "Reconfigurez avec -DEROSION_ENABLE_MPI=ON si MPI est disponible.\n";
         return 1;
 #endif
+    }
+
+    if (stateIt->second == State::Bench)
+    {
+        return Benchmark::run(argc, argv);
     }
 
     printUsage(argv[0]);

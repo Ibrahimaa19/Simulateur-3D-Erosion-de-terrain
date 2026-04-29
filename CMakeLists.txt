@@ -15,6 +15,7 @@ find_package(OpenMP REQUIRED)
 add_library(erosion_core STATIC
     src/Terrain.cpp
     src/ThermalErosion.cpp
+    src/BenchmarkStats.cpp
     src/FaultFormationTerrain.cpp
     src/MidpointDisplacement.cpp
     src/PerlinNoiseTerrain.cpp
@@ -42,7 +43,10 @@ if(EROSION_NATIVE_ARCH)
     target_compile_options(erosion_core PRIVATE -march=native)
 endif()
 
-add_executable(${PROJECT_NAME} src/main.cpp)
+add_executable(${PROJECT_NAME}
+    src/main.cpp
+    src/Benchmark.cpp
+)
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
