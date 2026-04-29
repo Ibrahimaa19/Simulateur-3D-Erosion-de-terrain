@@ -153,3 +153,46 @@ if(CLANG_FORMAT_EXE)
         COMMENT "Checking C++ formatting with clang-format"
     )
 endif()
+
+
+if(EROSION_ENABLE_TESTS AND EXISTS ${PROJECT_SOURCE_DIR}/tests/CMakeLists.txt)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
+add_executable(benchmark
+    src/benchmark.cpp
+)
+
+target_link_libraries(benchmark
+    PRIVATE
+        erosion_core
+        OpenMP::OpenMP_CXX
+)
+
+target_compile_options(benchmark
+    PRIVATE
+        $<$<CONFIG:Release>:-O3 -march=native>
+        $<$<CONFIG:RelWithDebInfo>:-O3 -march=native>
+)
+
+find_program(CLANG_FORMAT_EXE NAMES clang-format)
+if(CLANG_FORMAT_EXE)
+    file(GLOB_RECURSE EROSION_FORMAT_FILES CONFIGURE_DEPENDS
+        ${PROJECT_SOURCE_DIR}/include/*.hpp
+        ${PROJECT_SOURCE_DIR}/src/*.cpp
+        ${PROJECT_SOURCE_DIR}/tests/*.cpp
+        ${PROJECT_SOURCE_DIR}/tests/*.hpp
+    )
+    list(FILTER EROSION_FORMAT_FILES EXCLUDE REGEX ".*/include/stb_image\\.hpp$")
+
+    add_custom_target(format
+        COMMAND ${CLANG_FORMAT_EXE} -i ${EROSION_FORMAT_FILES}
+        COMMENT "Formatting C++ sources with clang-format"
+    )
+
+    add_custom_target(format-check
+        COMMAND ${CLANG_FORMAT_EXE} --dry-run --Werror ${EROSION_FORMAT_FILES}
+        COMMENT "Checking C++ formatting with clang-format"
+    )
+endif()

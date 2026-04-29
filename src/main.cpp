@@ -23,7 +23,8 @@ enum class State
 {
     Render,
     Test,
-    MPI
+    MPI,
+    Thermal
 };
 
 enum class Heightmap
@@ -41,6 +42,7 @@ const std::map<std::string, State> kStates{
     {"test", State::Test},
     {"MPI", State::MPI},
     {"mpi", State::MPI},
+    {"thermal", State::Thermal},
 };
 
 const std::map<std::string, Heightmap> kHeightmaps{
@@ -174,6 +176,82 @@ int main(int argc, char* argv[])
         std::cerr << "Reconfigurez avec -DEROSION_ENABLE_MPI=ON si MPI est disponible.\n";
         return 1;
 #endif
+    }
+
+    if (stateIt->second == State::Thermal)
+    {
+        if (argc < 4)
+        {
+            std::cerr << "Usage: " << argv[0] << " thermal <typeTerrain> <steps> [method]\n";
+            std::cerr << "method: 0=Pure, 1=Blocked, 2=BlockedParallel, 3=Checkerboard,\n";
+            std::cerr << "        4=BlockedCheckerboard, 5=InPlace, 6=InPlaceParallel\n";
+            return 1;
+        }
+
+        const std::string terrainType = argv[2];
+        const int steps = std::atoi(argv[3]);
+        const int method = (argc >= 5) ? std::atoi(argv[4]) : 0;
+
+        if (steps <= 0)
+        {
+            std::cerr << "Erreur: steps doit être strictement positif\n";
+            return 1;
+        }
+
+        auto terrain = buildTerrain(terrainType);
+        if (!terrain)
+        {
+            std::cerr << "Heightmap non prise en charge: " << terrainType << "\n";
+            return 1;
+        }
+
+        const char* methodNames[] = {
+            "Pure two-phase",
+            "Blocked pure two-phase",
+            "Blocked parallel pure two-phase",
+            "Checkerboard pure two-phase",
+            "Blocked checkerboard pure two-phase",
+            "Checkerboard in-place",
+            "Checkerboard in-place parallel"
+        };
+
+        ThermalErosion erosion;
+        erosion.loadTerrainInfo(*terrain);  // ← CORRECTION ICI
+        erosion.setTalusAngle(30.0f);
+        erosion.setTransferRate(0.1f);
+        erosion.useEightNeighbors();
+        erosion.resetProgress();
+
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        int totalChanges = 0;
+        for (int i = 0; i < steps; i++) {
+            switch (method) {
+                case 0: totalChanges += erosion.stepPureTwoPhase(); break;
+                case 1: totalChanges += erosion.stepBlockedPureTwoPhase(); break;
+                case 2: totalChanges += erosion.stepBlockedParallelPureTwoPhase(); break;
+                case 3: totalChanges += erosion.stepCheckerboardPureTwoPhase(); break;
+                case 4: totalChanges += erosion.stepBlockedCheckerboardPureTwoPhase(); break;
+                case 5: totalChanges += erosion.stepCheckerboardInPlace(); break;
+                case 6: totalChanges += erosion.stepCheckerboardInPlaceParallel(); break;
+                default: std::cerr << "Méthode invalide" << std::endl; return 1;
+            }
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        std::cout << "\n========================================" << std::endl;
+        std::cout << "Méthode: " << methodNames[method] << std::endl;
+        std::cout << "Terrain: " << terrainType << std::endl;
+        std::cout << "Taille: " << terrain->getTerrainWidth() << "x" << terrain->getTerrainHeight() << std::endl;
+        std::cout << "Étapes: " << steps << std::endl;
+        std::cout << "Temps total: " << duration.count() << " ms" << std::endl;
+        std::cout << "Temps par étape: " << (duration.count() / steps) << " ms" << std::endl;
+        std::cout << "Cellules modifiées: " << totalChanges << std::endl;
+        std::cout << "========================================" << std::endl;
+        
+        return 0;
     }
 
     printUsage(argv[0]);
