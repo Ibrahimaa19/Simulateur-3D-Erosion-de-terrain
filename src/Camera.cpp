@@ -1,11 +1,8 @@
-#include <GL/freeglut_std.h>
-#include <GL/freeglut_ext.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
 #include "Camera.hpp"
-
 
 Camera::Camera()
 {
@@ -14,9 +11,7 @@ Camera::Camera()
     mPitch = 0.0f;
 }
 
-Camera::~Camera()
-{
-}
+Camera::~Camera() {}
 
 glm::vec3 Camera::GetPosition()
 {
@@ -66,14 +61,15 @@ void Camera::Yaw(float angle)
 }
 
 void Camera::Pitch(float angle)
-{   
+{
     mPitch += angle;
     NormalizePitch();
 }
 
 void Camera::TurnTo(glm::vec3 position)
 {
-    if(position == mPosition) return;
+    if (position == mPosition)
+        return;
 
     glm::vec3 direction = glm::normalize(position - mPosition);
     mPitch = glm::degrees(asinf(-direction.y));
@@ -91,7 +87,7 @@ void Camera::MoveTo(glm::vec3 position)
 void Camera::NormalizeYaw()
 {
     mYaw = fmodf(mYaw, 360.f);
-    if(mYaw < 0.f)
+    if (mYaw < 0.f)
     {
         mYaw += 360.f;
     }
@@ -99,11 +95,11 @@ void Camera::NormalizeYaw()
 
 void Camera::NormalizePitch()
 {
-    if(mPitch > 87.f)
+    if (mPitch > 87.f)
     {
         mPitch = 87.f;
     }
-    if(mPitch < -87.f)
+    if (mPitch < -87.f)
     {
         mPitch = -87.f;
     }

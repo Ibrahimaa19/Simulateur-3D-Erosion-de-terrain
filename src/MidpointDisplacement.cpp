@@ -1,24 +1,25 @@
 #include "MidpointDisplacement.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 
 static float RandomFloat(float a, float b)
 {
     return a + (b - a) * (float(rand()) / float(RAND_MAX));
 }
-static bool isPowerOfTwo(int n) {
+static inline bool isPowerOfTwo(int n)
+{
     return n > 0 && (n & (n - 1)) == 0;
 }
 
-MidpointDisplacement::MidpointDisplacement()
-{
-}
+MidpointDisplacement::MidpointDisplacement() {}
 
-void MidpointDisplacement::CreateMidpointDisplacement(int size, float minHeight, float maxHeight, float scale, float roughness)
+void MidpointDisplacement::CreateMidpointDisplacement(int size, float minHeight, float maxHeight, float scale,
+                                                      float roughness)
 {
-    
-    this->mWidth  = size;
+
+    this->mWidth = size;
     this->mHeight = size;
     this->mMinHeight = minHeight;
     this->mMaxHeight = maxHeight;
@@ -28,17 +29,13 @@ void MidpointDisplacement::CreateMidpointDisplacement(int size, float minHeight,
 
     this->mData.assign(mWidth * mHeight, 0.0f);
 
-    this->mRenderer = (std::make_unique<RendererManager>(this));
-    
-    if(!isPowerOfTwo(size - 1))
+    if (!isPowerOfTwo(size - 1))
     {
         printf("Invalid terrain size : %d (size must be 2^n + 1)\n", size);
         return;
     }
     CreateMidpointDisplacementInterne(roughness);
     Normalize();
-
-    createPatches();
 }
 
 void MidpointDisplacement::CreateMidpointDisplacementInterne(float roughness)
@@ -66,7 +63,7 @@ void MidpointDisplacement::Normalize()
     float minMaxDelta = max - min;
     float targetRange = mMaxHeight - mMinHeight;
 
-    for(auto& element : mData)
+    for (auto& element : mData)
     {
         element = (element - min) / minMaxDelta * targetRange + mMinHeight;
     }
@@ -83,10 +80,10 @@ void MidpointDisplacement::DiamondStep(int rectSize, float curHeight)
             int nextZ = (z + rectSize) % mHeight;
             int nextX = (x + rectSize) % mWidth;
 
-            float bottomLeft  = getHeight(z, x);
+            float bottomLeft = getHeight(z, x);
             float bottomRight = getHeight(z, nextX);
-            float topLeft     = getHeight(nextZ, x);
-            float topRight    = getHeight(nextZ, nextX);
+            float topLeft = getHeight(nextZ, x);
+            float topRight = getHeight(nextZ, nextX);
 
             int midX = (x + halfRectSize) % mWidth;
             int midZ = (z + halfRectSize) % mHeight;

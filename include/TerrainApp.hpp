@@ -2,24 +2,26 @@
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
-#include <glm/ext.hpp>
-#include <iostream>
-#include <memory>
-#include <string.h>
+#include <atomic>
 #include <cmath>
 #include <future>
-#include <atomic>
+#include <glm/ext.hpp>
+#include <glm/glm.hpp>
+#include <iostream>
+#include <memory>
 #include <mutex>
+#include <string.h>
 
 #include "Camera.hpp"
-#include "Shader.hpp"
-#include "Terrain.hpp"
 #include "FaultFormationTerrain.hpp"
+#include "Gui.hpp"
 #include "MidpointDisplacement.hpp"
 #include "PerlinNoiseTerrain.hpp"
+#include "Shader.hpp"
+#include "Terrain.hpp"
 #include "ThermalErosion.hpp"
-#include "Gui.hpp"
+
+class RendererManager;
 
 /**
  * @class TerrainApp
@@ -29,7 +31,7 @@
  */
 class TerrainApp
 {
-public:
+  public:
     /**
      * @brief Constructs a TerrainApp instance
      * @param seed Seed used to initialize the random number generator
@@ -56,7 +58,7 @@ public:
      */
     void setCameraSpeed(float value);
 
-private:
+  private:
     /**
      * @brief Internal function to initialize the window.
      */
@@ -106,32 +108,40 @@ private:
      * @brief Checks async generation completion and finalizes on main thread.
      */
     void UpdateTerrainGeneration();
+    struct ThermalFrameResult
+    {
+        int cellsModified = 0;
+        bool iterationFinished = false;
+    };
 
-private:
-    GLFWwindow* mWindow;              ///< Pointer to the GLFW window
+    ThermalFrameResult AdvanceThermalErosionFrame();
 
-    int mScreenWidth;                 ///< Current window width
-    int mScreenHeight;                ///< Current window height
+  private:
+    GLFWwindow* mWindow; ///< Pointer to the GLFW window
 
-    float mLastX;                     ///< Last mouse X position
-    float mLastY;                     ///< Last mouse Y position
-    bool mFirstMouse;                 ///< Flag for first mouse movement
-    float mMouseSensitivity;          ///< Mouse sensitivity multiplier
+    int mScreenWidth;  ///< Current window width
+    int mScreenHeight; ///< Current window height
 
-    Camera mCamera;                   ///< 3D camera
-    glm::mat4 mModel;                 ///< Model matrix
-    glm::mat4 mView;                  ///< View matrix
-    glm::mat4 mProjection;            ///< Projection matrix
+    float mLastX;            ///< Last mouse X position
+    float mLastY;            ///< Last mouse Y position
+    bool mFirstMouse;        ///< Flag for first mouse movement
+    float mMouseSensitivity; ///< Mouse sensitivity multiplier
 
-    std::unique_ptr<Shader> mShader;   ///< Smart pointer to the shader program
-    std::unique_ptr<Terrain> mTerrain; ///< Smart pointer to the Terrain object (Polymorphic)
-    ThermalErosion mThermalErosion;    ///< Objet gérant l’érosion thermique appliquée au terrain courant
+    Camera mCamera;        ///< 3D camera
+    glm::mat4 mModel;      ///< Model matrix
+    glm::mat4 mView;       ///< View matrix
+    glm::mat4 mProjection; ///< Projection matrix
 
-    GLuint mVAO = 0;                   ///< Vertex Array Object
-    GLuint mVBO = 0;                   ///< Vertex Buffer Object
-    GLuint mIBO = 0;                   ///< Index Buffer Object
+    std::unique_ptr<Shader> mShader;            ///< Smart pointer to the shader program
+    std::unique_ptr<Terrain> mTerrain;          ///< Smart pointer to the Terrain object (Polymorphic)
+    std::unique_ptr<RendererManager> mRenderer; ///< Ressources OpenGL associées au terrain courant
+    ThermalErosion mThermalErosion;             ///< Objet gérant l’érosion thermique appliquée au terrain courant
 
-    float mCameraSpeed;                ///< Speed used for keyboard movement
+    GLuint mVAO = 0; ///< Vertex Array Object
+    GLuint mVBO = 0; ///< Vertex Buffer Object
+    GLuint mIBO = 0; ///< Index Buffer Object
+
+    float mCameraSpeed; ///< Speed used for keyboard movement
 
     bool thermalEnabled;
     bool thermalStarted;
@@ -139,17 +149,17 @@ private:
     bool hydraulicEnabled;
     bool hydraulicStarted;
 
-    Gui mGui;                          ///< User Interface instance
-    bool mShowMenu;                    ///< Boolean to toggle menu visibility
+    Gui mGui;       ///< User Interface instance
+    bool mShowMenu; ///< Boolean to toggle menu visibility
 
-    std::future<void> mGenerationFuture;   ///< Tâche asynchrone de génération du terrain
-    std::atomic<bool> mIsGenerating{false}; ///< Indique si une génération est en cours
+    std::future<void> mGenerationFuture;       ///< Tâche asynchrone de génération du terrain
+    std::atomic<bool> mIsGenerating{false};    ///< Indique si une génération est en cours
     std::atomic<bool> mPendingFinalize{false}; ///< Indique qu'une finalisation sur le thread principal est attendue
 
-    std::mutex mGenerationMutex;           ///< Mutex protégeant l'échange du terrain généré
+    std::mutex mGenerationMutex;              ///< Mutex protégeant l'échange du terrain généré
     std::unique_ptr<Terrain> mPendingTerrain; ///< Terrain généré en arrière-plan en attente d'intégration
 
-private:
+  private:
     /** Keyboard callback wrapper */
     static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 

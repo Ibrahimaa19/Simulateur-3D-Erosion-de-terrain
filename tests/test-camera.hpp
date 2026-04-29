@@ -1,6 +1,6 @@
 #pragma once
-#include <gtest/gtest.h>
 #include "Camera.hpp"
+#include <gtest/gtest.h>
 
 /**
  * @class CameraTest
@@ -10,7 +10,7 @@
  */
 class CameraTest : public ::testing::Test
 {
-protected:
+  protected:
     Camera camera;
 
     void SetUp() override

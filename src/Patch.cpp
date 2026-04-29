@@ -1,6 +1,9 @@
 #include "Patch.hpp"
 
-void Patch::setPatch(unsigned int x, unsigned int z, float xzFactor, unsigned int nbPatchX, unsigned int nbPatchZ,Texture* texture)
+#include <cstddef>
+
+void Patch::setPatch(unsigned int x, unsigned int z, float xzFactor, unsigned int nbPatchX, unsigned int nbPatchZ,
+                     Texture* texture)
 {
     this->mPatchX = x;
     this->mPatchZ = z;
@@ -10,17 +13,17 @@ void Patch::setPatch(unsigned int x, unsigned int z, float xzFactor, unsigned in
     this->mPatchTexture = texture;
 }
 
-void Patch::addNeighbor(Patch *neighbor)
+void Patch::addNeighbor(Patch* neighbor)
 {
     mNeighbors.push_back(neighbor);
 }
 
-std::vector<Patch *> Patch::getNeighbors()
+const std::vector<Patch*>& Patch::getNeighbors() const
 {
     return this->mNeighbors;
 }
 
-int Patch::getNeighborLodLevel(int index)
+int Patch::getNeighborLodLevel(int index) const
 {
     return mNeighbors[index]->mLodLevel;
 }
@@ -43,7 +46,8 @@ GLuint Patch::getVbo(int lodLevel)
 void Patch::createBuffersGL()
 {
     unsigned int idBufPos = 0;
-    unsigned int idBufTex = 1;
+    unsigned int idBufNormal = 1;
+    unsigned int idBufTex = 2;
 
     for (int lod = 0; lod < 5; lod++)
     {
@@ -55,15 +59,16 @@ void Patch::createBuffersGL()
         glBindBuffer(GL_ARRAY_BUFFER, mVbo[lod]);
 
         glEnableVertexAttribArray(idBufPos);
-        glVertexAttribPointer(idBufPos, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)0);
+        glVertexAttribPointer(idBufPos, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
 
-        glBufferData(GL_ARRAY_BUFFER, this->mLod[lod].vertices.size() * sizeof(Vertex), this->mLod[lod].vertices.data(),GL_DYNAMIC_DRAW);
-        
-        unsigned numFloat =3;
-        
+        glBufferData(GL_ARRAY_BUFFER, this->mLod[lod].vertices.size() * sizeof(Vertex), this->mLod[lod].vertices.data(),
+                     GL_DYNAMIC_DRAW);
+
+        glEnableVertexAttribArray(idBufNormal);
+        glVertexAttribPointer(idBufNormal, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
+
         glEnableVertexAttribArray(idBufTex);
-        glVertexAttribPointer(idBufTex, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)(numFloat*sizeof(float)));
-        
+        glVertexAttribPointer(idBufTex, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texture));
 
         // Créer EBO
         glGenBuffers(1, &mEbo[lod]);
@@ -75,26 +80,35 @@ void Patch::createBuffersGL()
     }
 }
 
-void Patch::generateLodVertices(std::vector<float> &heights, unsigned int width, unsigned int height)
+void Patch::generateLodVertices(std::vector<float>& heights, unsigned int width, unsigned int height)
 {
     const float skirtDepth = 0.01f;
     const float textureScale = 20.0f;
 
-    const int basePatchX = static_cast<int>(mPatchX) * PATCH_SIZE;
-    const int basePatchZ = static_cast<int>(mPatchZ) * PATCH_SIZE;
+    const int basePatchX = static_cast<int>(mPatchX) * kTerrainPatchSize;
+    const int basePatchZ = static_cast<int>(mPatchZ) * kTerrainPatchSize;
 
     const float invXzFactor = 1.0f / mXzFactor;
     const float invTexWidth = textureScale / (static_cast<float>(width) * mXzFactor);
     const float invTexHeight = textureScale / (static_cast<float>(height) * mXzFactor);
+    const int maxX = static_cast<int>(width) - 1;
+    const int maxZ = static_cast<int>(height) - 1;
+
+    auto heightAt = [&heights, width, maxX, maxZ](int x, int z)
+    {
+        const int sx = std::clamp(x, 0, maxX);
+        const int sz = std::clamp(z, 0, maxZ);
+        return heights[sz * static_cast<int>(width) + sx];
+    };
 
     for (int k = 0; k < 5; ++k)
     {
         const int step = mLodSteps[k];
-        const int innerResolution = (PATCH_SIZE / step) + 1;
+        const int innerResolution = (kTerrainPatchSize / step) + 1;
         const int resolution = innerResolution + 2;
         const int totalVertices = resolution * resolution;
 
-        auto &vertices = mLod[k].vertices;
+        auto& vertices = mLod[k].vertices;
         vertices.resize(totalVertices);
 
         int outIndex = 0;
@@ -106,7 +120,7 @@ void Patch::generateLodVertices(std::vector<float> &heights, unsigned int width,
 
             const int worldZ = basePatchZ + innerY * step;
             int sampleZ = basePatchZ + clampedY * step;
-            sampleZ = std::clamp(sampleZ, 0, static_cast<int>(height) - 1);
+            sampleZ = std::clamp(sampleZ, 0, maxZ);
 
             const bool borderY = (localY == 0 || localY == resolution - 1);
 
@@ -117,31 +131,30 @@ void Patch::generateLodVertices(std::vector<float> &heights, unsigned int width,
 
                 const int worldX = basePatchX + innerX * step;
                 int sampleX = basePatchX + clampedX * step;
-                sampleX = std::clamp(sampleX, 0, static_cast<int>(width) - 1);
+                sampleX = std::clamp(sampleX, 0, maxX);
 
-                float heightValue = heights[sampleZ * static_cast<int>(width) + sampleX];
+                float heightValue = heightAt(sampleX, sampleZ);
+                glm::vec3 normal = glm::normalize(glm::vec3(
+                    heightAt(sampleX - step, sampleZ) - heightAt(sampleX + step, sampleZ), 2.0f * step * invXzFactor,
+                    heightAt(sampleX, sampleZ - step) - heightAt(sampleX, sampleZ + step)));
 
                 if (borderY || localX == 0 || localX == resolution - 1)
                 {
                     heightValue -= skirtDepth;
                 }
 
-                vertices[outIndex].position = glm::vec3(
-                    static_cast<float>(worldX) * invXzFactor,
-                    heightValue,
-                    static_cast<float>(worldZ) * invXzFactor
-                );
+                vertices[outIndex].position = glm::vec3(static_cast<float>(worldX) * invXzFactor, heightValue,
+                                                        static_cast<float>(worldZ) * invXzFactor);
+                vertices[outIndex].normal = normal;
 
-                vertices[outIndex].texture = glm::vec2(
-                    static_cast<float>(worldX) * invTexWidth,
-                    static_cast<float>(worldZ) * invTexHeight
-                );
+                vertices[outIndex].texture =
+                    glm::vec2(static_cast<float>(worldX) * invTexWidth, static_cast<float>(worldZ) * invTexHeight);
             }
         }
     }
 }
 
-void Patch::generateLodIndices(std::vector<float> &heights, unsigned int width, unsigned int height)
+void Patch::generateLodIndices(std::vector<float>& heights, unsigned int width, unsigned int height)
 {
     for (int k = 0; k < 5; ++k)
     {
@@ -149,7 +162,7 @@ void Patch::generateLodIndices(std::vector<float> &heights, unsigned int width, 
 
         int step = mLodSteps[k];
 
-        int innerResolution = (PATCH_SIZE / step) + 1;
+        int innerResolution = (kTerrainPatchSize / step) + 1;
         int resolution = innerResolution + 2;
 
         int cellsPerRow = resolution - 1;
@@ -187,14 +200,14 @@ void Patch::render()
     glBindVertexArray(0);
 }
 
-int Patch::chooseLod(glm::vec3 cameraPos, Frustrum *frustrum)
+int Patch::chooseLod(glm::vec3 cameraPos, Frustrum* frustrum)
 {
-    float centreX = (mPatchX * PATCH_SIZE + PATCH_SIZE * 0.5f) / mXzFactor;
-    float centreZ = (mPatchZ * PATCH_SIZE + PATCH_SIZE * 0.5f) / mXzFactor;
+    float centreX = (mPatchX * kTerrainPatchSize + kTerrainPatchSize * 0.5f) / mXzFactor;
+    float centreZ = (mPatchZ * kTerrainPatchSize + kTerrainPatchSize * 0.5f) / mXzFactor;
     float hauteurMoyenne = 0.5f;
 
     glm::vec3 centre(centreX, hauteurMoyenne, centreZ);
-    bool inFrustrum = frustrum->isPatchInFrustum(centre, (PATCH_SIZE * (17.f)) / mXzFactor);
+    bool inFrustrum = frustrum->isPatchInFrustum(centre, (kTerrainPatchSize * (17.f)) / mXzFactor);
 
     if (!inFrustrum)
         return -1;
@@ -223,7 +236,7 @@ int Patch::chooseLod(glm::vec3 cameraPos, Frustrum *frustrum)
     }
 }
 
-int Patch::getLodLevel()
+int Patch::getLodLevel() const
 {
     return this->mLodLevel;
 }
@@ -248,20 +261,12 @@ void Patch::uploadSingleLodToGpu(int lodLevel)
     glBindVertexArray(mVao[lodLevel]);
 
     glBindBuffer(GL_ARRAY_BUFFER, mVbo[lodLevel]);
-    glBufferSubData(
-        GL_ARRAY_BUFFER,
-        0,
-        mLod[lodLevel].vertices.size() * sizeof(Vertex),
-        mLod[lodLevel].vertices.data()
-    );
+    glBufferSubData(GL_ARRAY_BUFFER, 0, mLod[lodLevel].vertices.size() * sizeof(Vertex),
+                    mLod[lodLevel].vertices.data());
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mEbo[lodLevel]);
-    glBufferSubData(
-        GL_ELEMENT_ARRAY_BUFFER,
-        0,
-        mLod[lodLevel].indices.size() * sizeof(unsigned int),
-        mLod[lodLevel].indices.data()
-    );
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, mLod[lodLevel].indices.size() * sizeof(unsigned int),
+                    mLod[lodLevel].indices.data());
 
     glBindVertexArray(0);
 }

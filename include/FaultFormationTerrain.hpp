@@ -1,7 +1,6 @@
-#pragma once 
+#pragma once
 
 #include "Terrain.hpp"
-#include "RendererManager.hpp"
 
 /**
  * @class FaultFormationTerrain
@@ -15,14 +14,14 @@
  */
 class FaultFormationTerrain : public Terrain
 {
-public: 
+  public:
     /**
      * @brief Default constructor.
      *
      * Initializes the terrain object without setting width, height, or data.
      */
     FaultFormationTerrain();
-    
+
     /**
      * @brief Generates a terrain using the fault formation algorithm.
      *
@@ -38,9 +37,10 @@ public:
      * @param applyFilter Whether to apply the FIR smoothing filter (default = false).
      * @param filter FIR filter coefficient (default = 0.5f, interval [0.0 ; 1.0]).
      */
-    void CreateFaultFormation(int width, int height, int iterations, float minHeight, float maxHeight, float scale = 1.0f, bool applyFilter = false, float filter = 0.5f);
+    void CreateFaultFormation(int width, int height, int iterations, float minHeight, float maxHeight,
+                              float scale = 1.0f, bool applyFilter = false, float filter = 0.5f);
 
-private:
+  private:
     /**
      * @struct TerrainPoint
      * @brief Represents a single point in the terrain grid.
@@ -49,7 +49,7 @@ private:
     {
         int x = 0; ///< X coordinate in the terrain grid
         int z = 0; ///< Z coordinate in the terrain grid
-        
+
         /**
          * @brief Compares this point to another point.
          * @param p The point to compare with.

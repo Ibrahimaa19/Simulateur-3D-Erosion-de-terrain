@@ -9,7 +9,7 @@
  */
 class HydraulicErosion
 {
-public:
+  public:
     /**
      * @brief Constructeur de la classe HydraulicErosion
      * @param iterations Nombre de gouttes à simuler
@@ -18,10 +18,7 @@ public:
      * @param depositRate Taux de dépôt de sédiments
      * @param evaporation Fraction d'eau évaporée par étape
      */
-    HydraulicErosion(int iterations = 20000,
-                     float rain = 1.0f,
-                     float erosionRate = 0.02f,
-                     float depositRate = 0.05f,
+    HydraulicErosion(int iterations = 20000, float rain = 1.0f, float erosionRate = 0.02f, float depositRate = 0.05f,
                      float evaporation = 0.1f);
 
     /**
@@ -30,10 +27,10 @@ public:
      */
     void apply(Terrain& terrain);
 
-private:
-    int iterations;   
-    float rain;          
-    float erosionRate;   
-    float depositRate;   
-    float evaporation;   
+  private:
+    int iterations;
+    float rain;
+    float erosionRate;
+    float depositRate;
+    float evaporation;
 };

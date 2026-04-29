@@ -1,18 +1,13 @@
 #include "PerlinNoiseTerrain.hpp"
 #include <algorithm>
 #include <cmath>
-#include <numeric>
 #include <cstdlib>
+#include <numeric>
 
 PerlinNoiseTerrain::PerlinNoiseTerrain() {}
 
-void PerlinNoiseTerrain::CreatePerlinNoise(int width, int height,
-                                           float minHeight, float maxHeight,
-                                           float scale,
-                                           float frequency,
-                                           int octaves,
-                                           float persistence,
-                                           float lacunarity)
+void PerlinNoiseTerrain::CreatePerlinNoise(int width, int height, float minHeight, float maxHeight, float scale,
+                                           float frequency, int octaves, float persistence, float lacunarity)
 {
     this->mWidth = width;
     this->mHeight = height;
@@ -24,8 +19,6 @@ void PerlinNoiseTerrain::CreatePerlinNoise(int width, int height,
 
     this->mData.assign(width * height, 0.0f);
 
-    this->mRenderer = (std::make_unique<RendererManager>(this));
-
     mBaseFrequency = frequency;
     mNumOctaves = octaves;
     mPersistenceCoef = persistence;
@@ -34,8 +27,6 @@ void PerlinNoiseTerrain::CreatePerlinNoise(int width, int height,
     InitPermutation();
     CreatePerlinNoiseInternal(minHeight, maxHeight);
     Normalize();
-
-    createPatches();
 }
 
 void PerlinNoiseTerrain::CreatePerlinNoiseInternal(float minH, float maxH)
@@ -48,7 +39,7 @@ void PerlinNoiseTerrain::CreatePerlinNoiseInternal(float minH, float maxH)
     const float persistence = mPersistenceCoef;
     const float lacunarity = mLacunarityCoef;
 
-    #pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static)
     for (int z = 0; z < height; ++z)
     {
         const int rowOffset = z * width;
@@ -111,10 +102,10 @@ float PerlinNoiseTerrain::Noise2D(float x, float y) const
         return gx * dx + gy * dy;
     };
 
-    const float tl = dot(mPermutation[pX + Y],     xf,      yf);
-    const float tr = dot(mPermutation[pX1 + Y],    xf - 1,  yf);
-    const float bl = dot(mPermutation[pX + Y + 1], xf,      yf - 1);
-    const float br = dot(mPermutation[pX1 + Y + 1],xf - 1,  yf - 1);
+    const float tl = dot(mPermutation[pX + Y], xf, yf);
+    const float tr = dot(mPermutation[pX1 + Y], xf - 1, yf);
+    const float bl = dot(mPermutation[pX + Y + 1], xf, yf - 1);
+    const float br = dot(mPermutation[pX1 + Y + 1], xf - 1, yf - 1);
 
     const float u = Fade(xf);
     const float v = Fade(yf);
@@ -127,16 +118,8 @@ float PerlinNoiseTerrain::Noise2D(float x, float y) const
 
 void PerlinNoiseTerrain::Gradient(int hash, float& gx, float& gy) const
 {
-    static const float gradients[8][2] = {
-        { 1.0f,  1.0f},
-        {-1.0f,  1.0f},
-        { 1.0f, -1.0f},
-        {-1.0f, -1.0f},
-        { 1.0f,  0.0f},
-        {-1.0f,  0.0f},
-        { 0.0f,  1.0f},
-        { 0.0f, -1.0f}
-    };
+    static const float gradients[8][2] = {{1.0f, 1.0f}, {-1.0f, 1.0f}, {1.0f, -1.0f}, {-1.0f, -1.0f},
+                                          {1.0f, 0.0f}, {-1.0f, 0.0f}, {0.0f, 1.0f},  {0.0f, -1.0f}};
 
     const int idx = hash & 7;
     gx = gradients[idx][0];
@@ -170,7 +153,7 @@ void PerlinNoiseTerrain::Normalize()
 
     const float scale = minMaxRange / minMaxDelta;
 
-    #pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static)
     for (int i = 0; i < static_cast<int>(mData.size()); ++i)
     {
         mData[i] = (mData[i] - minVal) * scale + mMinHeight;

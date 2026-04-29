@@ -31,9 +31,7 @@ struct Sphere
      * @param c Centre de la sphère
      * @param r Rayon de la sphère
      */
-    Sphere(glm::vec3 c, float r) : center(c), radius(r)
-    {
-    }
+    Sphere(glm::vec3 c, float r) : center(c), radius(r) {}
 };
 
 /**
@@ -68,7 +66,7 @@ class Frustrum
      * Calcule les 6 plans du frustum à partir de la combinaison
      * des matrices projection et vue.
      */
-    void updateFrustum(glm::mat4 &projection, glm::mat4 &view);
+    void updateFrustum(glm::mat4& projection, glm::mat4& view);
 
     /**
      * @brief Teste si une sphère est dans le frustum
@@ -79,7 +77,7 @@ class Frustrum
      * Utilise l'algorithme de test sphère/frustum pour déterminer
      * si un patch est potentiellement visible.
      */
-    bool isPatchInFrustum(const glm::vec3 &patchCentre, float radius);
+    bool isPatchInFrustum(const glm::vec3& patchCentre, float radius);
 };
 
 #endif

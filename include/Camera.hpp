@@ -1,10 +1,7 @@
-#pragma once 
+#pragma once
 
-#include <GL/freeglut_std.h>
-#include <GL/freeglut_ext.h>
-
-#include <glm/glm.hpp>
 #include <glm/ext.hpp>
+#include <glm/glm.hpp>
 
 /**
  * @class Camera
@@ -16,7 +13,7 @@
  */
 class Camera
 {
-public:
+  public:
     /**
      * @brief Default constructor for the camera.
      *
@@ -107,7 +104,7 @@ public:
      */
     void MoveTo(glm::vec3 position);
 
-private:
+  private:
     /**
      * @brief Normalizes the yaw angle to stay within 0 to 360 degrees.
      */
@@ -118,7 +115,7 @@ private:
      */
     void NormalizePitch();
 
-private:
+  private:
     glm::vec3 mPosition; ///< Current position of the camera in space
     float mYaw;          ///< Yaw angle (horizontal rotation) in degrees
     float mPitch;        ///< Pitch angle (vertical rotation) in degrees

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <gtest/gtest.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <gtest/gtest.h>
 
 /**
  * @class ShaderTest
@@ -13,20 +13,22 @@
  */
 class ShaderTest : public ::testing::Test
 {
-protected:
+  protected:
     GLFWwindow* mWindow = nullptr;
 
     void SetUp() override
     {
         // Initialize GLFW
-        if (!glfwInit()) {
+        if (!glfwInit())
+        {
             FAIL() << "Failed to initialize GLFW";
         }
 
         // Create an invisible window
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
         mWindow = glfwCreateWindow(100, 100, "Test OpenGL", nullptr, nullptr);
-        if (!mWindow) {
+        if (!mWindow)
+        {
             glfwTerminate();
             FAIL() << "Failed to create a GLFW window for tests";
         }
@@ -36,15 +38,16 @@ protected:
         // Initialize GLEW
         glewExperimental = GL_TRUE;
         GLenum err = glewInit();
-        if (err != GLEW_OK) {
-            std::cerr << "Failed to initialize GLEW: "
-                      << glewGetErrorString(err) << std::endl;
+        if (err != GLEW_OK)
+        {
+            std::cerr << "Failed to initialize GLEW: " << glewGetErrorString(err) << std::endl;
         }
     }
 
     void TearDown() override
     {
-        if (mWindow) {
+        if (mWindow)
+        {
             glfwDestroyWindow(mWindow);
             glfwTerminate();
             mWindow = nullptr;

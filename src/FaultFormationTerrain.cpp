@@ -1,15 +1,14 @@
 #include "FaultFormationTerrain.hpp"
 #include <algorithm>
-#include <utility>
-#include <cstdlib>
 #include <cstdio>
+#include <cstdlib>
 #include <omp.h>
+#include <utility>
 
-FaultFormationTerrain::FaultFormationTerrain()
-{
-}
+FaultFormationTerrain::FaultFormationTerrain() {}
 
-void FaultFormationTerrain::CreateFaultFormation(int width, int height, int iterations, float minHeight, float maxHeight, float scale, bool applyFilter, float filter)
+void FaultFormationTerrain::CreateFaultFormation(int width, int height, int iterations, float minHeight,
+                                                 float maxHeight, float scale, bool applyFilter, float filter)
 {
     this->mWidth = width;
     this->mHeight = height;
@@ -19,15 +18,11 @@ void FaultFormationTerrain::CreateFaultFormation(int width, int height, int iter
     this->mXzFactor = 1.0f / scale;
     this->mBorderSize = 0;
 
-    this->mRenderer = (std::make_unique<RendererManager>(this));
-
     this->mData.assign(width * height, 0.0f);
 
     CreateFaultFormationInternal(iterations, minHeight, maxHeight, applyFilter, filter);
 
     Normalize();
-    
-    createPatches();
 }
 
 bool FaultFormationTerrain::TerrainPoint::IsEqual(TerrainPoint& p) const
@@ -35,7 +30,8 @@ bool FaultFormationTerrain::TerrainPoint::IsEqual(TerrainPoint& p) const
     return (x == p.x) && (z == p.z);
 }
 
-void FaultFormationTerrain::CreateFaultFormationInternal(int iterations, float minHeight, float maxHeight, bool applyFilter, float filter)
+void FaultFormationTerrain::CreateFaultFormationInternal(int iterations, float minHeight, float maxHeight,
+                                                         bool applyFilter, float filter)
 {
     const float deltaHeight = maxHeight - minHeight;
     float* data = mData.data();
@@ -55,7 +51,7 @@ void FaultFormationTerrain::CreateFaultFormationInternal(int iterations, float m
         const int p1x = p1.x;
         const int p1z = p1.z;
 
-        #pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static)
         for (int z = 0; z < height; ++z)
         {
             const int rowOffset = z * width;
@@ -115,7 +111,7 @@ void FaultFormationTerrain::Normalize()
 
     const float scale = minMaxRange / minMaxDelta;
 
-    #pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static)
     for (int i = 0; i < static_cast<int>(mData.size()); ++i)
     {
         mData[i] = (mData[i] - minVal) * scale + mMinHeight;

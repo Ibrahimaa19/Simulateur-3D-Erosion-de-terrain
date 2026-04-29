@@ -1,78 +1,57 @@
 #ifndef RENDERER_MANAGER_H
 #define RENDERER_MANAGER_H
 
+#include "Frustrum.hpp"
+#include "Patch.hpp"
 #include "Terrain.hpp"
+#include "Texture.hpp"
+
 #include <glm/glm.hpp>
+#include <memory>
+#include <vector>
 
 /**
- * @class RendererManager
- * @brief Gère le rendu du terrain avec système de LOD (Level of Detail)
+ * @brief Gère toutes les ressources de rendu associées à un Terrain CPU.
  *
- * Cette classe est responsable du rendu du terrain en utilisant un système
- * de niveau de détail (LOD) pour optimiser les performances. Elle utilise
- * un frustum culling et gère l'activation/désactivation du LOD.
+ * Terrain reste indépendant d'OpenGL/GLM. Cette classe possède les patches,
+ * textures, buffers GPU et le frustum nécessaires au rendu LOD.
  */
 class RendererManager
 {
   private:
-    Terrain *mTerrain;    /** Pointeur vers le terrain à afficher */
-    Frustrum *mFrustrum;  /** Frustum pour le culling des patches */
-    bool mLodIsOn = true; /** État du système LOD (activé/désactivé) */
+    Terrain* mTerrain = nullptr;
+    Frustrum mFrustrum;
+    bool mLodIsOn = true;
+
+    std::vector<std::unique_ptr<Patch>> mPatches;
+    std::unique_ptr<Texture> mTexture;
+
+    void loadVerticesLod();
+    void loadIndicesLod();
+    void createPatches();
+    void connectPatchNeighbors();
 
     /**
-     * @brief Corrige les différences de LOD entre patches voisins
-     *
-     * Parcourt tous les patches et ajuste leurs niveaux de LOD pour éviter
-     * des différences trop importantes entre patches adjacents, ce qui
-     * pourrait causer des artefacts visuels.
+     * @brief Corrige les différences de LOD entre patches voisins.
      */
     void correctLod();
 
   public:
-    /**
-     * @brief Constructeur du RendererManager
-     * @param terrain Pointeur vers le terrain associé
-     *
-     * Initialise le gestionnaire de rendu et crée le frustum associé.
-     */
-    RendererManager(Terrain *terrain);
+    explicit RendererManager(Terrain* terrain);
+    ~RendererManager() = default;
 
-    /**
-     * @brief Destructeur du RendererManager
-     *
-     * Nettoie les ressources allouées (notamment le frustum).
-     */
-    ~RendererManager();
+    void renderLod(const glm::vec3& cameraPos, glm::mat4& projection, glm::mat4& view);
 
-    /**
-     * @brief Effectue le rendu du terrain avec gestion LOD
-     * @param cameraPos Position actuelle de la caméra
-     * @param projection Matrice de projection
-     * @param view Matrice de vue
-     *
-     * Fonction principale de rendu qui :
-     * 1. Met à jour le frustum avec les matrices projection et vue
-     * 2. Pour chaque patch, choisit le niveau de LOD approprié
-     * 3. Applique la correction des LOD si nécessaire
-     * 4. Affiche uniquement les patches visibles
-     */
-    void renderLod(const glm::vec3 &cameraPos, glm::mat4 &projection, glm::mat4 &view);
-
-    /**
-     * @brief Active ou désactive le système de LOD
-     *
-     * Bascule l'état du LOD. Quand désactivé, tous les patches sont rendus
-     * avec le niveau de détail maximal.
-     */
     void activateLod();
+    void setTerrain(Terrain* terrain);
 
-    /**
-     * @brief Change le terrain associé au renderer
-     * @param terrain Nouveau pointeur vers le terrain
-     *
-     * Permet de changer dynamiquement le terrain rendu par ce gestionnaire.
-     */
-    void setTerrain(Terrain *terrain);
+    void initTexture();
+    void setupTerrainLod(unsigned int& vao, unsigned int& vbo, unsigned int& ebo);
+    void updateVerticesGpuLod();
+    void updateVerticesGpuLod(const std::vector<int>& dirtyPatchIndices);
+
+    Texture* getTexture();
+    std::vector<std::unique_ptr<Patch>>& getPatches();
 };
 
 #endif
