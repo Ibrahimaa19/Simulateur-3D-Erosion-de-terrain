@@ -168,7 +168,7 @@ int main(int argc, char* argv[])
         }
 
 #if EROSION_ENABLE_MPI
-        return lauchMPI(argc, argv);
+        return launchMPI2D(argc, argv);
 #else
         std::cerr << "Le mode MPI est désactivé dans ce build.\n";
         std::cerr << "Reconfigurez avec -DEROSION_ENABLE_MPI=ON si MPI est disponible.\n";

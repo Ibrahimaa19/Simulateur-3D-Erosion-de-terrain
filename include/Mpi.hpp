@@ -1,29 +1,37 @@
-#pragma once
+
+#include <mpi.h>
+#include <omp.h>
+
+#include "stb_image_write.h"
+#include <chrono>
+#include <fstream>
+#include <numeric>
+#include <cstring>
+#include <algorithm>
+#include <cmath>
+#include <vector>
 
 #include "FaultFormationTerrain.hpp"
 #include "MidpointDisplacement.hpp"
 #include "PerlinNoiseTerrain.hpp"
 #include "ThermalErosion.hpp"
-#include "stb_image_write.h"
-#include <algorithm>
-#include <chrono>
-#include <cmath>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <fstream>
-#include <mpi.h>
-#include <numeric>
-#include <omp.h>
-#include <string>
+
+
+#define TAG_GHOST_ROW 100
+#define TAG_GHOST_COL 101
+#define TAG_GHOST_CORNER 102
+#define TAG_FLUX_ROW 200
+#define TAG_FLUX_COL 201
+#define TAG_FLUX_CORNER 202
+
 
 int neighbors[8][2] = {{1, -1}, {1, 0}, {1, 1}, {0, -1}, {0, 1}, {-1, -1}, {-1, 0}, {-1, 1}};
 
 bool boolNeightbors[8];
 
-void savePngHeightmap(const char* nom_fichier, float* heightmap, int largeur, int hauteur)
+void savePngHeightmap(const char *nom_fichier, float *heightmap, int largeur, int hauteur)
 {
-    unsigned char* pixels = new unsigned char[largeur * hauteur];
+    unsigned char *pixels = new unsigned char[largeur * hauteur];
 
     for (int i = 0; i < largeur * hauteur; i++)
     {
@@ -41,1198 +49,8 @@ static inline bool isPowerOfTwo(int n)
     return n > 0 && (n & (n - 1)) == 0;
 }
 
-int stepChunkMPIBlockVect2(float* __restrict__ initialData, float* __restrict__ fluxData,
-                           float* __restrict__ bottomFlux, float* __restrict__ topFlux, const int width,
-                           const int height) noexcept
-{
-    const float transferRate = 0.5f;
-    const float PI = 3.14159265f;
-    const float talusAngle = std::tan(30.f * PI / 180.0f);
 
-    const int W = width;
-    const int H = height;
-
-    memset(fluxData, 0, sizeof(float) * (H + 2) * W);
-    int changes = 0;
-
-    const int BLOCKSIZE = 32;
-    float dist[8];
-
-    for (int ii = 2; ii < H - 1; ii += BLOCKSIZE)
-    {
-        int i_end = std::min(H - 1, ii + BLOCKSIZE);
-
-        for (int jj = 2; jj < W - 2; jj += BLOCKSIZE)
-        {
-            int j_end = std::min(W - 2, jj + BLOCKSIZE);
-
-            for (int i = ii; i < i_end; i++)
-            {
-                const float* __restrict__ rowDown = initialData + (i + 1) * W;
-                const float* __restrict__ rowCurr = initialData + i * W;
-                const float* __restrict__ rowUp = initialData + (i - 1) * W;
-
-                float* __restrict__ fluxDown = fluxData + (i + 1) * W;
-                float* __restrict__ fluxCurr = fluxData + i * W;
-                float* __restrict__ fluxUp = fluxData + (i - 1) * W;
-
-#pragma omp simd reduction(+ : changes)
-                for (int j = jj; j < j_end; j++)
-                {
-
-                    const float currentHeight = initialData[i * W + j];
-
-                    const float d0 = currentHeight - rowDown[j - 1];
-                    const float d1 = currentHeight - rowDown[j];
-                    const float d2 = currentHeight - rowDown[j + 1];
-                    const float d3 = currentHeight - rowCurr[j - 1];
-                    const float d4 = currentHeight - rowCurr[j + 1];
-                    const float d5 = currentHeight - rowUp[j - 1];
-                    const float d6 = currentHeight - rowUp[j];
-                    const float d7 = currentHeight - rowUp[j + 1];
-
-                    const float mask0 = (d0 > talusAngle) ? 1.0f : 0.0f;
-                    const float mask1 = (d1 > talusAngle) ? 1.0f : 0.0f;
-                    const float mask2 = (d2 > talusAngle) ? 1.0f : 0.0f;
-                    const float mask3 = (d3 > talusAngle) ? 1.0f : 0.0f;
-                    const float mask4 = (d4 > talusAngle) ? 1.0f : 0.0f;
-                    const float mask5 = (d5 > talusAngle) ? 1.0f : 0.0f;
-                    const float mask6 = (d6 > talusAngle) ? 1.0f : 0.0f;
-                    const float mask7 = (d7 > talusAngle) ? 1.0f : 0.0f;
-
-                    const float totalDiff = d0 * mask0 + d1 * mask1 + d2 * mask2 + d3 * mask3 + d4 * mask4 +
-                                            d5 * mask5 + d6 * mask6 + d7 * mask7;
-                    const float validNeighbors = (mask0 + mask1 + mask2 + mask3 + mask4 + mask5 + mask6 + mask7);
-
-                    const float move0 = d0 * mask0;
-                    const float move1 = d1 * mask1;
-                    const float move2 = d2 * mask2;
-                    const float move3 = d3 * mask3;
-                    const float move4 = d4 * mask4;
-                    const float move5 = d5 * mask5;
-                    const float move6 = d6 * mask6;
-                    const float move7 = d7 * mask7;
-
-                    if (totalDiff > 0.f && validNeighbors > 0.f)
-                    {
-
-                        float materialToMove = transferRate * (totalDiff / validNeighbors);
-                        materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-                        fluxCurr[j] -= materialToMove;
-
-                        const float material = materialToMove / totalDiff;
-
-                        fluxDown[j - 1] += move0 * material;
-                        fluxDown[j] += move1 * material;
-                        fluxDown[j + 1] += move2 * material;
-                        fluxCurr[j - 1] += move3 * material;
-                        fluxCurr[j + 1] += move4 * material;
-                        fluxUp[j - 1] += move5 * material;
-                        fluxUp[j] += move6 * material;
-                        fluxUp[j + 1] += move7 * material;
-
-                        changes++;
-                    }
-                }
-            }
-        }
-    }
-
-    // -------------------------- BOTTOM
-    for (int j = 2; j < W - 2; ++j)
-    {
-        int i = H - 1;
-        float currentHeight = initialData[i * W + j];
-
-        for (int p = 0; p < 8; ++p)
-        {
-            dist[p] = currentHeight - initialData[(i + neighbors[p][0]) * W + (j + neighbors[p][1])];
-        }
-        float totalDiff = 0.f;
-        int validNeighbors = 0;
-
-        for (int p = 0; p < 8; ++p)
-        {
-            if (dist[p] > talusAngle)
-            {
-                totalDiff = totalDiff + dist[p];
-                ++validNeighbors;
-            }
-        }
-
-        if (totalDiff > 0 && validNeighbors > 0)
-        {
-
-            float materialToMove = transferRate * (totalDiff / validNeighbors);
-            materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-            fluxData[i * W + j] -= materialToMove;
-
-            // bas cad dans la ghost cell
-            for (int k = 0; k < 8; k++)
-            {
-                float mask = (dist[k] > talusAngle) ? 1.0f : 0.0f;
-                float move = materialToMove * (dist[k] / totalDiff) * mask;
-
-                int ni = i + neighbors[k][0];
-                int nj = j + neighbors[k][1];
-
-                if (ni == H)
-                {
-                    if (nj >= 0 && nj < W)
-                        bottomFlux[nj] += move;
-                }
-                else
-                    fluxData[ni * W + nj] += move;
-            }
-
-            changes++;
-        }
-    }
-
-    // -------------------------- TOP
-    for (int j = 2; j < W - 2; ++j)
-    {
-        int i = 1;
-        float currentHeight = initialData[i * W + j];
-
-        for (int p = 0; p < 8; ++p)
-        {
-            dist[p] = currentHeight - initialData[(i + neighbors[p][0]) * W + (j + neighbors[p][1])];
-        }
-
-        float totalDiff = 0.f;
-        int validNeighbors = 0;
-
-        for (int p = 0; p < 8; ++p)
-        {
-            if (dist[p] > talusAngle)
-            {
-                totalDiff = totalDiff + dist[p];
-                ++validNeighbors;
-            }
-        }
-
-        if (totalDiff > 0 && validNeighbors > 0)
-        {
-
-            float materialToMove = transferRate * (totalDiff / validNeighbors);
-            materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-            fluxData[i * W + j] -= materialToMove;
-
-            // côté et bas
-            for (int k = 0; k < 8; k++)
-            {
-
-                float mask = (dist[k] > talusAngle) ? 1.0f : 0.0f;
-                float move = materialToMove * (dist[k] / totalDiff) * mask;
-                int ni = i + neighbors[k][0];
-                int nj = j + neighbors[k][1];
-
-                // haut cad dans la ghost cell
-                if (ni == 0)
-                {
-                    if (nj >= 0 && nj < W)
-                        topFlux[nj] += move;
-                }
-                else
-                {
-                    fluxData[ni * W + nj] += move;
-                }
-            }
-
-            changes++;
-        }
-    }
-
-    // -------------------------- RIGHT
-    for (int i = 2; i < H - 2; ++i)
-    {
-        int j = W - 2;
-
-        float currentHeight = initialData[i * W + j];
-
-        for (int p = 0; p < 8; ++p)
-        {
-            dist[p] = currentHeight - initialData[(i + neighbors[p][0]) * W + (j + neighbors[p][1])];
-        }
-        float totalDiff = 0.f;
-        int validNeighbors = 0;
-
-        for (int p = 0; p < 8; ++p)
-        {
-            if (dist[p] > talusAngle)
-            {
-                totalDiff = totalDiff + dist[p];
-                ++validNeighbors;
-            }
-        }
-
-        if (totalDiff > 0 && validNeighbors > 0)
-        {
-
-            float materialToMove = transferRate * (totalDiff / validNeighbors);
-            materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-            fluxData[i * W + j] -= materialToMove;
-
-            for (int k = 0; k < 8; k++)
-            {
-
-                float mask = (dist[k] > talusAngle) ? 1.0f : 0.0f;
-                float move = materialToMove * (dist[k] / totalDiff) * mask;
-                int ni = i + neighbors[k][0];
-                int nj = j + neighbors[k][1];
-
-                // sortie à droite
-                if (nj == W - 1)
-                {
-                    fluxData[i * W + j] += move;
-                }
-                else if (ni == 0)
-                {
-                    topFlux[nj] += move;
-                }
-                else if (ni == H)
-                {
-                    bottomFlux[nj] += move;
-                }
-                else
-                {
-                    fluxData[ni * W + nj] += move;
-                }
-            }
-
-            changes++;
-        }
-    }
-
-    // -------------------------- LEFT
-    for (int i = 2; i < H - 2; ++i)
-    {
-        int j = 1;
-
-        float currentHeight = initialData[i * W + j];
-
-        for (int p = 0; p < 8; ++p)
-        {
-            dist[p] = currentHeight - initialData[(i + neighbors[p][0]) * W + (j + neighbors[p][1])];
-        }
-
-        float totalDiff = 0.f;
-        int validNeighbors = 0;
-
-        for (int p = 0; p < 8; ++p)
-        {
-            if (dist[p] > talusAngle)
-            {
-                totalDiff = totalDiff + dist[p];
-                ++validNeighbors;
-            }
-        }
-
-        if (totalDiff > 0 && validNeighbors > 0)
-        {
-
-            float materialToMove = transferRate * (totalDiff / validNeighbors);
-            materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-            fluxData[i * W + j] -= materialToMove;
-
-            for (int k = 0; k < 8; k++)
-            {
-
-                float mask = (dist[k] > talusAngle) ? 1.0f : 0.0f;
-                float move = materialToMove * (dist[k] / totalDiff) * mask;
-                int ni = i + neighbors[k][0];
-                int nj = j + neighbors[k][1];
-
-                if (nj == 0)
-                {
-                    fluxData[i * W + j] += move; // rebond
-                }
-                else if (ni == 0)
-                {
-                    topFlux[nj] += move;
-                }
-                else if (ni == H)
-                {
-                    bottomFlux[nj] += move;
-                }
-                else
-                {
-                    fluxData[ni * W + nj] += move;
-                }
-            }
-
-            changes++;
-        }
-    }
-
-#pragma omp simd
-    for (int j = 0; j < W * H; j++)
-    {
-        initialData[j] += fluxData[j];
-    }
-
-    return changes;
-}
-
-int stepChunkMPIBlockVect(float* __restrict__ initialData, float* __restrict__ fluxData, float* __restrict__ bottomFlux,
-                          float* __restrict__ topFlux, const int width, const int height)
-{
-    const float transferRate = 0.5f;
-    const float PI = 3.14159265f;
-    const float talusAngle = std::tan(30.f * PI / 180.0f);
-
-    const int W = width;
-    const int H = height;
-
-    memset(fluxData, 0, sizeof(float) * (H + 2) * W);
-    int changes = 0;
-
-    const int BLOCKSIZE = 32;
-    float dist[8];
-
-    for (int ii = 2; ii < H - 1; ii += BLOCKSIZE)
-    {
-        int i_end = std::min(H - 1, ii + BLOCKSIZE);
-
-        for (int jj = 2; jj < W - 2; jj += BLOCKSIZE)
-        {
-            int j_end = std::min(W - 2, jj + BLOCKSIZE);
-
-            for (int i = ii; i < i_end; i++)
-            {
-#pragma omp simd
-                for (int j = jj; j < j_end; j++)
-                {
-
-                    float currentHeight = initialData[i * W + j];
-
-#pragma omp simd
-                    for (int p = 0; p < 8; ++p)
-                    {
-                        dist[p] = currentHeight - initialData[(i + neighbors[p][0]) * W + (j + neighbors[p][1])];
-                    }
-
-                    float totalDiff = 0.f;
-                    int validNeighbors = 0;
-
-#pragma omp simd reduction(+ : totalDiff, validNeighbors)
-                    for (int p = 0; p < 8; ++p)
-                    {
-                        if (dist[p] > talusAngle)
-                        {
-                            totalDiff = totalDiff + dist[p];
-                            ++validNeighbors;
-                        }
-                    }
-
-                    if (totalDiff > 0 && validNeighbors > 0)
-                    {
-
-                        float materialToMove = transferRate * (totalDiff / validNeighbors);
-                        materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-                        fluxData[i * W + j] -= materialToMove;
-
-                        for (int k = 0; k < 8; k++)
-                        {
-                            float mask = (dist[k] > talusAngle) ? 1.0f : 0.0f;
-                            float move = materialToMove * (dist[k] / totalDiff) * mask;
-
-                            int ni = i + neighbors[k][0];
-                            int nj = j + neighbors[k][1];
-
-                            fluxData[ni * W + nj] += move;
-                        }
-
-                        changes++;
-                    }
-                }
-            }
-        }
-    }
-
-    // -------------------------- BOTTOM
-    for (int j = 2; j < W - 2; ++j)
-    {
-        int i = H - 1;
-        float currentHeight = initialData[i * W + j];
-
-        for (int p = 0; p < 8; ++p)
-        {
-            dist[p] = currentHeight - initialData[(i + neighbors[p][0]) * W + (j + neighbors[p][1])];
-        }
-        float totalDiff = 0.f;
-        int validNeighbors = 0;
-
-        for (int p = 0; p < 8; ++p)
-        {
-            if (dist[p] > talusAngle)
-            {
-                totalDiff = totalDiff + dist[p];
-                ++validNeighbors;
-            }
-        }
-
-        if (totalDiff > 0 && validNeighbors > 0)
-        {
-
-            float materialToMove = transferRate * (totalDiff / validNeighbors);
-            materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-            fluxData[i * W + j] -= materialToMove;
-
-            // bas cad dans la ghost cell
-            for (int k = 0; k < 8; k++)
-            {
-                float mask = (dist[k] > talusAngle) ? 1.0f : 0.0f;
-                float move = materialToMove * (dist[k] / totalDiff) * mask;
-
-                int ni = i + neighbors[k][0];
-                int nj = j + neighbors[k][1];
-
-                if (ni == H)
-                {
-                    if (nj >= 0 && nj < W)
-                        bottomFlux[nj] += move;
-                }
-                else
-                    fluxData[ni * W + nj] += move;
-            }
-
-            changes++;
-        }
-    }
-    // --------------------------
-
-    // -------------------------- TOP
-    for (int j = 2; j < W - 2; ++j)
-    {
-        int i = 1;
-        float currentHeight = initialData[i * W + j];
-
-        for (int p = 0; p < 8; ++p)
-        {
-            dist[p] = currentHeight - initialData[(i + neighbors[p][0]) * W + (j + neighbors[p][1])];
-        }
-
-        float totalDiff = 0.f;
-        int validNeighbors = 0;
-
-        for (int p = 0; p < 8; ++p)
-        {
-            if (dist[p] > talusAngle)
-            {
-                totalDiff = totalDiff + dist[p];
-                ++validNeighbors;
-            }
-        }
-
-        if (totalDiff > 0 && validNeighbors > 0)
-        {
-
-            float materialToMove = transferRate * (totalDiff / validNeighbors);
-            materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-            fluxData[i * W + j] -= materialToMove;
-
-            // côté et bas
-            for (int k = 0; k < 8; k++)
-            {
-
-                float mask = (dist[k] > talusAngle) ? 1.0f : 0.0f;
-                float move = materialToMove * (dist[k] / totalDiff) * mask;
-                int ni = i + neighbors[k][0];
-                int nj = j + neighbors[k][1];
-
-                // haut cad dans la ghost cell
-                if (ni == 0)
-                {
-                    if (nj >= 0 && nj < W)
-                        topFlux[nj] += move;
-                }
-                else
-                {
-                    fluxData[ni * W + nj] += move;
-                }
-            }
-
-            changes++;
-        }
-    }
-    // --------------------------
-
-    // -------------------------- RIGHT
-    for (int i = 2; i < H - 2; ++i)
-    {
-        int j = W - 2;
-
-        float currentHeight = initialData[i * W + j];
-
-        for (int p = 0; p < 8; ++p)
-        {
-            dist[p] = currentHeight - initialData[(i + neighbors[p][0]) * W + (j + neighbors[p][1])];
-        }
-        float totalDiff = 0.f;
-        int validNeighbors = 0;
-
-        for (int p = 0; p < 8; ++p)
-        {
-            if (dist[p] > talusAngle)
-            {
-                totalDiff = totalDiff + dist[p];
-                ++validNeighbors;
-            }
-        }
-
-        if (totalDiff > 0 && validNeighbors > 0)
-        {
-
-            float materialToMove = transferRate * (totalDiff / validNeighbors);
-            materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-            fluxData[i * W + j] -= materialToMove;
-
-            for (int k = 0; k < 8; k++)
-            {
-
-                float mask = (dist[k] > talusAngle) ? 1.0f : 0.0f;
-                float move = materialToMove * (dist[k] / totalDiff) * mask;
-                int ni = i + neighbors[k][0];
-                int nj = j + neighbors[k][1];
-
-                // sortie à droite
-                if (nj == W - 1)
-                {
-                    fluxData[i * W + j] += move;
-                }
-                else if (ni == 0)
-                {
-                    topFlux[nj] += move;
-                }
-                else if (ni == H)
-                {
-                    bottomFlux[nj] += move;
-                }
-                else
-                {
-                    fluxData[ni * W + nj] += move;
-                }
-            }
-
-            changes++;
-        }
-    }
-
-    // -------------------------- LEFT
-    for (int i = 2; i < H - 2; ++i)
-    {
-        int j = 1;
-
-        float currentHeight = initialData[i * W + j];
-
-        for (int p = 0; p < 8; ++p)
-        {
-            dist[p] = currentHeight - initialData[(i + neighbors[p][0]) * W + (j + neighbors[p][1])];
-        }
-
-        float totalDiff = 0.f;
-        int validNeighbors = 0;
-
-        for (int p = 0; p < 8; ++p)
-        {
-            if (dist[p] > talusAngle)
-            {
-                totalDiff = totalDiff + dist[p];
-                ++validNeighbors;
-            }
-        }
-
-        if (totalDiff > 0 && validNeighbors > 0)
-        {
-
-            float materialToMove = transferRate * (totalDiff / validNeighbors);
-            materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-            fluxData[i * W + j] -= materialToMove;
-
-            for (int k = 0; k < 8; k++)
-            {
-
-                float mask = (dist[k] > talusAngle) ? 1.0f : 0.0f;
-                float move = materialToMove * (dist[k] / totalDiff) * mask;
-                int ni = i + neighbors[k][0];
-                int nj = j + neighbors[k][1];
-
-                if (nj == 0)
-                {
-                    fluxData[i * W + j] += move; // rebond
-                }
-                else if (ni == 0)
-                {
-                    topFlux[nj] += move;
-                }
-                else if (ni == H)
-                {
-                    bottomFlux[nj] += move;
-                }
-                else
-                {
-                    fluxData[ni * W + nj] += move;
-                }
-            }
-
-            changes++;
-        }
-    }
-
-#pragma omp simd
-    for (int j = 0; j < W * H; j++)
-    {
-        initialData[j] += fluxData[j];
-    }
-
-    return changes;
-}
-
-int stepChunkMPIBlock(float* initialData, float* fluxData, float* bottomFlux, float* topFlux, const int width,
-                      const int height)
-{
-    const float transferRate = 0.5f;
-    const float PI = 3.14159265f;
-    const float talusAngle = std::tan(30.f * PI / 180.0f);
-
-    const int W = width;
-    const int H = height;
-
-    memset(fluxData, 0, sizeof(float) * (H + 2) * W);
-    int changes = 0;
-
-    const int BLOCKSIZE = 32;
-
-    for (int ii = 1; ii < H; ii += BLOCKSIZE)
-    {
-        int i_end = std::min(H, ii + BLOCKSIZE);
-
-        for (int jj = 1; jj < W - 1; jj += BLOCKSIZE)
-        {
-            int j_end = std::min(W - 1, jj + BLOCKSIZE);
-
-            for (int i = ii; i < i_end; i++)
-            {
-                for (int j = jj; j < j_end; j++)
-                {
-
-                    float currentHeight = initialData[i * W + j];
-
-                    float dist[8] = {currentHeight - initialData[(i + 1) * W + (j - 1)],
-                                     currentHeight - initialData[(i + 1) * W + j],
-                                     currentHeight - initialData[(i + 1) * W + (j + 1)],
-                                     currentHeight - initialData[i * W + (j - 1)],
-                                     currentHeight - initialData[i * W + (j + 1)],
-                                     currentHeight - initialData[(i - 1) * W + (j - 1)],
-                                     currentHeight - initialData[(i - 1) * W + j],
-                                     currentHeight - initialData[(i - 1) * W + (j + 1)]};
-
-                    int neighbors[8][2] = {{1, -1}, {1, 0}, {1, 1}, {0, -1}, {0, 1}, {-1, -1}, {-1, 0}, {-1, 1}};
-
-                    float totalDiff = 0.f;
-                    int validNeighbors = 0;
-
-                    for (int k = 0; k < 8; k++)
-                    {
-                        if (dist[k] > talusAngle)
-                        {
-                            totalDiff += dist[k];
-                            validNeighbors++;
-                        }
-                    }
-
-                    if (totalDiff > 0 && validNeighbors > 0)
-                    {
-
-                        float materialToMove = transferRate * (totalDiff / validNeighbors);
-                        materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-                        fluxData[i * W + j] -= materialToMove;
-
-                        for (int k = 0; k < 8; k++)
-                        {
-                            if (dist[k] > talusAngle)
-                            {
-
-                                float move = materialToMove * (dist[k] / totalDiff);
-                                int ni = i + neighbors[k][0];
-                                int nj = j + neighbors[k][1];
-
-                                if (i == H - 1 && ni == H)
-                                {
-                                    if (nj >= 0 && nj < W)
-                                        bottomFlux[nj] += move;
-                                }
-                                else if (i == 1 && ni == 0)
-                                {
-                                    if (nj >= 0 && nj < W)
-                                        topFlux[nj] += move;
-                                }
-                                else if (nj <= 0 || nj >= W - 1)
-                                {
-                                    fluxData[i * W + j] += move;
-                                }
-                                else
-                                {
-                                    fluxData[ni * W + nj] += move;
-                                }
-                            }
-                        }
-
-                        changes++;
-                    }
-                }
-            }
-        }
-    }
-
-    for (int i = 1; i < H; i++)
-    {
-        for (int j = 0; j < W; j++)
-        {
-            initialData[i * W + j] += fluxData[i * W + j];
-        }
-    }
-
-    return changes;
-}
-
-#pragma omp declare simd uniform(initialData, fluxData, bottomFlux, topFlux, width, height)
-int stepChunkMPIVect(float* initialData, float* fluxData, float* bottomFlux, float* topFlux, const int width,
-                     const int height) noexcept
-{
-    float transferRate = 0.5;
-
-    const float PI = 3.14159265f;
-    float talusAngle = std::tan(30.f * PI / 180.0f);
-
-    const int W = width;
-    const int H = height;
-
-    if (!initialData)
-    {
-        std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
-        return 0;
-    }
-
-    for (int i = 0; i < (H + 2) * W; i++)
-    {
-        fluxData[i] = 0.0f;
-    }
-
-    int changes = 0;
-    float dist[8];
-
-    // Boucle sur le terrain
-    for (int i = 2; i <= H - 1; i++)
-    {
-#pragma omp simd
-        for (int j = 2; j < W - 2; j++)
-        {
-            float currentHeight = initialData[i * W + j];
-
-#pragma omp simd
-            for (int p = 0; p < 8; ++p)
-            {
-                dist[p] = currentHeight - initialData[(i + neighbors[p][0]) * W + (j + neighbors[p][1])];
-            }
-
-            float totalDiff = 0.f;
-            int validNeighbors = 0;
-
-#pragma omp simd reduction(+ : totalDiff, validNeighbors)
-            for (int p = 0; p < 8; ++p)
-            {
-                if (dist[p] > talusAngle)
-                {
-                    totalDiff = totalDiff + dist[p];
-                    ++validNeighbors;
-                }
-            }
-
-            if (totalDiff > 0 && validNeighbors > 0)
-            {
-
-                float materialToMove = transferRate * (totalDiff / validNeighbors);
-                materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-                fluxData[i * W + j] -= materialToMove;
-
-                for (int k = 0; k < 8; k++)
-                {
-                    float mask = (dist[k] > talusAngle) ? 1.0f : 0.0f;
-                    float move = materialToMove * (dist[k] / totalDiff) * mask;
-
-                    int ni = i + neighbors[k][0];
-                    int nj = j + neighbors[k][1];
-
-                    fluxData[ni * W + nj] += move;
-                }
-            }
-        }
-    }
-
-    // -------------------------- BOTTOM
-    for (int j = 2; j < W - 2; ++j)
-    {
-        int i = H - 1;
-        float currentHeight = initialData[i * W + j];
-
-        for (int p = 0; p < 8; ++p)
-        {
-            dist[p] = currentHeight - initialData[(i + neighbors[p][0]) * W + (j + neighbors[p][1])];
-        }
-        float totalDiff = 0.f;
-        int validNeighbors = 0;
-
-        for (int p = 0; p < 8; ++p)
-        {
-            if (dist[p] > talusAngle)
-            {
-                totalDiff = totalDiff + dist[p];
-                ++validNeighbors;
-            }
-        }
-
-        if (totalDiff > 0 && validNeighbors > 0)
-        {
-
-            float materialToMove = transferRate * (totalDiff / validNeighbors);
-            materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-            fluxData[i * W + j] -= materialToMove;
-
-            // bas cad dans la ghost cell
-            for (int k = 0; k < 8; k++)
-            {
-                float mask = (dist[k] > talusAngle) ? 1.0f : 0.0f;
-                float move = materialToMove * (dist[k] / totalDiff) * mask;
-
-                int ni = i + neighbors[k][0];
-                int nj = j + neighbors[k][1];
-
-                if (ni == H)
-                {
-                    if (nj >= 0 && nj < W)
-                        bottomFlux[nj] += move;
-                }
-                else
-                    fluxData[ni * W + nj] += move;
-            }
-
-            changes++;
-        }
-    }
-    // --------------------------
-
-    // -------------------------- TOP
-    for (int j = 2; j < W - 2; ++j)
-    {
-        int i = 1;
-        float currentHeight = initialData[i * W + j];
-
-        for (int p = 0; p < 8; ++p)
-        {
-            dist[p] = currentHeight - initialData[(i + neighbors[p][0]) * W + (j + neighbors[p][1])];
-        }
-
-        float totalDiff = 0.f;
-        int validNeighbors = 0;
-
-        for (int p = 0; p < 8; ++p)
-        {
-            if (dist[p] > talusAngle)
-            {
-                totalDiff = totalDiff + dist[p];
-                ++validNeighbors;
-            }
-        }
-
-        if (totalDiff > 0 && validNeighbors > 0)
-        {
-
-            float materialToMove = transferRate * (totalDiff / validNeighbors);
-            materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-            fluxData[i * W + j] -= materialToMove;
-
-            // côté et bas
-            for (int k = 0; k < 8; k++)
-            {
-
-                float mask = (dist[k] > talusAngle) ? 1.0f : 0.0f;
-                float move = materialToMove * (dist[k] / totalDiff) * mask;
-                int ni = i + neighbors[k][0];
-                int nj = j + neighbors[k][1];
-
-                // haut cad dans la ghost cell
-                if (ni == 0)
-                {
-                    if (nj >= 0 && nj < W)
-                        topFlux[nj] += move;
-                }
-                else
-                {
-                    fluxData[ni * W + nj] += move;
-                }
-            }
-
-            changes++;
-        }
-    }
-    // --------------------------
-
-    // -------------------------- RIGHT
-    for (int i = 2; i < H - 2; ++i)
-    {
-        int j = W - 2;
-
-        float currentHeight = initialData[i * W + j];
-
-        for (int p = 0; p < 8; ++p)
-        {
-            dist[p] = currentHeight - initialData[(i + neighbors[p][0]) * W + (j + neighbors[p][1])];
-        }
-        float totalDiff = 0.f;
-        int validNeighbors = 0;
-
-        for (int p = 0; p < 8; ++p)
-        {
-            if (dist[p] > talusAngle)
-            {
-                totalDiff = totalDiff + dist[p];
-                ++validNeighbors;
-            }
-        }
-
-        if (totalDiff > 0 && validNeighbors > 0)
-        {
-
-            float materialToMove = transferRate * (totalDiff / validNeighbors);
-            materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-            fluxData[i * W + j] -= materialToMove;
-
-            for (int k = 0; k < 8; k++)
-            {
-
-                float mask = (dist[k] > talusAngle) ? 1.0f : 0.0f;
-                float move = materialToMove * (dist[k] / totalDiff) * mask;
-                int ni = i + neighbors[k][0];
-                int nj = j + neighbors[k][1];
-
-                // sortie à droite
-                if (nj == W - 1)
-                {
-                    fluxData[i * W + j] += move;
-                }
-                else if (ni == 0)
-                {
-                    topFlux[nj] += move;
-                }
-                else if (ni == H)
-                {
-                    bottomFlux[nj] += move;
-                }
-                else
-                {
-                    fluxData[ni * W + nj] += move;
-                }
-            }
-
-            changes++;
-        }
-    }
-
-    // -------------------------- LEFT
-    for (int i = 2; i < H - 2; ++i)
-    {
-        int j = 1;
-
-        float currentHeight = initialData[i * W + j];
-
-        for (int p = 0; p < 8; ++p)
-        {
-            dist[p] = currentHeight - initialData[(i + neighbors[p][0]) * W + (j + neighbors[p][1])];
-        }
-
-        float totalDiff = 0.f;
-        int validNeighbors = 0;
-
-        for (int p = 0; p < 8; ++p)
-        {
-            if (dist[p] > talusAngle)
-            {
-                totalDiff = totalDiff + dist[p];
-                ++validNeighbors;
-            }
-        }
-
-        if (totalDiff > 0 && validNeighbors > 0)
-        {
-
-            float materialToMove = transferRate * (totalDiff / validNeighbors);
-            materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-            fluxData[i * W + j] -= materialToMove;
-
-            for (int k = 0; k < 8; k++)
-            {
-
-                float mask = (dist[k] > talusAngle) ? 1.0f : 0.0f;
-                float move = materialToMove * (dist[k] / totalDiff) * mask;
-                int ni = i + neighbors[k][0];
-                int nj = j + neighbors[k][1];
-
-                if (nj == 0)
-                {
-                    fluxData[i * W + j] += move; // rebond
-                }
-                else if (ni == 0)
-                {
-                    topFlux[nj] += move;
-                }
-                else if (ni == H)
-                {
-                    bottomFlux[nj] += move;
-                }
-                else
-                {
-                    fluxData[ni * W + nj] += move;
-                }
-            }
-
-            changes++;
-        }
-    }
-
-#pragma omp simd
-    for (int i = 1; i <= H * W; i++)
-    {
-        initialData[i] += fluxData[i];
-    }
-
-    return changes;
-}
-
-int stepChunkMPI(float* initialData, float* fluxData, float* bottomFlux, float* topFlux, const int width,
-                 const int height)
-{
-    float transferRate = 0.5;
-
-    const float PI = 3.14159265f;
-    float talusAngle = std::tan(30.f * PI / 180.0f);
-
-    const int W = width;
-    const int H = height;
-
-    if (!initialData)
-    {
-        std::cerr << "Error: Terrain data not loaded in ThermalErosion.\n";
-        return 0;
-    }
-
-    memset(fluxData, 0, sizeof(float) * (H + 2) * W);
-    int changes = 0;
-
-    // Boucle sur le terrain
-    for (int i = 1; i <= H; i++)
-    {
-        for (int j = 1; j < W - 1; j++)
-        {
-            float currentHeight = initialData[i * W + j];
-
-            float dist[8] = {
-                currentHeight - initialData[(i + 1) * W + (j - 1)], currentHeight - initialData[(i + 1) * W + j],
-                currentHeight - initialData[(i + 1) * W + (j + 1)], currentHeight - initialData[i * W + (j - 1)],
-                currentHeight - initialData[i * W + (j + 1)],       currentHeight - initialData[(i - 1) * W + (j - 1)],
-                currentHeight - initialData[(i - 1) * W + j],       currentHeight - initialData[(i - 1) * W + (j + 1)]};
-
-            int neighbors[8][2] = {{1, -1}, {1, 0}, {1, 1}, {0, -1}, {0, 1}, {-1, -1}, {-1, 0}, {-1, 1}};
-
-            float totalDiff = 0.0f;
-            int validNeighbors = 0;
-
-            // Accumulation des différences valides
-            for (int k = 0; k < 8; k++)
-            {
-                if (dist[k] > talusAngle)
-                {
-                    totalDiff += dist[k];
-                    validNeighbors++;
-                }
-            }
-
-            // Érosion
-            if (totalDiff > 0 && validNeighbors > 0)
-            {
-
-                float materialToMove = transferRate * (totalDiff / validNeighbors);
-                materialToMove = std::min(materialToMove, currentHeight * transferRate);
-
-                // On retire la matière de la cellule actuelle
-                fluxData[i * W + j] -= materialToMove;
-
-                // Redistribution aux voisins
-                for (int k = 0; k < 8; k++)
-                {
-                    if (dist[k] > talusAngle)
-                    {
-                        float move = materialToMove * (dist[k] / totalDiff);
-
-                        int ni = i + neighbors[k][0];
-                        int nj = j + neighbors[k][1];
-
-                        if (i == H && ni == H + 1)
-                        {
-                            if (nj >= 0 && nj < W)
-                                bottomFlux[nj] += move;
-                        }
-                        else if (i == 1 && ni == 0)
-                        {
-                            if (nj >= 0 && nj < W)
-                                topFlux[nj] += move;
-                        }
-                        else if (nj <= 0 || nj >= W - 1)
-                        {
-                            fluxData[i * W + j] += move; // reflexion
-                        }
-                        else
-                        {
-                            fluxData[ni * W + nj] += move;
-                        }
-                    }
-                }
-
-                changes++;
-            }
-        }
-    }
-
-    for (int i = 1; i <= H; i++)
-    {
-        for (int j = 0; j < W; j++)
-        {
-            initialData[i * W + j] += fluxData[i * W + j];
-        }
-    }
-
-    return changes;
-}
-
-void generateTerrain(std::unique_ptr<Terrain>& terrain, int width, int height, std::string terrainType)
+void generateTerrain(std::unique_ptr<Terrain> &terrain, int width, int height, std::string terrainType)
 {
     if (terrainType == "faultFormation")
     {
@@ -1257,7 +75,8 @@ void generateTerrain(std::unique_ptr<Terrain>& terrain, int width, int height, s
     }
 }
 
-double checksum(float* tab, int size)
+
+double checksum(float *tab, int size)
 {
     double sum = 0.;
     for (int i = 0; i < size; ++i)
@@ -1267,409 +86,874 @@ double checksum(float* tab, int size)
     return sum;
 }
 
-enum COMM
+/**
+ * Calcule l'erreur relative de conservation de masse entre deux tableaux.
+ * @param initialData Tableau de référence (état initial).
+ * @param finalData Tableau final (après simulation).
+ * @param size Taille totale des tableaux (nombre de cellules intérieures).
+ * @return Erreur relative (0 = conservation parfaite).
+ */
+static float testConservation(const float *initialData, const float *finalData, int size)
 {
-    SEND,
-    RECV
-};
+    // 1. Calcul des sommes globales (en ignorant les ghost cells)
+    double sumInitial = 0.0;
+    double sumFinal = 0.0;
 
-struct Mesh
-{
-    float* __restrict__ meshData;
-    float* __restrict__ meshFluxData;
-
-    float* __restrict__ bottomFlux;
-    float* __restrict__ topFlux;
-    float* __restrict__ tempFlux;
-
-    int meshWidth;
-    int meshHeight;
-
-    int meshSize;
-    int meshBufferSize;
-
-    int meshTopId;
-    int meshBottomId;
-
-    void initMesh(int width, int height, int topId, int botId)
+    for (int i = 0; i < size; ++i)
     {
-        meshWidth = width;
-        meshHeight = height;
-
-        meshSize = meshHeight * meshWidth;
-        meshBufferSize = (meshHeight + 2) * (meshWidth);
-
-        meshData = (float*)aligned_alloc(32, meshBufferSize * sizeof(float));
-        meshFluxData = (float*)aligned_alloc(32, meshBufferSize * sizeof(float));
-
-        memset(meshData, 0, meshBufferSize * sizeof(float));
-        memset(meshFluxData, 0, meshBufferSize * sizeof(float));
-
-        bottomFlux = (float*)aligned_alloc(32, meshWidth * sizeof(float));
-        topFlux = (float*)aligned_alloc(32, meshWidth * sizeof(float));
-        tempFlux = (float*)aligned_alloc(32, meshWidth * 2 * sizeof(float));
-
-        memset(bottomFlux, 0, meshWidth * sizeof(float));
-        memset(topFlux, 0, meshWidth * sizeof(float));
-        memset(tempFlux, 0, meshWidth * 2 * sizeof(float));
-
-        meshTopId = topId;
-        meshBottomId = botId;
+        sumInitial += initialData[i];
+        sumFinal += finalData[i];
     }
 
-    ~Mesh()
+    // 2. Évite la division par zéro et normalise
+    if (sumInitial < 1e-10)
     {
-        free(meshData);
-        free(meshFluxData);
-
-        free(bottomFlux);
-        free(topFlux);
-
-        free(tempFlux);
+        return 0.0f; // Cas dégénéré : masse nulle
     }
-};
 
-void initSplitMesh(int rank, int sizeProc, Mesh& mesh, int terrainWidth, int terrainHeight, int* sizes, int* offsets)
+    // 3. Erreur relative (valeur absolue pour éviter les problèmes de signe)
+    float relativeError = fabs((sumFinal - sumInitial) / sumInitial);
+
+    return relativeError;
+}
+
+// -----------------------------------------------------------
+// Rang dans la grille 2D
+// -----------------------------------------------------------
+static inline int rankOf2D(int row, int col, int P_cols)
 {
-    int sizeBlock = terrainHeight / sizeProc;
-    int sizeBlockRest = terrainHeight % sizeProc;
+    return row * P_cols + col;
+}
 
-    int meshHeight = sizeBlock;
-    int meshWidth = terrainWidth;
+// -----------------------------------------------------------
+// ÉTAPE 1 — calcul du flux UNIQUEMENT (aucune modification de data)
+// Travaille sur les cellules réelles [1..H][1..W].
+// Les ghost cells (ligne 0, ligne H+1, col 0, col W+1)
+// doivent déjà contenir les hauteurs des voisins.
+// -----------------------------------------------------------
+static void stepMpi2D(const float *__restrict__ data, float *__restrict__ flux, int H, int W)
+{
+    const float transferRate = 0.5f;
+    const float PI = 3.14159265f;
+    const float talusAngle = std::tan(30.f * PI / 180.f);
+    const int stride = W + 2;
 
-    int meshNbElement = meshHeight * meshWidth;
+    memset(flux, 0, sizeof(float) * (H + 2) * stride);
 
-    if (rank == 0)
+    const int di[8] = {1, 1, 1, 0, 0, -1, -1, -1};
+    const int dj[8] = {-1, 0, 1, -1, 1, -1, 0, 1};
+    const int nb_v = 8;
+
+    // const int di[4] = {1, -1, 0, 0};
+    // const int dj[4] = {0, 0, -1, 1};
+    // const int nb_v = 4;
+
+    for (int i = 1; i <= H; ++i)
     {
-        mesh.initMesh(meshWidth, meshHeight, MPI_PROC_NULL, rank + 1);
+        for (int j = 1; j <= W; ++j)
+        {
+            float cur = data[i * stride + j];
+            float diff[nb_v], totalDiff = 0.f, validCount = 0.f;
+
+            for (int k = 0; k < nb_v; ++k)
+            {
+                diff[k] = cur - data[(i + di[k]) * stride + (j + dj[k])];
+                if (diff[k] > talusAngle)
+                {
+                    totalDiff += diff[k];
+                    validCount += 1.f;
+                }
+            }
+
+            if (totalDiff > 0.f && validCount > 0.f)
+            {
+                float mat = transferRate * (totalDiff / validCount);
+                mat = std::min(mat, cur * transferRate);
+
+                flux[i * stride + j] -= mat;
+
+                for (int k = 0; k < nb_v; ++k)
+                {
+                    if (diff[k] > talusAngle)
+                        flux[(i + di[k]) * stride + (j + dj[k])] += mat * (diff[k] / totalDiff);
+                }
+            }
+        }
     }
-    else if (rank == sizeProc - 1)
+}
+
+static void stepMpi2DBlocked(const float *__restrict__ data, float *__restrict__ flux, int H, int W)
+{
+    const float transferRate = 0.5f;
+    const float PI = 3.14159265f;
+    const float talusAngle = std::tan(30.f * PI / 180.f);
+    const int stride = W + 2;
+
+    memset(flux, 0, sizeof(float) * (H + 2) * stride);
+
+    const int di[8] = {1, 1, 1, 0, 0, -1, -1, -1};
+    const int dj[8] = {-1, 0, 1, -1, 1, -1, 0, 1};
+    const int nb_v = 8;
+
+    // const int di[4] = {1, -1, 0, 0};
+    // const int dj[4] = {0, 0, -1, 1};
+    // const int nb_v = 4;
+
+    // Paramètres de blocage - à ajuster selon votre cache L1/L2
+    const int BLOCK_SIZE_I = 64;  // Hauteur du bloc (lignes)
+    const int BLOCK_SIZE_J = 64;  // Largeur du bloc (colonnes)
+
+    // Parcours par blocs
+    for (int ii = 1; ii <= H; ii += BLOCK_SIZE_I)
     {
-        mesh.initMesh(meshWidth, meshHeight + sizeBlockRest, rank - 1, MPI_PROC_NULL);
+        int i_max = std::min(ii + BLOCK_SIZE_I - 1, H);
+        
+        for (int jj = 1; jj <= W; jj += BLOCK_SIZE_J)
+        {
+            int j_max = std::min(jj + BLOCK_SIZE_J - 1, W);
+            
+            // Traitement du bloc [ii..i_max] x [jj..j_max]
+            for (int i = ii; i <= i_max; ++i)
+            {
+                for (int j = jj; j <= j_max; ++j)
+                {
+                    float cur = data[i * stride + j];
+                    float diff[nb_v], totalDiff = 0.f, validCount = 0.f;
+                    
+                    for (int k = 0; k < nb_v; ++k)
+                    {
+                        diff[k] = cur - data[(i + di[k]) * stride + (j + dj[k])];
+                        if (diff[k] > talusAngle)
+                        {
+                            totalDiff += diff[k];
+                            validCount += 1.f;
+                        }
+                    }
+                    
+                    if (totalDiff > 0.f && validCount > 0.f)
+                    {
+                        float mat = transferRate * (totalDiff / validCount);
+                        mat = std::min(mat, cur * transferRate);
+                        
+                        flux[i * stride + j] -= mat;
+                        
+                        for (int k = 0; k < nb_v; ++k)
+                        {
+                            if (diff[k] > talusAngle)
+                                flux[(i + di[k]) * stride + (j + dj[k])] += mat * (diff[k] / totalDiff);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+static void stepMpi2DCheckboard(const float *__restrict__ data, float *__restrict__ flux, int H, int W)
+{
+    const float transferRate = 0.5f;
+    const float PI = 3.14159265f;
+    const float talusAngle = std::tan(30.f * PI / 180.f);
+    const int stride = W + 2;
+
+    memset(flux, 0, sizeof(float) * (H + 2) * stride);
+
+    const int di[4] = {1, -1, 0, 0};
+    const int dj[4] = {0, 0, -1, 1};
+
+    for(int color = 0 ; color <2 ; ++color){
+        for (int i = 1; i <= H; ++i)
+        {
+            for (int j = 1; j <= W; ++j)
+            {
+                if (((i + j) & 1) != color)
+                {
+                    continue;
+                }
+
+                float cur = data[i * stride + j];
+                float diff[8], totalDiff = 0.f, validCount = 0.f;
+
+                for (int k = 0; k < 4; ++k)
+                {
+                    diff[k] = cur - data[(i + di[k]) * stride + (j + dj[k])];
+                    if (diff[k] > talusAngle)
+                    {
+                        totalDiff += diff[k];
+                        validCount += 1.f;
+                    }
+                }
+
+                if (totalDiff > 0.f && validCount > 0.f)
+                {
+                    float mat = transferRate * (totalDiff / validCount);
+                    mat = std::min(mat, cur * transferRate);
+
+                    flux[i * stride + j] -= mat;
+
+                    for (int k = 0; k < 4; ++k)
+                    {
+                        if (diff[k] > talusAngle)
+                            flux[(i + di[k]) * stride + (j + dj[k])] += mat * (diff[k] / totalDiff);
+                    }
+                }
+            }
+        }
+    }
+
+}
+
+static void stepMpi2DCheckboardBlocked(const float *__restrict__ data, float *__restrict__ flux, int H, int W)
+{
+    const float transferRate = 0.5f;
+    const float PI = 3.14159265f;
+    const float talusAngle = std::tan(30.f * PI / 180.f);
+    const int stride = W + 2;
+
+    memset(flux, 0, sizeof(float) * (H + 2) * stride);
+
+    const int di[4] = {1, -1, 0, 0};
+    const int dj[4] = {0, 0, -1, 1};
+
+    const int BLOCK_SIZE_I = 64;
+    const int BLOCK_SIZE_J = 64;
+
+    for (int color=0;color<2;++color){
+        for (int ii = 1; ii <= H; ii += BLOCK_SIZE_I)
+        {
+            int i_max = std::min(ii + BLOCK_SIZE_I - 1, H);
+            
+            for (int jj = 1; jj <= W; jj += BLOCK_SIZE_J)
+            {
+                int j_max = std::min(jj + BLOCK_SIZE_J - 1, W);
+                
+                // Traitement des cellules de la couleur actuelle dans le bloc
+                for (int i = ii; i <= i_max; ++i)
+                {
+                    // Calcul du premier j qui correspond à la couleur
+                    int start_j = jj;
+                    if ((i + start_j) % 2 != color)
+                        start_j++;
+                    
+                    for (int j = start_j; j <= j_max; j += 2)
+                    {
+                        float cur = data[i * stride + j];
+                        float diff[4], totalDiff = 0.f, validCount = 0.f;
+                        
+                        for (int k = 0; k < 4; ++k)
+                        {
+                            diff[k] = cur - data[(i + di[k]) * stride + (j + dj[k])];
+                            if (diff[k] > talusAngle)
+                            {
+                                totalDiff += diff[k];
+                                validCount += 1.f;
+                            }
+                        }
+                        
+                        if (totalDiff > 0.f && validCount > 0.f)
+                        {
+                            float mat = transferRate * (totalDiff / validCount);
+                            mat = std::min(mat, cur * transferRate);
+                            
+                            flux[i * stride + j] -= mat;
+                            
+                            for (int k = 0; k < 4; ++k)
+                            {
+                                if (diff[k] > talusAngle)
+                                    flux[(i + di[k]) * stride + (j + dj[k])] += mat * (diff[k] / totalDiff);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+}
+
+static void stepMpi2DCheckboardInplace(const float *__restrict__ data, float *__restrict__ flux, int H, int W)
+{
+    const float transferRate = 0.5f;
+    const float PI = 3.14159265f;
+    const float talusAngle = std::tan(30.f * PI / 180.f);
+    const int stride = W + 2;
+
+    memset(flux, 0, sizeof(float) * (H + 2) * stride);
+
+    const int di[4] = {1, -1, 0, 0};
+    const int dj[4] = {0, 0, -1, 1};
+
+
+    for (int color=0 ;color <2;++color){
+        for (int i = 1; i <= H; ++i)
+        {
+            for (int j = 1; j <= W; ++j)
+            {
+                if (((i + j) & 1) != color)
+                {
+                    continue;
+                }
+
+                float cur = data[i * stride + j] + flux[i * stride + j];
+                float diff[8], totalDiff = 0.f, validCount = 0.f;
+
+                for (int k = 0; k < 4; ++k)
+                {
+                    diff[k] = cur - (data[(i + di[k]) * stride + (j + dj[k])] + flux[(i + di[k]) * stride + (j + dj[k])]);
+                    if (diff[k] > talusAngle)
+                    {
+                        totalDiff += diff[k];
+                        validCount += 1.f;
+                    }
+                }
+
+                if (totalDiff > 0.f && validCount > 0.f)
+                {
+                    float mat = transferRate * (totalDiff / validCount);
+                    mat = std::min(mat, cur * transferRate);
+
+                    flux[i * stride + j] -= mat;
+
+                    for (int k = 0; k < 4; ++k)
+                    {
+                        if (diff[k] > talusAngle)
+                            flux[(i + di[k]) * stride + (j + dj[k])] += mat * (diff[k] / totalDiff);
+                    }
+                }
+            }
+        }
+    }
+
+}
+
+static void stepMpi2DCheckboardInplaceBlocked(const float *__restrict__ data, float *__restrict__ flux, int H, int W)
+{
+    const float transferRate = 0.5f;
+    const float PI = 3.14159265f;
+    const float talusAngle = std::tan(30.f * PI / 180.f);
+    const int stride = W + 2;
+
+    memset(flux, 0, sizeof(float) * (H + 2) * stride);
+
+    const int di[4] = {1, -1, 0, 0};
+    const int dj[4] = {0, 0, -1, 1};
+
+    const int BLOCK_SIZE_J = 64;  // Bloquer uniquement en largeur
+
+    // Pour chaque couleur (0 puis 1)
+    for (int color = 0; color < 2; ++color)
+    {
+        // Parcours dans l'ORDRE NORMAL (ligne par ligne)
+        for (int i = 1; i <= H; ++i)
+        {
+            // Mais découpage en blocs horizontaux pour améliorer la localité
+            for (int jj = 1; jj <= W; jj += BLOCK_SIZE_J)
+            {
+                int j_max = std::min(jj + BLOCK_SIZE_J - 1, W);
+                
+                // Calcul du premier j qui correspond à la couleur
+                int start_j = jj;
+                if (((i + jj) & 1) != color) {
+                    start_j = jj + 1;
+                }
+                
+                for (int j = start_j; j <= j_max; j += 2)
+                {
+                    float cur = data[i * stride + j] + flux[i * stride + j];
+                    float diff[4], totalDiff = 0.f, validCount = 0.f;
+                    
+                    for (int k = 0; k < 4; ++k)
+                    {
+                        diff[k] = cur - (data[(i + di[k]) * stride + (j + dj[k])] + 
+                                        flux[(i + di[k]) * stride + (j + dj[k])]);
+                        if (diff[k] > talusAngle)
+                        {
+                            totalDiff += diff[k];
+                            validCount += 1.f;
+                        }
+                    }
+                    
+                    if (totalDiff > 0.f && validCount > 0.f)
+                    {
+                        float mat = transferRate * (totalDiff / validCount);
+                        mat = std::min(mat, cur * transferRate);
+                        
+                        flux[i * stride + j] -= mat;
+                        
+                        for (int k = 0; k < 4; ++k)
+                        {
+                            if (diff[k] > talusAngle)
+                                flux[(i + di[k]) * stride + (j + dj[k])] += mat * (diff[k] / totalDiff);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+}
+
+
+// -----------------------------------------------------------
+// ÉTAPE 2 — appliquer le flux sur les cellules réelles
+// -----------------------------------------------------------
+static void applyFlux2D(float *__restrict__ data, const float *__restrict__ flux, int H, int W)
+{
+    const int stride = W + 2;
+    for (int i = 1; i <= H; ++i)
+        for (int j = 1; j <= W; ++j)
+            data[i * stride + j] += flux[i * stride + j];
+}
+
+// -----------------------------------------------------------
+// ÉTAPE 3 — échange des hauteurs (ghost cells)
+// Envoie la première/dernière ligne et colonne réelle,
+// reçoit dans la ghost cell opposée.
+// -----------------------------------------------------------
+static void exchangeGhosts2D(float *data, int H, int W, int top, int bot, int left, int right, int topLeft,
+                             int topRight, int botLeft, int botRight)
+{
+    const int stride = W + 2;
+
+    // ---- lignes ----
+    if (top != -1)
+        MPI_Sendrecv(&data[1 * stride], stride, MPI_FLOAT, top, TAG_GHOST_ROW, &data[0], stride, MPI_FLOAT, top,
+                     TAG_GHOST_ROW, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    if (bot != -1)
+        MPI_Sendrecv(&data[H * stride], stride, MPI_FLOAT, bot, TAG_GHOST_ROW, &data[(H + 1) * stride], stride,
+                     MPI_FLOAT, bot, TAG_GHOST_ROW, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    // ---- colonnes ----
+    std::vector<float> sendCol(H + 2), recvCol(H + 2);
+
+    if (left != -1)
+    {
+        for (int i = 0; i <= H + 1; ++i)
+            sendCol[i] = data[i * stride + 1];
+        MPI_Sendrecv(sendCol.data(), H + 2, MPI_FLOAT, left, TAG_GHOST_COL, recvCol.data(), H + 2, MPI_FLOAT, left,
+                     TAG_GHOST_COL, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        for (int i = 0; i <= H + 1; ++i)
+            data[i * stride + 0] = recvCol[i];
+    }
+
+    if (right != -1)
+    {
+        for (int i = 0; i <= H + 1; ++i)
+            sendCol[i] = data[i * stride + W];
+        MPI_Sendrecv(sendCol.data(), H + 2, MPI_FLOAT, right, TAG_GHOST_COL, recvCol.data(), H + 2, MPI_FLOAT, right,
+                     TAG_GHOST_COL, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        for (int i = 0; i <= H + 1; ++i)
+            data[i * stride + W + 1] = recvCol[i];
+    }
+
+    // ---- coins diagonaux ----
+    // Chaque coin est un scalaire unique : on envoie notre cellule réelle
+    // de coin et on reçoit dans notre ghost cell de coin opposé.
+    float send1, recv1;
+
+    // coin haut-gauche  [0][0]  ← voisin topLeft envoie son [H][W]
+    if (topLeft != -1)
+    {
+        send1 = data[1 * stride + 1];
+        MPI_Sendrecv(&send1, 1, MPI_FLOAT, topLeft, TAG_GHOST_CORNER, &recv1, 1, MPI_FLOAT, topLeft, TAG_GHOST_CORNER,
+                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        data[0 * stride + 0] = recv1;
+    }
+
+    // coin haut-droit  [0][W+1]  ← voisin topRight envoie son [H][1]
+    if (topRight != -1)
+    {
+        send1 = data[1 * stride + W];
+        MPI_Sendrecv(&send1, 1, MPI_FLOAT, topRight, TAG_GHOST_CORNER, &recv1, 1, MPI_FLOAT, topRight, TAG_GHOST_CORNER,
+                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        data[0 * stride + W + 1] = recv1;
+    }
+
+    // coin bas-gauche  [H+1][0]  ← voisin botLeft envoie son [1][W]
+    if (botLeft != -1)
+    {
+        send1 = data[H * stride + 1];
+        MPI_Sendrecv(&send1, 1, MPI_FLOAT, botLeft, TAG_GHOST_CORNER, &recv1, 1, MPI_FLOAT, botLeft, TAG_GHOST_CORNER,
+                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        data[(H + 1) * stride + 0] = recv1;
+    }
+
+    // coin bas-droit  [H+1][W+1]  ← voisin botRight envoie son [1][1]
+    if (botRight != -1)
+    {
+        send1 = data[H * stride + W];
+        MPI_Sendrecv(&send1, 1, MPI_FLOAT, botRight, TAG_GHOST_CORNER, &recv1, 1, MPI_FLOAT, botRight, TAG_GHOST_CORNER,
+                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        data[(H + 1) * stride + W + 1] = recv1;
+    }
+}
+
+// -----------------------------------------------------------
+// ÉTAPE 4 — échange des flux de bord
+//
+// Après stepMpi2D, certains flux ont atterri dans les
+// ghost cells (ex: un pixel en i=1 envoie du flux à i=0).
+// Ces valeurs appartiennent aux voisins : on les leur envoie
+// et on additionne ce qu'on reçoit à nos propres bordures.
+// Ensuite on remet les ghost cells de flux à 0.
+// -----------------------------------------------------------
+static void exchangeFluxBorders2D(float *flux, int H, int W, int top, int bot, int left, int right, int topLeft,
+                                  int topRight, int botLeft, int botRight)
+{
+    const int stride = W + 2;
+
+    // ---- ghost row top ----
+    if (top != -1)
+    {
+        // Envoyer notre ghost row 0 au voisin, recevoir le sien
+        std::vector<float> sendBuf(stride), recvBuf(stride, 0.f);
+        memcpy(sendBuf.data(), &flux[0], stride * sizeof(float));
+        MPI_Sendrecv(sendBuf.data(), stride, MPI_FLOAT, top, TAG_FLUX_ROW, recvBuf.data(), stride, MPI_FLOAT, top,
+                     TAG_FLUX_ROW, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        for (int j = 0; j < stride; ++j)
+            flux[1 * stride + j] += recvBuf[j];
     }
     else
     {
-        mesh.initMesh(meshWidth, meshHeight, rank - 1, rank + 1);
+        // Bord du domaine : réflexion — le flux retourne à la ligne réelle 1
+        for (int j = 0; j < stride; ++j)
+            flux[1 * stride + j] += flux[0 * stride + j];
     }
+    memset(&flux[0], 0, stride * sizeof(float));
 
-    for (int i = 0; i < sizeProc; ++i)
+    // ---- ghost row bottom ----
+    if (bot != -1)
     {
-        if (i == sizeProc - 1)
-            sizes[i] = meshNbElement + sizeBlockRest * meshWidth;
-        else
-            sizes[i] = meshNbElement;
+        std::vector<float> sendBuf(stride), recvBuf(stride, 0.f);
+        memcpy(sendBuf.data(), &flux[(H + 1) * stride], stride * sizeof(float));
+        MPI_Sendrecv(sendBuf.data(), stride, MPI_FLOAT, bot, TAG_FLUX_ROW, recvBuf.data(), stride, MPI_FLOAT, bot,
+                     TAG_FLUX_ROW, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        for (int j = 0; j < stride; ++j)
+            flux[H * stride + j] += recvBuf[j];
     }
+    else
+    {
+        // Bord du domaine : réflexion
+        for (int j = 0; j < stride; ++j)
+            flux[H * stride + j] += flux[(H + 1) * stride + j];
+    }
+    memset(&flux[(H + 1) * stride], 0, stride * sizeof(float));
 
-    for (int i = 0; i < sizeProc; ++i)
-        offsets[i] = i * meshNbElement;
+    // ---- ghost col left ----
+    std::vector<float> sendCol(H + 2), recvCol(H + 2, 0.f);
+
+    if (left != -1)
+    {
+        for (int i = 0; i <= H + 1; ++i)
+            sendCol[i] = flux[i * stride + 0];
+        MPI_Sendrecv(sendCol.data(), H + 2, MPI_FLOAT, left, TAG_FLUX_COL, recvCol.data(), H + 2, MPI_FLOAT, left,
+                     TAG_FLUX_COL, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        for (int i = 0; i <= H + 1; ++i)
+            flux[i * stride + 1] += recvCol[i];
+    }
+    else
+    {
+        // Bord du domaine : réflexion
+        for (int i = 0; i <= H + 1; ++i)
+            flux[i * stride + 1] += flux[i * stride + 0];
+    }
+    for (int i = 0; i <= H + 1; ++i)
+        flux[i * stride + 0] = 0.f;
+
+    // ---- ghost col right ----
+    if (right != -1)
+    {
+        for (int i = 0; i <= H + 1; ++i)
+            sendCol[i] = flux[i * stride + W + 1];
+        MPI_Sendrecv(sendCol.data(), H + 2, MPI_FLOAT, right, TAG_FLUX_COL, recvCol.data(), H + 2, MPI_FLOAT, right,
+                     TAG_FLUX_COL, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        for (int i = 0; i <= H + 1; ++i)
+            flux[i * stride + W] += recvCol[i];
+    }
+    else
+    {
+        // Bord du domaine : réflexion
+        for (int i = 0; i <= H + 1; ++i)
+            flux[i * stride + W] += flux[i * stride + W + 1];
+    }
+    for (int i = 0; i <= H + 1; ++i)
+        flux[i * stride + W + 1] = 0.f;
+
+    // ---- coins diagonaux ----
+    float send1, recv1;
+
+    // coin haut-gauche [0][0]
+    if (topLeft != -1)
+    {
+        send1 = flux[0 * stride + 0];
+        MPI_Sendrecv(&send1, 1, MPI_FLOAT, topLeft, TAG_FLUX_CORNER, &recv1, 1, MPI_FLOAT, topLeft, TAG_FLUX_CORNER,
+                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        flux[1 * stride + 1] += recv1;
+    }
+    else
+    {
+        // Bord du domaine : réflexion vers la cellule réelle de coin
+        flux[1 * stride + 1] += flux[0 * stride + 0];
+    }
+    flux[0 * stride + 0] = 0.f;
+
+    // coin haut-droit [0][W+1]
+    if (topRight != -1)
+    {
+        send1 = flux[0 * stride + W + 1];
+        MPI_Sendrecv(&send1, 1, MPI_FLOAT, topRight, TAG_FLUX_CORNER, &recv1, 1, MPI_FLOAT, topRight, TAG_FLUX_CORNER,
+                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        flux[1 * stride + W] += recv1;
+    }
+    else
+    {
+        flux[1 * stride + W] += flux[0 * stride + W + 1];
+    }
+    flux[0 * stride + W + 1] = 0.f;
+
+    // coin bas-gauche [H+1][0]
+    if (botLeft != -1)
+    {
+        send1 = flux[(H + 1) * stride + 0];
+        MPI_Sendrecv(&send1, 1, MPI_FLOAT, botLeft, TAG_FLUX_CORNER, &recv1, 1, MPI_FLOAT, botLeft, TAG_FLUX_CORNER,
+                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        flux[H * stride + 1] += recv1;
+    }
+    else
+    {
+        flux[H * stride + 1] += flux[(H + 1) * stride + 0];
+    }
+    flux[(H + 1) * stride + 0] = 0.f;
+
+    // coin bas-droit [H+1][W+1]
+    if (botRight != -1)
+    {
+        send1 = flux[(H + 1) * stride + W + 1];
+        MPI_Sendrecv(&send1, 1, MPI_FLOAT, botRight, TAG_FLUX_CORNER, &recv1, 1, MPI_FLOAT, botRight, TAG_FLUX_CORNER,
+                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        flux[H * stride + W] += recv1;
+    }
+    else
+    {
+        flux[H * stride + W] += flux[(H + 1) * stride + W + 1];
+    }
+    flux[(H + 1) * stride + W + 1] = 0.f;
 }
 
-double testConservation(float* initialData, float* finalData, int size)
+// -----------------------------------------------------------
+// Scatter : rang 0 distribue les blocs
+// -----------------------------------------------------------
+static void scatter2D(float *globalData, float *localData, int GH, int GW, int baseBlockH, int baseBlockW, int P_rows,
+                      int P_cols, int myBlockH, int myBlockW, int rank)
 {
-    if (!initialData || !finalData)
+    const int localStride = myBlockW + 2;
+    const int globalStride = GW;
+
+    if (rank == 0)
     {
-        printf("intialData or finalData is null ! \n");
+        for (int pr = 0; pr < P_rows; ++pr)
+        {
+            int bH = (pr == P_rows - 1) ? (GH - pr * baseBlockH) : baseBlockH;
+            for (int pc = 0; pc < P_cols; ++pc)
+            {
+                int bW = (pc == P_cols - 1) ? (GW - pc * baseBlockW) : baseBlockW;
+                int dest = rankOf2D(pr, pc, P_cols);
+
+                std::vector<float> buf(bH * bW);
+                for (int i = 0; i < bH; ++i)
+                    memcpy(&buf[i * bW], &globalData[(pr * baseBlockH + i) * globalStride + pc * baseBlockW],
+                           bW * sizeof(float));
+
+                if (dest == 0)
+                {
+                    // Copie directe dans le buffer local du rang 0
+                    for (int i = 0; i < bH; ++i)
+                        memcpy(&localData[(i + 1) * localStride + 1], &buf[i * bW], bW * sizeof(float));
+                }
+                else
+                {
+                    int dims[2] = {bH, bW};
+                    MPI_Send(dims, 2, MPI_INT, dest, 0, MPI_COMM_WORLD);
+                    MPI_Send(buf.data(), bH * bW, MPI_FLOAT, dest, 1, MPI_COMM_WORLD);
+                }
+            }
+        }
+    }
+    else
+    {
+        int dims[2];
+        MPI_Recv(dims, 2, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        int bH = dims[0], bW = dims[1];
+        std::vector<float> buf(bH * bW);
+        MPI_Recv(buf.data(), bH * bW, MPI_FLOAT, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        for (int i = 0; i < bH; ++i)
+            memcpy(&localData[(i + 1) * localStride + 1], &buf[i * bW], bW * sizeof(float));
+    }
+}
+
+// -----------------------------------------------------------
+// Gather : chaque rang renvoie son bloc au rang 0
+// -----------------------------------------------------------
+static void gather2D(float *globalData, float *localData, int GH, int GW, int baseBlockH, int baseBlockW, int P_rows,
+                     int P_cols, int myBlockH, int myBlockW, int rank)
+{
+    const int localStride = myBlockW + 2;
+    const int globalStride = GW;
+
+    if (rank != 0)
+    {
+        std::vector<float> buf(myBlockH * myBlockW);
+        for (int i = 0; i < myBlockH; ++i)
+            memcpy(&buf[i * myBlockW], &localData[(i + 1) * localStride + 1], myBlockW * sizeof(float));
+        MPI_Send(buf.data(), myBlockH * myBlockW, MPI_FLOAT, 0, 2, MPI_COMM_WORLD);
+    }
+    else
+    {
+        for (int pr = 0; pr < P_rows; ++pr)
+        {
+            int bH = (pr == P_rows - 1) ? (GH - pr * baseBlockH) : baseBlockH;
+            for (int pc = 0; pc < P_cols; ++pc)
+            {
+                int bW = (pc == P_cols - 1) ? (GW - pc * baseBlockW) : baseBlockW;
+                int src = rankOf2D(pr, pc, P_cols);
+
+                if (src == 0)
+                {
+                    // Rang 0 se copie lui-même
+                    const int ls = baseBlockW + 2;
+                    for (int i = 0; i < bH; ++i)
+                        memcpy(&globalData[(pr * baseBlockH + i) * globalStride + pc * baseBlockW],
+                               &localData[(i + 1) * ls + 1], bW * sizeof(float));
+                }
+                else
+                {
+                    std::vector<float> buf(bH * bW);
+                    MPI_Recv(buf.data(), bH * bW, MPI_FLOAT, src, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                    for (int i = 0; i < bH; ++i)
+                        memcpy(&globalData[(pr * baseBlockH + i) * globalStride + pc * baseBlockW], &buf[i * bW],
+                               bW * sizeof(float));
+                }
+            }
+        }
+    }
+}
+
+// -----------------------------------------------------------
+//  launchMPI2D
+//  mpirun -np <N> ./prog mpi2d <type> <W> <H> <steps> <P_rows> <P_cols>
+// -----------------------------------------------------------
+int launchMPI2D(int argc, char *argv[])
+{
+    if (argc < 8)
+    {
+        if (argc > 1)
+            fprintf(stderr, "Usage: %s mpi2d <terrainType> <W> <H> <steps> <P_rows> <P_cols>\n", argv[0]);
         return 1;
     }
-
-    double mass_before = checksum(initialData, size);
-    double mass_after = checksum(finalData, size);
-    // printf("Mass before: %.10f, Mass after: %.10f\n", mass_before, mass_after);
-    if (mass_before == 0)
-        return 0;
-    return std::abs(mass_after - mass_before) / mass_before;
-}
-
-void transferFluxTopBot(float* __restrict__ top, float* __restrict__ bot, float* __restrict__ flux, int size)
-{
-#pragma omp simd
-    for (int i = 0; i < size; i++)
-    {
-        top[i] += flux[i];
-        bot[i] += flux[size + i];
-    }
-
-    memset(flux, 0, sizeof(float) * size * 2);
-}
-
-int lauchMPI(int argc, char* argv[])
-{
-
-    int rank, size, nbChanges;
-
-    float* data = nullptr;
-
-    ThermalErosion erosion;
-    std::unique_ptr<Terrain> terrain;
-
-    std::string terrainType = argv[2];
-    int terrainWidth = atoi(argv[3]);
-    int terrainHeight = atoi(argv[4]);
-    int terrainStep = atoi(argv[5]);
-
-    int terrainSize = terrainHeight * terrainWidth;
 
     MPI_Init(&argc, &argv);
 
+    int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    if (size < 2)
+    std::string terrainType = argv[2];
+    int GW = atoi(argv[3]);
+    int GH = atoi(argv[4]);
+    int steps = atoi(argv[5]);
+    int P_rows = atoi(argv[6]);
+    int P_cols = atoi(argv[7]);
+
+    if (P_rows * P_cols != size)
     {
-        printf("You must launch this code with atleast 2 processors \n");
+        if (rank == 0)
+            fprintf(stderr, "Erreur : P_rows(%d) * P_cols(%d) != nb_procs(%d)\n", P_rows, P_cols, size);
+        MPI_Finalize();
         return 1;
     }
 
-    float* initialData = nullptr;
+    int myRow = rank / P_cols;
+    int myCol = rank % P_cols;
 
-    std::vector<double> elapsedAll(size, 0.0);
+    int baseBlockH = GH / P_rows;
+    int baseBlockW = GW / P_cols;
 
-    if (terrainType == "midpointDisplacement" && (terrainWidth != terrainHeight || !isPowerOfTwo(terrainWidth - 1)))
-    {
-        perror("Invalid terrain size : (size must be 2^n + 1)");
-        return 1;
-    }
+    int myBlockH = (myRow == P_rows - 1) ? (GH - myRow * baseBlockH) : baseBlockH;
+    int myBlockW = (myCol == P_cols - 1) ? (GW - myCol * baseBlockW) : baseBlockW;
 
-    if (rank == 0)
-    {
+    int topNeigh = (myRow > 0) ? rankOf2D(myRow - 1, myCol, P_cols) : -1;
+    int botNeigh = (myRow < P_rows - 1) ? rankOf2D(myRow + 1, myCol, P_cols) : -1;
+    int leftNeigh = (myCol > 0) ? rankOf2D(myRow, myCol - 1, P_cols) : -1;
+    int rightNeigh = (myCol < P_cols - 1) ? rankOf2D(myRow, myCol + 1, P_cols) : -1;
 
-        generateTerrain(terrain, terrainWidth, terrainHeight, terrainType);
-        erosion.loadTerrainInfo(*terrain);
+    // Voisins diagonaux (-1 si bord du domaine)
+    int topLeftNeigh = (myRow > 0 && myCol > 0) ? rankOf2D(myRow - 1, myCol - 1, P_cols) : -1;
+    int topRightNeigh = (myRow > 0 && myCol < P_cols - 1) ? rankOf2D(myRow - 1, myCol + 1, P_cols) : -1;
+    int botLeftNeigh = (myRow < P_rows - 1 && myCol > 0) ? rankOf2D(myRow + 1, myCol - 1, P_cols) : -1;
+    int botRightNeigh = (myRow < P_rows - 1 && myCol < P_cols - 1) ? rankOf2D(myRow + 1, myCol + 1, P_cols) : -1;
 
-        data = terrain->getData()->data();
+    int localStride = myBlockW + 2;
+    int localSize = (myBlockH + 2) * localStride;
 
-        initialData = (float*)malloc(sizeof(float) * terrainHeight * terrainWidth);
-        memcpy(initialData, data, terrainSize * sizeof(float));
-    }
+    float *localData = (float *)calloc(localSize, sizeof(float));
+    float *localFlux = (float *)calloc(localSize, sizeof(float));
 
-    int* scatterOffset = (int*)malloc(sizeof(int) * size);
-    int* scatterSize = (int*)malloc(sizeof(int) * size);
-
-    Mesh myTerrain;
-    initSplitMesh(rank, size, myTerrain, terrainWidth, terrainHeight, scatterSize, scatterOffset);
-
-    auto start = MPI_Wtime();
-
-    MPI_Scatterv(data, scatterSize, scatterOffset, MPI_FLOAT, myTerrain.meshData + myTerrain.meshWidth,
-                 scatterSize[rank], MPI_FLOAT, 0, MPI_COMM_WORLD);
+    float *globalData = nullptr;
+    float *globalInitial = nullptr;
 
     if (rank == 0)
     {
-        savePngHeightmap("MPI_heightmap_before.png", data, terrainWidth, terrainHeight);
+        std::unique_ptr<Terrain> terrain;
+        generateTerrain(terrain, GW, GH, terrainType);
+        globalData = (float *)malloc(GH * GW * sizeof(float));
+        memcpy(globalData, terrain->getData()->data(), GH * GW * sizeof(float));
+
+        globalInitial = (float *)malloc(GH * GW * sizeof(float));
+        memcpy(globalInitial, globalData, GH * GW * sizeof(float));
+
+        savePngHeightmap("MPI2D_before.png", globalData, GW, GH);
     }
 
-    int ghostStartIndex = myTerrain.meshBufferSize - myTerrain.meshWidth;
-    int lastLineIndex = myTerrain.meshBufferSize - (myTerrain.meshWidth * 2);
-    int tagCpt = 0;
+    double t0 = MPI_Wtime();
 
-    for (int i = 1; i <= terrainStep; ++i)
+    scatter2D(globalData, localData, GH, GW, baseBlockH, baseBlockW, P_rows, P_cols, myBlockH, myBlockW, rank);
+
+    for (int step = 0; step < steps; ++step)
     {
+        // 1. Ghost cells de hauteur (arêtes + coins)
+        exchangeGhosts2D(localData, myBlockH, myBlockW, topNeigh, botNeigh, leftNeigh, rightNeigh, topLeftNeigh,
+                         topRightNeigh, botLeftNeigh, botRightNeigh);
 
-        MPI_Sendrecv(myTerrain.meshData, myTerrain.meshWidth, MPI_FLOAT, myTerrain.meshTopId, tagCpt,
+        // 2. Calcul du flux (sans modifier data)
+        stepMpi2DCheckboardInplaceBlocked(localData, localFlux, myBlockH, myBlockW);
 
-                     myTerrain.meshData + ghostStartIndex, myTerrain.meshWidth, MPI_FLOAT, myTerrain.meshBottomId,
-                     tagCpt,
+        // 3. Échange des flux qui ont débordé dans les ghost cells (arêtes + coins)
+        exchangeFluxBorders2D(localFlux, myBlockH, myBlockW, topNeigh, botNeigh, leftNeigh, rightNeigh, topLeftNeigh,
+                              topRightNeigh, botLeftNeigh, botRightNeigh);
 
-                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        tagCpt++;
-
-        MPI_Sendrecv(myTerrain.meshData + lastLineIndex, myTerrain.meshWidth, MPI_FLOAT, myTerrain.meshBottomId, tagCpt,
-
-                     myTerrain.meshData, myTerrain.meshWidth, MPI_FLOAT, myTerrain.meshTopId, tagCpt,
-
-                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        tagCpt++;
-
-        nbChanges = stepChunkMPIBlockVect2(myTerrain.meshData, myTerrain.meshFluxData, myTerrain.bottomFlux,
-                                           myTerrain.topFlux, myTerrain.meshWidth, myTerrain.meshHeight);
-        memset(myTerrain.tempFlux, 0, myTerrain.meshWidth * 2 * sizeof(float));
-
-        MPI_Sendrecv(myTerrain.topFlux, myTerrain.meshWidth, MPI_FLOAT, myTerrain.meshTopId, tagCpt,
-
-                     myTerrain.tempFlux, myTerrain.meshWidth, MPI_FLOAT, myTerrain.meshBottomId, tagCpt,
-
-                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-        tagCpt++;
-
-        MPI_Sendrecv(myTerrain.bottomFlux, myTerrain.meshWidth, MPI_FLOAT, myTerrain.meshBottomId, tagCpt,
-
-                     myTerrain.tempFlux + myTerrain.meshWidth, myTerrain.meshWidth, MPI_FLOAT, myTerrain.meshTopId,
-                     tagCpt,
-
-                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        tagCpt++;
-
-        transferFluxTopBot(myTerrain.meshData + myTerrain.meshWidth, myTerrain.meshData + lastLineIndex,
-                           myTerrain.tempFlux, myTerrain.meshWidth);
-
-        if (myTerrain.meshTopId == MPI_PROC_NULL)
-        {
-            for (int i = 0; i < myTerrain.meshWidth; ++i)
-                myTerrain.meshData[myTerrain.meshWidth + i] += myTerrain.topFlux[i];
-        }
-
-        if (myTerrain.meshBottomId == MPI_PROC_NULL)
-        {
-            for (int i = 0; i < myTerrain.meshWidth; ++i)
-                myTerrain.meshData[lastLineIndex + i] += myTerrain.bottomFlux[i];
-        }
-
-        memset(myTerrain.topFlux, 0, myTerrain.meshWidth * sizeof(float));
-        memset(myTerrain.bottomFlux, 0, myTerrain.meshWidth * sizeof(float));
+        // 4. Application du flux
+        applyFlux2D(localData, localFlux, myBlockH, myBlockW);
     }
 
-    MPI_Gatherv(myTerrain.meshData + myTerrain.meshWidth, scatterSize[rank], MPI_FLOAT, data, scatterSize,
-                scatterOffset, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    gather2D(globalData, localData, GH, GW, baseBlockH, baseBlockW, P_rows, P_cols, myBlockH, myBlockW, rank);
 
-    auto stop = MPI_Wtime();
-    double elapsed = stop - start;
-
-    MPI_Gather(&elapsed, 1, MPI_DOUBLE, elapsedAll.data(), 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    double elapsed = MPI_Wtime() - t0;
 
     if (rank == 0)
     {
-        double elapsedMoy = 0.0;
-        for (int i = 0; i < size; i++)
-        {
-            elapsedMoy += elapsedAll[i];
-            if (i == size - 1)
-                elapsedMoy = elapsedMoy / size;
-        }
-        printf("-------------- RESULT -------------- \n");
-        savePngHeightmap("MPI_heightmap_After.png", data, terrainWidth, terrainHeight);
-        printf("Relative error : %f\n", testConservation(initialData, data, terrainSize));
-        printf("Temps moyen d'excution de l'érosion : %lf \n", elapsedMoy);
+        savePngHeightmap("MPI2D_after.png", globalData, GW, GH);
+        printf("-------------- RESULT (MPI 2D %dx%d) --------------\n", P_rows, P_cols);
+        printf("Relative error : %f\n", testConservation(globalInitial, globalData, GH * GW));
+        printf("Elapsed : %.6f s\n", elapsed);
+
+        free(globalData);
+        free(globalInitial);
     }
 
-    free(scatterOffset);
-    free(scatterSize);
-    free(initialData);
+    free(localData);
+    free(localFlux);
 
     MPI_Finalize();
-
-    return 0;
-}
-
-int lauchSequential(int argc, char* argv[])
-{
-    if (argc < 5)
-    {
-        printf("Usage: %s <terrainType> <width> <height> <steps>\n", argv[0]);
-        printf("terrainType: perlinNoise, faultFormation, midpointDisplacement\n");
-        return 1;
-    }
-
-    std::string terrainType = argv[2];
-    int terrainWidth = atoi(argv[3]);
-    int terrainHeight = atoi(argv[4]);
-    int terrainStep = atoi(argv[5]);
-    int terrainSize = terrainHeight * terrainWidth;
-
-    // Vérification pour midpointDisplacement
-    if (terrainType == "midpointDisplacement" && (terrainWidth != terrainHeight || !isPowerOfTwo(terrainWidth - 1)))
-    {
-        printf("Invalid terrain size : (size must be 2^n + 1)\n");
-        return 1;
-    }
-
-    // Génération du terrain
-    std::unique_ptr<Terrain> terrain;
-    generateTerrain(terrain, terrainWidth, terrainHeight, terrainType);
-
-    float* data = terrain->getData()->data();
-
-    // Sauvegarde avant érosion
-    savePngHeightmap("heightmap_before.png", data, terrainWidth, terrainHeight);
-
-    // Copie des données initiales pour vérification
-    float* initialData = (float*)malloc(sizeof(float) * terrainSize);
-    memcpy(initialData, data, terrainSize * sizeof(float));
-
-    // Allocation des buffers (avec lignes fantômes)
-    const int W = terrainWidth;
-    const int H = terrainHeight;
-    const int bufferSize = (H + 2) * W;
-
-    float* fluxData = (float*)calloc(bufferSize, sizeof(float));
-    float* bottomFlux = (float*)calloc(W, sizeof(float));
-    float* topFlux = (float*)calloc(W, sizeof(float));
-
-    // Timer
-    auto start = std::chrono::high_resolution_clock::now();
-
-    // Copie des données dans le buffer avec lignes fantômes
-    float* meshData = (float*)calloc(bufferSize, sizeof(float));
-    for (int i = 0; i < H; i++)
-    {
-        memcpy(meshData + (i + 1) * W, data + i * W, W * sizeof(float));
-    }
-    // Recopie des lignes fantômes (bords)
-    memcpy(meshData, meshData + W, W * sizeof(float));                   // haut
-    memcpy(meshData + (H + 1) * W, meshData + H * W, W * sizeof(float)); // bas
-
-    int changes = 0;
-    int lastLineIndex = H * W; // Dernière ligne réelle (index de début)
-
-    for (int step = 1; step <= terrainStep; step++)
-    {
-        // Érosion (version non MPI)
-        changes = stepChunkMPIBlock(meshData, fluxData, bottomFlux, topFlux, W, H);
-
-        // Appliquer les flux de bordure
-        // Transfert topFlux vers la première ligne réelle
-        for (int j = 0; j < W; j++)
-        {
-            meshData[W + j] += topFlux[j];
-        }
-
-        // Transfert bottomFlux vers la dernière ligne réelle
-        for (int j = 0; j < W; j++)
-        {
-            meshData[lastLineIndex + j] += bottomFlux[j];
-        }
-
-        // Réinitialiser les flux
-        memset(fluxData, 0, bufferSize * sizeof(float));
-        memset(topFlux, 0, W * sizeof(float));
-        memset(bottomFlux, 0, W * sizeof(float));
-
-        // if (step % 100 == 0) {
-        //     printf("[%d/%d] changes: %d\n", step, terrainStep, changes);
-        // }
-    }
-
-    // Appliquer les flux finaux aux données
-    for (int i = 0; i < H; i++)
-    {
-        for (int j = 0; j < W; j++)
-        {
-            meshData[(i + 1) * W + j] += fluxData[(i + 1) * W + j];
-        }
-    }
-
-    // Récupérer les données finales
-    for (int i = 0; i < H; i++)
-    {
-        memcpy(data + i * W, meshData + (i + 1) * W, W * sizeof(float));
-    }
-
-    auto end = std::chrono::high_resolution_clock::now();
-    double elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / 1000.0;
-
-    // Sauvegarde après érosion
-    savePngHeightmap("heightmap_after.png", data, terrainWidth, terrainHeight);
-
-    printf("-------------- RESULT -------------- \n");
-    printf("Relative error : %f\n", testConservation(initialData, data, terrainSize));
-    printf("Temps d'exécution de l'érosion : %.6f s\n", elapsed);
-
-    // Nettoyage
-    free(initialData);
-    free(fluxData);
-    free(bottomFlux);
-    free(topFlux);
-    free(meshData);
-
     return 0;
 }
