@@ -30,6 +30,7 @@ target_include_directories(erosion_core
 target_link_libraries(erosion_core
     PUBLIC
         OpenMP::OpenMP_CXX
+        stdc++fs
 )
 
 target_compile_options(erosion_core
