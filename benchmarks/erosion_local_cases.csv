@@ -1,0 +1,11 @@
+variant,neighbors,threads_list,description
+pure,4,"1,2,4,8",Version deux phases naive en voisinage 4
+pure,8,"1,2,4,8",Version deux phases naive en voisinage 8
+blocked,4,"1,2,4,8",Parcours par blocs en voisinage 4
+blocked,8,"1,2,4,8",Parcours par blocs en voisinage 8
+blockedParallel,4,"1,2,4,8",Version blocked avec accumulation thread-local OpenMP en voisinage 4
+blockedParallel,8,"1,2,4,8",Version blocked avec accumulation thread-local OpenMP en voisinage 8
+checkerboard,4,"1,2,4,8",Checkerboard deux phases en voisinage 4
+blockedCheckerboard,4,"1,2,4,8",Checkerboard bloque en voisinage 4
+inPlace,4,"1,2,4,8",Checkerboard in-place sequentiel en voisinage 4
+inPlaceParallel,4,"1,2,4,8",Checkerboard in-place parallele en voisinage 4
