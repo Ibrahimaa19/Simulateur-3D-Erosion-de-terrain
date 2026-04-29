@@ -1,0 +1,6 @@
+case,lod,culling,sync,gpu_timer,description
+baseline,off,off,full,off,Sans LOD sans culling avec synchronisation complete
+lod,on,off,full,off,LOD seul
+culling,off,on,full,off,Frustum culling seul
+lod_culling,on,on,full,off,LOD et frustum culling
+lod_culling_dirty_sync,on,on,dirty,off,LOD culling et synchronisation par dirty patches
