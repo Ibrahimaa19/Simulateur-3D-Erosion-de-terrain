@@ -2,9 +2,8 @@
 #SBATCH --job-name=erosion-weak
 #SBATCH --output=benchmarks/results/cluster/weak_%j.out
 #SBATCH --error=benchmarks/results/cluster/weak_%j.err
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=32
 #SBATCH --time=00:30:00
+#SBATCH --cpus-per-task=1
 
 set -euo pipefail
 
@@ -16,13 +15,23 @@ STEPS=${STEPS:-200}
 WARMUP=${WARMUP:-3}
 RUNS=${RUNS:-10}
 RANKS_LIST=${RANKS_LIST:-"1 2 4 8 16 32"}
+CPUS_PER_TASK=${SLURM_CPUS_PER_TASK:-1}
 
 mkdir -p benchmarks/results/cluster
+
+if [ -n "${MODULES:-}" ]; then
+    module load ${MODULES}
+fi
+
+echo "Job started on $(hostname) at $(date)"
+echo "Allocated nodes: ${SLURM_JOB_NUM_NODES:-unknown}"
+echo "CPUs per task: ${CPUS_PER_TASK}"
 
 for ranks in ${RANKS_LIST}; do
     height=$((BASE_HEIGHT * ranks))
     out="benchmarks/results/cluster/weak_np${ranks}"
-    mpirun -np "${ranks}" "${EXE}" bench mpi \
+    echo "Running weak-scaling case with ${ranks} MPI ranks and height ${height}"
+    srun --ntasks="${ranks}" --cpus-per-task="${CPUS_PER_TASK}" "${EXE}" bench mpi \
         --terrain "${TERRAIN}" \
         --width "${BASE_WIDTH}" \
         --height "${height}" \
@@ -31,3 +40,5 @@ for ranks in ${RANKS_LIST}; do
         --runs "${RUNS}" \
         --out "${out}"
 done
+
+echo "Job finished at $(date)"
