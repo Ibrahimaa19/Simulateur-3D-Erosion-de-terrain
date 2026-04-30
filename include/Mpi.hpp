@@ -912,7 +912,7 @@ int launchMPI2D(int argc, char *argv[])
         globalInitial = (float *)malloc(GH * GW * sizeof(float));
         memcpy(globalInitial, globalData, GH * GW * sizeof(float));
 
-        savePngHeightmap("MPI2D_before.png", globalData, GW, GH);
+        //savePngHeightmap("MPI2D_before.png", globalData, GW, GH);
     }
 
     double t0 = MPI_Wtime();
@@ -940,12 +940,28 @@ int launchMPI2D(int argc, char *argv[])
 
     double elapsed = MPI_Wtime() - t0;
 
+    double total_cell_updates = (double)steps * GH * GW;
+    double mlups_total = total_cell_updates / elapsed / 1e6;
+
+    const uint8_t FLOPS_PER_CELL = 52; // 28 avec 4 voisins
+    double total_ops = total_cell_updates * FLOPS_PER_CELL;
+    double gflops = total_ops / elapsed / 1e9;
+
+    double bytes_per_cell = 72.0;
+    double total_bytes = total_cell_updates * bytes_per_cell;  // octets totaux transférés
+
+    double effective_bandwidth = total_bytes / elapsed / 1e9;  // GB/s;
+
     if (rank == 0)
     {
-        savePngHeightmap("MPI2D_after.png", globalData, GW, GH);
-        printf("-------------- RESULT (MPI 2D %dx%d) --------------\n", P_rows, P_cols);
-        printf("Relative error : %f\n", testConservation(globalInitial, globalData, GH * GW));
-        printf("Elapsed : %.6f s\n", elapsed);
+        //savePngHeightmap("MPI2D_after.png", globalData, GW, GH);
+        // printf("-------------- RESULT (MPI 2D %dx%d) --------------\n", P_rows, P_cols);
+        // printf("Relative error : %f\n", testConservation(globalInitial, globalData, GH * GW));
+        // printf("Elapsed : %.6f s\n", elapsed);
+        // printf("MLUPS: %.2f\n", mlups_total);
+        // printf("GFLOPS: %.2f\n", gflops);
+        //printf("Effective BW: %.2f GB/s\n", effective_bandwidth);
+
 
         free(globalData);
         free(globalInitial);
