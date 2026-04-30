@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Terrain.hpp"
+#include "ThermalErosionCore.hpp"
 #include <memory>
-#include <cmath>
 #include <vector>
 
 /**
@@ -35,9 +35,7 @@ public:
      * @param talus Angle de talus en degrés
      */
     void setTalusAngle(float angle) { 
-        float PI = 3.14159265f;
-        float talus = std::tan(angle * PI / 180.0);
-        talusAngle = talus; 
+        talusAngle = thermalTalusThresholdFromDegrees(angle);
         //talusAngle = 0.006; 
     }
 
@@ -64,7 +62,7 @@ private:
     /** largeur du terrain */
     int m_width = 0;
 
-    /** Angle de talus critique (en degrés) */
+    /** Seuil de talus critique utilise par l'algorithme */
     float talusAngle = 0.f;
 
     /** Taux de transfert de matière */

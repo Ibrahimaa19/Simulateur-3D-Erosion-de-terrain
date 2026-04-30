@@ -30,3 +30,17 @@ target_compile_definitions(benchmark_render
 set_target_properties(benchmark_render PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/benchmarks
 )
+
+add_executable(benchmark_thermal_erosion
+    benchmark_thermal_erosion.cpp
+    ${PROJECT_SOURCE_DIR}/src/ThermalErosionCore.cpp
+)
+
+target_include_directories(benchmark_thermal_erosion
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+)
+
+set_target_properties(benchmark_thermal_erosion PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/benchmarks
+)
