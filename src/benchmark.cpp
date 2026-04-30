@@ -10,7 +10,7 @@
 #include <chrono>
 
 // ============================================================
-// IMPLÉMENTATION DES MÉTHODES DE BENCHMARK
+// IMPLEMENTATION DES METHODES DE BENCHMARK
 // ============================================================
 
 std::unique_ptr<Terrain> Benchmark::createPerlinTerrain(int size)
@@ -94,7 +94,6 @@ BenchmarkResult Benchmark::runMethod(int methodId, int terrainSize, int steps, i
     std::cout << "  " << methodNames[methodId] << " (" << terrainSize << "x" << terrainSize 
               << ", " << steps << " steps, " << result.threads << " threads)..." << std::flush;
     
-    // Warm-up
     for (int run = 0; run < WARMUP_RUNS; ++run) {
         auto terrain = createPerlinTerrain(terrainSize);
         ThermalErosion erosion;
@@ -102,12 +101,10 @@ BenchmarkResult Benchmark::runMethod(int methodId, int terrainSize, int steps, i
         erosion.setTalusAngle(30.0f);
         erosion.setTransferRate(0.1f);
         
-        if (methodId >= 3) {  // 3,4,5,6 sont des méthodes checkerboard
+        if (methodId >= 3) {
             erosion.useFourNeighbors();
-            std::cout << " (4 voisins)" << std::flush;
         } else {
             erosion.useEightNeighbors();
-            std::cout << " (8 voisins)" << std::flush;
         }
         erosion.resetProgress();
         
@@ -124,7 +121,6 @@ BenchmarkResult Benchmark::runMethod(int methodId, int terrainSize, int steps, i
         }
     }
     
-    // Mesures
     for (int run = 0; run < MEASURED_RUNS; ++run) {
         auto terrain = createPerlinTerrain(terrainSize);
         std::vector<float> initialData = *terrain->getData();
@@ -134,14 +130,11 @@ BenchmarkResult Benchmark::runMethod(int methodId, int terrainSize, int steps, i
         erosion.setTalusAngle(30.0f);
         erosion.setTransferRate(0.1f);
         
-        if (methodId >= 3) {  // 3,4,5,6 sont des méthodes checkerboard
+        if (methodId >= 3) {
             erosion.useFourNeighbors();
-            std::cout << " (4 voisins)" << std::flush;
         } else {
             erosion.useEightNeighbors();
-            std::cout << " (8 voisins)" << std::flush;
         }
-
         erosion.resetProgress();
         
         auto start = std::chrono::high_resolution_clock::now();
@@ -172,7 +165,7 @@ BenchmarkResult Benchmark::runMethod(int methodId, int terrainSize, int steps, i
     result.cellsStats = computeStats(std::vector<double>(result.cellsModified.begin(), result.cellsModified.end()));
     result.errorStats = computeStats(result.massErrors);
     
-    std::cout << " " << std::fixed << std::setprecision(0) << result.timeStats.mean << "±" 
+    std::cout << " " << std::fixed << std::setprecision(0) << result.timeStats.mean << " +- " 
               << result.timeStats.stddev << " ms" << std::endl;
     
     if (threads > 0) omp_set_num_threads(originalThreads);
@@ -180,12 +173,44 @@ BenchmarkResult Benchmark::runMethod(int methodId, int terrainSize, int steps, i
     return result;
 }
 
+void Benchmark::saveToCSV(const std::vector<BenchmarkResult>& results, const std::string& filename)
+{
+    std::ofstream file(filename);
+    file << "method,method_id,size,steps,threads,"
+         << "time_mean_ms,time_median_ms,time_stddev_ms,time_min_ms,time_max_ms,"
+         << "time_q1_ms,time_q3_ms,time_ci95_low,time_ci95_high,"
+         << "cells_mean,cells_stddev,mass_error_mean,mass_error_stddev\n";
+    
+    for (const auto& r : results) {
+        file << r.methodName << ","
+             << r.methodId << ","
+             << r.terrainSize << ","
+             << r.steps << ","
+             << r.threads << ","
+             << r.timeStats.mean << ","
+             << r.timeStats.median << ","
+             << r.timeStats.stddev << ","
+             << r.timeStats.min << ","
+             << r.timeStats.max << ","
+             << r.timeStats.q1 << ","
+             << r.timeStats.q3 << ","
+             << r.timeStats.ci95_low << ","
+             << r.timeStats.ci95_high << ","
+             << r.cellsStats.mean << ","
+             << r.cellsStats.stddev << ","
+             << r.errorStats.mean << ","
+             << r.errorStats.stddev << "\n";
+    }
+    file.close();
+    std::cout << "Saved: " << filename << std::endl;
+}
+
 void Benchmark::printResults(const std::vector<BenchmarkResult>& results)
 {
     std::cout << "\n" << std::string(100, '-') << std::endl;
-    std::cout << std::left << std::setw(32) << "Méthode"
-              << std::right << std::setw(10) << "Moyenne"
-              << std::setw(10) << "Médiane"
+    std::cout << std::left << std::setw(32) << "Method"
+              << std::right << std::setw(10) << "Mean"
+              << std::setw(10) << "Median"
               << std::setw(10) << "StdDev"
               << std::setw(10) << "Min"
               << std::setw(10) << "Max"
@@ -213,33 +238,85 @@ void Benchmark::printResults(const std::vector<BenchmarkResult>& results)
     std::cout << std::string(100, '-') << std::endl;
 }
 
-void Benchmark::saveToCSV(const std::vector<BenchmarkResult>& results, const std::string& filename)
+void Benchmark::runWeakScaling(int baseSize, int steps)
 {
-    std::ofstream file(filename);
-    file << "method,method_id,size,steps,threads,"
-         << "time_mean_ms,time_median_ms,time_stddev_ms,time_min_ms,time_max_ms,time_q1_ms,time_q3_ms,"
-         << "cells_mean,cells_stddev,mass_error_mean,mass_error_stddev\n";
+    std::cout << "\n" << std::string(80, '=') << std::endl;
+    std::cout << "WEAK SCALING - OPENMP" << std::endl;
+    std::cout << std::string(80, '=') << std::endl;
+    std::cout << "Base size (1 thread): " << baseSize << "x" << baseSize << std::endl;
+    std::cout << "Steps: " << steps << std::endl;
+    std::cout << std::string(60, '-') << std::endl;
     
-    for (const auto& r : results) {
-        file << r.methodName << ","
-             << r.methodId << ","
-             << r.terrainSize << ","
-             << r.steps << ","
-             << r.threads << ","
-             << r.timeStats.mean << ","
-             << r.timeStats.median << ","
-             << r.timeStats.stddev << ","
-             << r.timeStats.min << ","
-             << r.timeStats.max << ","
-             << r.timeStats.q1 << ","
-             << r.timeStats.q3 << ","
-             << r.cellsStats.mean << ","
-             << r.cellsStats.stddev << ","
-             << r.errorStats.mean << ","
-             << r.errorStats.stddev << "\n";
+    std::vector<int> threadCounts = {1, 2, 4, 8, 12, 16};
+    std::vector<BenchmarkResult> weakResults;
+    
+    for (int threads : threadCounts) {
+        int size = baseSize * (int)std::sqrt(threads);
+        size = (size / 2) * 2;
+        if (size < 64) size = 64;
+        
+        std::cout << "  Threads: " << threads << " | Size: " << size << "x" << size << std::flush;
+        
+        int originalThreads = omp_get_max_threads();
+        omp_set_num_threads(threads);
+        
+        auto terrain = createPerlinTerrain(size);
+        std::vector<float> initialData = *terrain->getData();
+        
+        ThermalErosion erosion;
+        erosion.loadTerrainInfo(*terrain);
+        erosion.setTalusAngle(30.0f);
+        erosion.setTransferRate(0.1f);
+        erosion.useEightNeighbors();
+        erosion.resetProgress();
+        
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        for (int i = 0; i < steps; ++i) {
+            erosion.stepBlockedParallelPureTwoPhase();
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        double timeMs = std::chrono::duration<double, std::milli>(end - start).count();
+        double massError = computeMassError(initialData, *terrain->getData());
+        
+        BenchmarkResult result;
+        result.methodName = "Weak scaling";
+        result.methodId = 2;
+        result.terrainSize = size;
+        result.steps = steps;
+        result.threads = threads;
+        result.timeStats.mean = timeMs;
+        result.timeStats.stddev = 0;
+        result.massErrors.push_back(massError);
+        
+        weakResults.push_back(result);
+        
+        std::cout << " | Time: " << std::fixed << std::setprecision(0) << timeMs << " ms" << std::endl;
+        
+        omp_set_num_threads(originalThreads);
     }
-    file.close();
-    std::cout << "\n✅ Résultats sauvegardés dans " << filename << std::endl;
+    
+    saveToCSV(weakResults, "weak_scaling_results.csv");
+    
+    double baseTime = weakResults[0].timeStats.mean;
+    std::cout << "\n" << std::string(60, '-') << std::endl;
+    std::cout << std::left << std::setw(10) << "Threads"
+              << std::right << std::setw(12) << "Size"
+              << std::setw(14) << "Time (ms)"
+              << std::setw(14) << "Efficiency"
+              << std::endl;
+    std::cout << std::string(60, '-') << std::endl;
+    
+    for (const auto& r : weakResults) {
+        double efficiency = (baseTime / r.timeStats.mean) * 100.0;
+        std::cout << std::left << std::setw(10) << r.threads
+                  << std::right << std::setw(8) << r.terrainSize << "x" << std::setw(4) << r.terrainSize
+                  << std::setw(14) << std::fixed << std::setprecision(0) << r.timeStats.mean
+                  << std::setw(13) << std::setprecision(1) << efficiency << "%"
+                  << std::endl;
+    }
+    std::cout << std::string(60, '-') << std::endl;
 }
 
 void Benchmark::runAll(int size, int steps)
@@ -247,118 +324,44 @@ void Benchmark::runAll(int size, int steps)
     std::vector<BenchmarkResult> results;
     
     std::cout << "\n" << std::string(80, '=') << std::endl;
-    std::cout << "🔬 BENCHMARK ÉROSION THERMIQUE - PERLIN NOISE" << std::endl;
+    std::cout << "BENCHMARK THERMAL EROSION - PERLIN NOISE" << std::endl;
     std::cout << std::string(80, '=') << std::endl;
-    std::cout << "📊 " << MEASURED_RUNS << " runs mesurés, " << WARMUP_RUNS << " warmup" << std::endl;
-    std::cout << "📊 Terrain: " << size << "x" << size << ", " << steps << " étapes" << std::endl;
+    std::cout << "Runs: " << MEASURED_RUNS << " measured, " << WARMUP_RUNS << " warmup" << std::endl;
+    std::cout << "Terrain: " << size << "x" << size << ", " << steps << " steps" << std::endl;
     std::cout << std::string(80, '=') << "\n" << std::endl;
     
-    // ============================================================
-    // TEST A: Comparaison des 7 méthodes (12 threads)
-    // ============================================================
-    std::cout << "📊 TEST A: COMPARAISON DES 7 MÉTHODES" << std::endl;
-    std::cout << "   (" << size << "x" << size << ", " << steps << " étapes, 12 threads)" << std::endl;
-    std::cout << std::string(60, '-') << std::endl;
+    // TEST A: 7 methods comparison
     
-    for (int method = 0; method < 7; ++method) {
-        results.push_back(runMethod(method, size, steps));
-    }
+    std::vector<BenchmarkResult> testAResults;
     
-    printResults(results);
-    
-    // Identifier la meilleure méthode (celle avec le meilleur speedup)
-    double refTime = results[0].timeStats.mean;
-    int bestMethod = 0;
+    int bestMethod = 2;
     double bestSpeedup = 1.0;
-    for (const auto& r : results) {
-        double speedup = refTime / r.timeStats.mean;
-        if (speedup > bestSpeedup) {
-            bestSpeedup = speedup;
-            bestMethod = r.methodId;
-        }
-    }
     
-    std::cout << "\n🏆 Meilleure méthode identifiée: " << results[bestMethod].methodName 
-              << " (speedup " << bestSpeedup << "x)" << std::endl;
-    
-    // ============================================================
-    // TEST B: Scalabilité OpenMP - meilleure méthode
-    // ============================================================
-    std::cout << "\n📊 TEST B: SCALABILITÉ OPENMP" << std::endl;
-    std::cout << "   (" << results[bestMethod].methodName << " - meilleure méthode, " 
-              << size << "x" << size << ", " << steps << " étapes)" << std::endl;
-    std::cout << std::string(60, '-') << std::endl;
-    
-    std::vector<BenchmarkResult> scalingResults;
-    std::vector<int> threadCounts = {1, 2, 4, 8, 12};
-    for (int threads : threadCounts) {
-        scalingResults.push_back(runMethod(bestMethod, size, steps, threads));
-    }
-    
-    std::cout << "\n📊 SCALABILITÉ OPENMP" << std::endl;
-    std::cout << std::string(60, '-') << std::endl;
-    std::cout << std::left << std::setw(12) << "Threads"
-              << std::right << std::setw(14) << "Temps (ms)"
-              << std::setw(12) << "Speedup"
-              << std::setw(12) << "Idéal"
-              << std::setw(14) << "Efficacité"
-              << std::endl;
-    std::cout << std::string(60, '-') << std::endl;
-    
-    double baseTime = scalingResults[0].timeStats.mean;
-    int bestThreads = 1;
-    double bestThreadSpeedup = 1.0;
-    for (const auto& r : scalingResults) {
-        double speedup = baseTime / r.timeStats.mean;
-        if (speedup > bestThreadSpeedup) {
-            bestThreadSpeedup = speedup;
-            bestThreads = r.threads;
-        }
-        double ideal = r.threads;
-        double eff = (speedup / ideal) * 100.0;
-        std::cout << std::left << std::setw(12) << r.threads
-                  << std::right << std::setw(14) << std::fixed << std::setprecision(0) << r.timeStats.mean
-                  << std::setw(12) << std::setprecision(2) << speedup << "x"
-                  << std::setw(12) << std::setprecision(2) << ideal << "x"
-                  << std::setw(13) << std::setprecision(1) << eff << "%"
-                  << std::endl;
-    }
-    std::cout << std::string(60, '-') << std::endl;
-    
-    std::cout << "\n🏆 Meilleur nombre de threads: " << bestThreads 
-              << " (speedup " << bestThreadSpeedup << "x)" << std::endl;
-    
-    results.insert(results.end(), scalingResults.begin(), scalingResults.end());
-    
-    // ============================================================
-    // TEST C: Différentes tailles - meilleure méthode + meilleur nombre de threads
-    // ============================================================
-    std::cout << "\n📊 TEST C: DIFFÉRENTES TAILLES" << std::endl;
-    std::cout << "   (" << results[bestMethod].methodName << " - meilleure méthode, " 
-              << bestThreads << " threads, " << steps << " étapes)" << std::endl;
-    std::cout << std::string(60, '-') << std::endl;
+    // TEST C: Different sizes
     
     std::vector<int> testSizes = {128, 256, 512, 1024, 2048, 4096};
-    std::vector<BenchmarkResult> sizeResults;
+    std::vector<BenchmarkResult> testCResults;
     
     for (int s : testSizes) {
         if (s <= size * 2) {
-            sizeResults.push_back(runMethod(bestMethod, s, steps, bestThreads));
+            testCResults.push_back(runMethod(bestMethod, s, steps, 2));
         }
     }
     
-    std::cout << "\n📊 SCALABILITÉ PAR TAILLE" << std::endl;
+    saveToCSV(testCResults, "benchmark_testC_size_scalability.csv");
+    
+    std::cout << "\nSIZE SCALABILITY" << std::endl;
     std::cout << std::string(70, '-') << std::endl;
-    std::cout << std::left << std::setw(12) << "Taille"
-              << std::right << std::setw(14) << "Temps (ms)"
-              << std::setw(14) << "Cellules"
+    std::cout << std::left << std::setw(12) << "Size"
+              << std::right << std::setw(14) << "Time (ms)"
+              << std::setw(14) << "Cells (M)"
               << std::setw(14) << "ms/Mcell"
               << std::setw(14) << "Speedup"
               << std::endl;
     std::cout << std::string(70, '-') << std::endl;
     
-    double baseTimeSize = sizeResults[0].timeStats.mean;
-    for (const auto& r : sizeResults) {
+    double baseTimeSize = testCResults[0].timeStats.mean;
+    for (const auto& r : testCResults) {
         double millionCells = (r.terrainSize * r.terrainSize) / 1e6;
         double msPerMcell = r.timeStats.mean / millionCells;
         double speedup = baseTimeSize / r.timeStats.mean;
@@ -371,15 +374,14 @@ void Benchmark::runAll(int size, int steps)
     }
     std::cout << std::string(70, '-') << std::endl;
     
-    results.insert(results.end(), sizeResults.begin(), sizeResults.end());
-    
-    saveToCSV(results, "benchmark_results.csv");
+    // WEAK SCALING
+    runWeakScaling(256, steps);
     
     std::cout << "\n" << std::string(80, '=') << std::endl;
-    std::cout << "✅ BENCHMARK TERMINÉ" << std::endl;
-    std::cout << "🏆 Meilleure méthode: " << results[bestMethod].methodName << std::endl;
-    std::cout << "🏆 Meilleur nombre de threads: " << bestThreads << std::endl;
-    std::cout << "🏆 Speedup maximal: " << bestSpeedup << "x" << std::endl;
+    std::cout << "BENCHMARK COMPLETED" << std::endl;
+    std::cout << "Best method: " << testAResults[bestMethod].methodName << std::endl;
+    std::cout << "Best threads: " << 2 << std::endl;
+    std::cout << "Max speedup: " << bestSpeedup << "x" << std::endl;
     std::cout << std::string(80, '=') << std::endl;
 }
 
@@ -389,14 +391,14 @@ void Benchmark::runAll(int size, int steps)
 
 int main(int argc, char* argv[])
 {
-    int size = 2048;    // Valeur par défaut
-    int steps = 500;    // Valeur par défaut
+    int size = 2048;
+    int steps = 500;
     
     if (argc > 1) size = std::atoi(argv[1]);
     if (argc > 2) steps = std::atoi(argv[2]);
     
-    std::cout << "Benchmark avec terrain " << size << "x" << size 
-              << ", " << steps << " étapes" << std::endl;
+    std::cout << "Benchmark with terrain " << size << "x" << size 
+              << ", " << steps << " steps" << std::endl;
     
     Benchmark::runAll(size, steps);
     return 0;

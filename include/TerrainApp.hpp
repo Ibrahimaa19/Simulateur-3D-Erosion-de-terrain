@@ -171,4 +171,11 @@ class TerrainApp
 
     /** Framebuffer resize callback wrapper */
     static void FramebufferCallback(GLFWwindow* window, int width, int height);
+
+    // Pour les mesures de performance
+    double m_simulationTime = 0.0;
+    double m_renderingTime = 0.0;
+    int m_frameCount = 0;
+    std::chrono::high_resolution_clock::time_point m_simStart;
+    std::chrono::high_resolution_clock::time_point m_renderStart;
 };

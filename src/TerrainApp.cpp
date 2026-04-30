@@ -112,6 +112,12 @@ void TerrainApp::Run()
 {
     int stepCounter = 0;
 
+    m_simulationTime = 0.0;
+    m_renderingTime = 0.0;
+    m_frameCount = 0;
+    
+    auto lastPrintTime = std::chrono::high_resolution_clock::now();
+
     while (!glfwWindowShouldClose(mWindow))
     {
         glClearColor(mGui.renderSkyColor[0], mGui.renderSkyColor[1], mGui.renderSkyColor[2], 1.0f);

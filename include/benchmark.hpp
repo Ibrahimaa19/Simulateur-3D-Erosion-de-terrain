@@ -41,10 +41,11 @@ struct BenchmarkResult {
 class Benchmark {
 public:
     static void runAll(int size, int steps);
+    static void runWeakScaling(int baseSize, int steps);
     static void saveToCSV(const std::vector<BenchmarkResult>& results, const std::string& filename);
     
 private:
-    static constexpr int WARMUP_RUNS = 1;
+    static constexpr int WARMUP_RUNS = 3;
     static constexpr int MEASURED_RUNS = 5;
     
     static std::unique_ptr<Terrain> createPerlinTerrain(int size);
@@ -52,7 +53,7 @@ private:
     static double computeMassError(const std::vector<float>& initial, const std::vector<float>& final);
     
     static BenchmarkResult runMethod(int methodId, int terrainSize, int steps, int threads = 0);
-    static void printResults(const std::vector<BenchmarkResult>& results); 
+    static void printResults(const std::vector<BenchmarkResult>& results);
 };
 
 #endif

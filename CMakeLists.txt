@@ -128,6 +128,19 @@ if(EROSION_ENABLE_RENDERING)
     target_compile_definitions(${PROJECT_NAME} PRIVATE GLEW_STATIC)
 endif()
 
+# ============================================================
+# BENCHMARK EXECUTABLE
+# ============================================================
+add_executable(benchmark
+    src/benchmark.cpp
+)
+
+target_link_libraries(benchmark
+    PRIVATE
+        erosion_core
+        OpenMP::OpenMP_CXX
+)
+
 if(EROSION_ENABLE_TESTS)
     enable_testing()
     add_subdirectory(tests)
@@ -155,44 +168,48 @@ if(CLANG_FORMAT_EXE)
 endif()
 
 
-if(EROSION_ENABLE_TESTS AND EXISTS ${PROJECT_SOURCE_DIR}/tests/CMakeLists.txt)
-    enable_testing()
-    add_subdirectory(tests)
-endif()
-
-add_executable(benchmark
-    src/benchmark.cpp
+# ============================================================
+# BENCHMARK SIMULATION PURE (sans rendu)
+# ============================================================
+add_executable(benchmark_simulation
+    src/benchmark_simulation.cpp
 )
 
-target_link_libraries(benchmark
+target_link_libraries(benchmark_simulation
     PRIVATE
         erosion_core
         OpenMP::OpenMP_CXX
 )
 
-target_compile_options(benchmark
+target_compile_options(benchmark_simulation
     PRIVATE
         $<$<CONFIG:Release>:-O3 -march=native>
         $<$<CONFIG:RelWithDebInfo>:-O3 -march=native>
 )
 
-find_program(CLANG_FORMAT_EXE NAMES clang-format)
-if(CLANG_FORMAT_EXE)
-    file(GLOB_RECURSE EROSION_FORMAT_FILES CONFIGURE_DEPENDS
-        ${PROJECT_SOURCE_DIR}/include/*.hpp
-        ${PROJECT_SOURCE_DIR}/src/*.cpp
-        ${PROJECT_SOURCE_DIR}/tests/*.cpp
-        ${PROJECT_SOURCE_DIR}/tests/*.hpp
+# ============================================================
+# BENCHMARK RENDU PUR (avec OpenGL)
+# ============================================================
+if(EROSION_ENABLE_RENDERING)
+    add_executable(benchmark_rendering
+        src/benchmark_rendering.cpp
     )
-    list(FILTER EROSION_FORMAT_FILES EXCLUDE REGEX ".*/include/stb_image\\.hpp$")
-
-    add_custom_target(format
-        COMMAND ${CLANG_FORMAT_EXE} -i ${EROSION_FORMAT_FILES}
-        COMMENT "Formatting C++ sources with clang-format"
+    
+    target_link_libraries(benchmark_rendering
+        PRIVATE
+            erosion_core
+            imgui_lib
+            OpenGL::GL
+            GLEW::GLEW
+            glfw
     )
-
-    add_custom_target(format-check
-        COMMAND ${CLANG_FORMAT_EXE} --dry-run --Werror ${EROSION_FORMAT_FILES}
-        COMMENT "Checking C++ formatting with clang-format"
+    
+    target_include_directories(benchmark_rendering PRIVATE ${GLM_INCLUDE_DIR})
+    target_compile_definitions(benchmark_rendering PRIVATE GLEW_STATIC)
+    
+    target_compile_options(benchmark_rendering
+        PRIVATE
+            $<$<CONFIG:Release>:-O3 -march=native>
+            $<$<CONFIG:RelWithDebInfo>:-O3 -march=native>
     )
 endif()
