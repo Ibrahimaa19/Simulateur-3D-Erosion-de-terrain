@@ -161,13 +161,16 @@ void RendererManager::renderLod(const glm::vec3& cameraPos, glm::mat4& projectio
 
         correctLod();
 
+        int patchRendered = 0;
         for (auto& patch : mPatches)
         {
             if (patch->getLodLevel() != -1)
             {
                 patch->render();
+                patchRendered++;
             }
         }
+        //std::cout << "patch rendered: " << patchRendered << "/" << mPatches.size() << std::endl;
     }
     else
     {
