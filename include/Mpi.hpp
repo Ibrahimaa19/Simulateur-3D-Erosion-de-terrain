@@ -195,15 +195,12 @@ static void stepMpi2DBlocked(const float *__restrict__ data, float *__restrict__
     const int dj[8] = {-1, 0, 1, -1, 1, -1, 0, 1};
     const int nb_v = 8;
 
-    // const int di[4] = {1, -1, 0, 0};
-    // const int dj[4] = {0, 0, -1, 1};
-    // const int nb_v = 4;
-
     // Paramètres de blocage - à ajuster selon votre cache L1/L2
     const int BLOCK_SIZE_I = 64;  // Hauteur du bloc (lignes)
     const int BLOCK_SIZE_J = 64;  // Largeur du bloc (colonnes)
 
     // Parcours par blocs
+    //#pragma omp parallel for collapse(2) schedule(static)
     for (int ii = 1; ii <= H; ii += BLOCK_SIZE_I)
     {
         int i_max = std::min(ii + BLOCK_SIZE_I - 1, H);
@@ -247,6 +244,106 @@ static void stepMpi2DBlocked(const float *__restrict__ data, float *__restrict__
             }
         }
     }
+}
+
+static void stepMpi2DBlockedParallel(const float *__restrict__ data, float *__restrict__ flux, int H, int W)
+{
+    const float transferRate = 0.5f;
+    const float PI = 3.14159265f;
+    const float talusAngle = std::tan(30.f * PI / 180.f);
+    const int stride = W + 2;
+
+    memset(flux, 0, sizeof(float) * (H + 2) * stride);
+
+    const int di[8] = {1, 1, 1, 0, 0, -1, -1, -1};
+    const int dj[8] = {-1, 0, 1, -1, 1, -1, 0, 1};
+    const int nb_v = 8;
+
+    const int BLOCK_SIZE_I = 64;
+    const int BLOCK_SIZE_J = 64;
+
+    // Mutex pour protéger les accès concurrents à flux
+    omp_lock_t fluxLock;
+    omp_init_lock(&fluxLock);
+
+    #pragma omp parallel for collapse(2) schedule(static)
+    for (int ii = 1; ii <= H; ii += BLOCK_SIZE_I)
+    {
+        int i_max = std::min(ii + BLOCK_SIZE_I - 1, H);
+        
+        for (int jj = 1; jj <= W; jj += BLOCK_SIZE_J)
+        {
+            int j_max = std::min(jj + BLOCK_SIZE_J - 1, W);
+            
+            // Variables locales pour réduire les accès au mutex
+            float localFluxBuffer[BLOCK_SIZE_I + 2][BLOCK_SIZE_J + 2] = {{0}};
+            
+            // Phase 1 : calcul local sans mutex
+            for (int i = ii; i <= i_max; ++i)
+            {
+                for (int j = jj; j <= j_max; ++j)
+                {
+                    float cur = data[i * stride + j];
+                    float diff[nb_v], totalDiff = 0.f, validCount = 0.f;
+                    
+                    for (int k = 0; k < nb_v; ++k)
+                    {
+                        diff[k] = cur - data[(i + di[k]) * stride + (j + dj[k])];
+                        if (diff[k] > talusAngle)
+                        {
+                            totalDiff += diff[k];
+                            validCount += 1.f;
+                        }
+                    }
+                    
+                    if (totalDiff > 0.f && validCount > 0.f)
+                    {
+                        float mat = transferRate * (totalDiff / validCount);
+                        mat = std::min(mat, cur * transferRate);
+                        
+                        // Stockage local (offset pour éviter les débordements)
+                        localFluxBuffer[i - ii + 1][j - jj + 1] -= mat;
+                        
+                        for (int k = 0; k < nb_v; ++k)
+                        {
+                            if (diff[k] > talusAngle)
+                            {
+                                int ni = i + di[k];
+                                int nj = j + dj[k];
+                                
+                                // Vérifier si le voisin est dans le bloc courant
+                                if (ni >= ii && ni <= i_max && nj >= jj && nj <= j_max)
+                                {
+                                    // Voisin dans le même bloc → stockage local
+                                    localFluxBuffer[ni - ii + 1][nj - jj + 1] += mat * (diff[k] / totalDiff);
+                                }
+                                else
+                                {
+                                    // Voisin dans un autre bloc → besoin du mutex
+                                    omp_set_lock(&fluxLock);
+                                    flux[ni * stride + nj] += mat * (diff[k] / totalDiff);
+                                    omp_unset_lock(&fluxLock);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Phase 2 : application du buffer local avec mutex
+            omp_set_lock(&fluxLock);
+            for (int i = 0; i <= (i_max - ii + 1); ++i)
+            {
+                for (int j = 0; j <= (j_max - jj + 1); ++j)
+                {
+                    flux[(ii + i) * stride + (jj + j)] += localFluxBuffer[i + 1][j + 1];
+                }
+            }
+            omp_unset_lock(&fluxLock);
+        }
+    }
+    
+    omp_destroy_lock(&fluxLock);
 }
 
 static void stepMpi2DCheckboard(const float *__restrict__ data, float *__restrict__ flux, int H, int W)
@@ -318,7 +415,77 @@ static void stepMpi2DCheckboardBlocked(const float *__restrict__ data, float *__
     const int BLOCK_SIZE_I = 64;
     const int BLOCK_SIZE_J = 64;
 
+    //#pragma omp parallel for collapse(2) schedule(static)
     for (int color=0;color<2;++color){
+        for (int ii = 1; ii <= H; ii += BLOCK_SIZE_I)
+        {
+            int i_max = std::min(ii + BLOCK_SIZE_I - 1, H);
+            
+            for (int jj = 1; jj <= W; jj += BLOCK_SIZE_J)
+            {
+                int j_max = std::min(jj + BLOCK_SIZE_J - 1, W);
+                
+                // Traitement des cellules de la couleur actuelle dans le bloc
+                for (int i = ii; i <= i_max; ++i)
+                {
+                    // Calcul du premier j qui correspond à la couleur
+                    int start_j = jj;
+                    if ((i + start_j) % 2 != color)
+                        start_j++;
+                    
+                    for (int j = start_j; j <= j_max; j += 2)
+                    {
+                        float cur = data[i * stride + j];
+                        float diff[4], totalDiff = 0.f, validCount = 0.f;
+                        
+                        for (int k = 0; k < 4; ++k)
+                        {
+                            diff[k] = cur - data[(i + di[k]) * stride + (j + dj[k])];
+                            if (diff[k] > talusAngle)
+                            {
+                                totalDiff += diff[k];
+                                validCount += 1.f;
+                            }
+                        }
+                        
+                        if (totalDiff > 0.f && validCount > 0.f)
+                        {
+                            float mat = transferRate * (totalDiff / validCount);
+                            mat = std::min(mat, cur * transferRate);
+                            
+                            flux[i * stride + j] -= mat;
+                            
+                            for (int k = 0; k < 4; ++k)
+                            {
+                                if (diff[k] > talusAngle)
+                                    flux[(i + di[k]) * stride + (j + dj[k])] += mat * (diff[k] / totalDiff);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+}
+
+static void stepMpi2DCheckboardBlockedParallel(const float *__restrict__ data, float *__restrict__ flux, int H, int W)
+{
+    const float transferRate = 0.5f;
+    const float PI = 3.14159265f;
+    const float talusAngle = std::tan(30.f * PI / 180.f);
+    const int stride = W + 2;
+
+    memset(flux, 0, sizeof(float) * (H + 2) * stride);
+
+    const int di[4] = {1, -1, 0, 0};
+    const int dj[4] = {0, 0, -1, 1};
+
+    const int BLOCK_SIZE_I = 64;
+    const int BLOCK_SIZE_J = 64;
+
+    for (int color=0;color<2;++color){
+        #pragma omp parallel for collapse(2) schedule(static)
         for (int ii = 1; ii <= H; ii += BLOCK_SIZE_I)
         {
             int i_max = std::min(ii + BLOCK_SIZE_I - 1, H);
@@ -447,6 +614,75 @@ static void stepMpi2DCheckboardInplaceBlocked(const float *__restrict__ data, fl
         for (int i = 1; i <= H; ++i)
         {
             // Mais découpage en blocs horizontaux pour améliorer la localité
+            for (int jj = 1; jj <= W; jj += BLOCK_SIZE_J)
+            {
+                int j_max = std::min(jj + BLOCK_SIZE_J - 1, W);
+                
+                // Calcul du premier j qui correspond à la couleur
+                int start_j = jj;
+                if (((i + jj) & 1) != color) {
+                    start_j = jj + 1;
+                }
+                
+                for (int j = start_j; j <= j_max; j += 2)
+                {
+                    float cur = data[i * stride + j] + flux[i * stride + j];
+                    float diff[4], totalDiff = 0.f, validCount = 0.f;
+                    
+                    for (int k = 0; k < 4; ++k)
+                    {
+                        diff[k] = cur - (data[(i + di[k]) * stride + (j + dj[k])] + 
+                                        flux[(i + di[k]) * stride + (j + dj[k])]);
+                        if (diff[k] > talusAngle)
+                        {
+                            totalDiff += diff[k];
+                            validCount += 1.f;
+                        }
+                    }
+                    
+                    if (totalDiff > 0.f && validCount > 0.f)
+                    {
+                        float mat = transferRate * (totalDiff / validCount);
+                        mat = std::min(mat, cur * transferRate);
+                        
+                        flux[i * stride + j] -= mat;
+                        
+                        for (int k = 0; k < 4; ++k)
+                        {
+                            if (diff[k] > talusAngle)
+                                flux[(i + di[k]) * stride + (j + dj[k])] += mat * (diff[k] / totalDiff);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+}
+
+static void stepMpi2DCheckboardInplaceBlockedParallel(const float *__restrict__ data, float *__restrict__ flux, int H, int W)
+{
+    const float transferRate = 0.5f;
+    const float PI = 3.14159265f;
+    const float talusAngle = std::tan(30.f * PI / 180.f);
+    const int stride = W + 2;
+
+    memset(flux, 0, sizeof(float) * (H + 2) * stride);
+
+    const int di[4] = {1, -1, 0, 0};
+    const int dj[4] = {0, 0, -1, 1};
+
+    const int BLOCK_SIZE_J = 64;  // Bloquer uniquement en largeur
+
+    // Pour chaque couleur (0 puis 1)
+    for (int color = 0; color < 2; ++color)
+    {
+        // Parcours dans l'ORDRE NORMAL (ligne par ligne)
+        #pragma omp parallel for schedule(static) collapse(2)
+        for (int i = 1; i <= H; ++i)
+        {
+            // Mais découpage en blocs horizontaux pour améliorer la localité
+            
             for (int jj = 1; jj <= W; jj += BLOCK_SIZE_J)
             {
                 int j_max = std::min(jj + BLOCK_SIZE_J - 1, W);
@@ -925,8 +1161,29 @@ int launchMPI2D(int argc, char *argv[])
         exchangeGhosts2D(localData, myBlockH, myBlockW, topNeigh, botNeigh, leftNeigh, rightNeigh, topLeftNeigh,
                          topRightNeigh, botLeftNeigh, botRightNeigh);
 
+        #if EROSION_MODE == 1
+            stepMpi2D(localData, localFlux, myBlockH, myBlockW);
+        #elif EROSION_MODE == 2
+            stepMpi2DBlocked(localData, localFlux, myBlockH, myBlockW);
+        #elif EROSION_MODE == 3
+            stepMpi2DBlockedParallel(localData, localFlux, myBlockH, myBlockW);
+        #elif EROSION_MODE == 4
+            stepMpi2DCheckboard(localData, localFlux, myBlockH, myBlockW);
+        #elif EROSION_MODE == 5
+            stepMpi2DCheckboardBlocked(localData, localFlux, myBlockH, myBlockW);
+        #elif EROSION_MODE == 6
+            stepMpi2DCheckboardBlockedParallel(localData, localFlux, myBlockH, myBlockW);
+        #elif EROSION_MODE == 7
+            stepMpi2DCheckboardInplace(localData, localFlux, myBlockH, myBlockW);
+        #elif EROSION_MODE == 8
+            stepMpi2DCheckboardInplaceBlocked(localData, localFlux, myBlockH, myBlockW);
+        #elif EROSION_MODE == 9
+            stepMpi2DCheckboardInplaceBlockedParallel(localData, localFlux, myBlockH, myBlockW);
+        #else
+            stepMpi2D(localData, localFlux, myBlockH, myBlockW);
+        #endif
         // 2. Calcul du flux (sans modifier data)
-        stepMpi2DCheckboardInplaceBlocked(localData, localFlux, myBlockH, myBlockW);
+        stepMpi2DCheckboardBlocked(localData, localFlux, myBlockH, myBlockW);
 
         // 3. Échange des flux qui ont débordé dans les ghost cells (arêtes + coins)
         exchangeFluxBorders2D(localFlux, myBlockH, myBlockW, topNeigh, botNeigh, leftNeigh, rightNeigh, topLeftNeigh,
@@ -947,20 +1204,37 @@ int launchMPI2D(int argc, char *argv[])
     double total_ops = total_cell_updates * FLOPS_PER_CELL;
     double gflops = total_ops / elapsed / 1e9;
 
-    double bytes_per_cell = 72.0;
-    double total_bytes = total_cell_updates * bytes_per_cell;  // octets totaux transférés
-
-    double effective_bandwidth = total_bytes / elapsed / 1e9;  // GB/s;
 
     if (rank == 0)
     {
         //savePngHeightmap("MPI2D_after.png", globalData, GW, GH);
-        // printf("-------------- RESULT (MPI 2D %dx%d) --------------\n", P_rows, P_cols);
-        // printf("Relative error : %f\n", testConservation(globalInitial, globalData, GH * GW));
-        // printf("Elapsed : %.6f s\n", elapsed);
-        // printf("MLUPS: %.2f\n", mlups_total);
+
+        #if EROSION_MODE == 1
+            printf("-------------- RESULT (MPI 2D %dx%d) --------------\n", P_rows, P_cols);
+        #elif EROSION_MODE == 2
+            printf("-------------- RESULT (MPI 2D BLOCKED %dx%d) --------------\n", P_rows, P_cols);
+        #elif EROSION_MODE == 3
+            printf("-------------- RESULT (MPI 2D BLOCKED PARALLEL%dx%d) --------------\n", P_rows, P_cols);
+        #elif EROSION_MODE == 4
+            printf("-------------- RESULT (MPI 2D CHECKBOARD %dx%d) --------------\n", P_rows, P_cols);
+        #elif EROSION_MODE == 5
+            printf("-------------- RESULT (MPI 2D CHECKBOARD BLOCKED %dx%d) --------------\n", P_rows, P_cols);
+        #elif EROSION_MODE == 6
+            printf("-------------- RESULT (MPI 2D CHECKBOARD BLOCKED PARALLEL%dx%d) --------------\n", P_rows, P_cols);
+        #elif EROSION_MODE == 7
+            printf("-------------- RESULT (MPI 2D CHECKBOARD INPLACE %dx%d) --------------\n", P_rows, P_cols);
+        #elif EROSION_MODE == 8
+            printf("-------------- RESULT (MPI 2D CHECKBOARD INPLACE BLOCKED %dx%d) --------------\n", P_rows, P_cols);
+        #elif EROSION_MODE == 9
+            printf("-------------- RESULT (MPI 2D CHECKBOARD INPLACE BLOCKED PARALLEL %dx%d) --------------\n", P_rows, P_cols);
+        #else
+            printf("-------------- RESULT (MPI 2D %dx%d) --------------\n", P_rows, P_cols);
+        #endif
+
+        printf("Relative error : %f\n", testConservation(globalInitial, globalData, GH * GW));
+        printf("Elapsed : %.6f s\n", elapsed);
+        printf("MLUPS: %.2f\n", mlups_total);
         // printf("GFLOPS: %.2f\n", gflops);
-        //printf("Effective BW: %.2f GB/s\n", effective_bandwidth);
 
 
         free(globalData);
