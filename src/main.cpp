@@ -54,7 +54,8 @@ void printUsage(const char* program)
 {
     std::cerr << "Usage: " << program << " render\n";
     std::cerr << "Usage: " << program << " test <typeTerrain> <steps>\n";
-    std::cerr << "Usage: " << program << " MPI <typeTerrain> <width> <height> <steps>\n";
+    std::cerr << "Usage: " << program
+              << " MPI <typeTerrain> <W> <H> <steps> <P_rows> <P_cols> [--no-image] [--csv <file>]\n";
     std::cerr << "<typeTerrain> : loadHeightmap | faultFormation | midpointDisplacement | perlinNoise\n";
 }
 
@@ -161,10 +162,14 @@ int main(int argc, char* argv[])
 
     if (stateIt->second == State::MPI)
     {
-        if (argc < 6)
+        if (argc < 8)
         {
+#if EROSION_ENABLE_MPI
+            return launchMPI2D(argc, argv);
+#else
             printUsage(argv[0]);
             return 1;
+#endif
         }
 
 #if EROSION_ENABLE_MPI

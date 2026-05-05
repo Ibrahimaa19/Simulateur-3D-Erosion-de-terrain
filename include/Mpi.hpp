@@ -3,13 +3,23 @@
 #include <omp.h>
 
 #include "stb_image_write.h"
+#include <cerrno>
 #include <chrono>
+#include <climits>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <fstream>
+#include <iomanip>
 #include <numeric>
 #include <cstring>
 #include <algorithm>
 #include <cmath>
+#include <memory>
+#include <sstream>
+#include <string>
 #include <vector>
+#include <unistd.h>
 
 #include "FaultFormationTerrain.hpp"
 #include "MidpointDisplacement.hpp"
@@ -23,6 +33,10 @@
 #define TAG_FLUX_ROW 200
 #define TAG_FLUX_COL 201
 #define TAG_FLUX_CORNER 202
+
+#ifndef EROSION_MODE
+#define EROSION_MODE 5
+#endif
 
 
 int neighbors[8][2] = {{1, -1}, {1, 0}, {1, 1}, {0, -1}, {0, 1}, {-1, -1}, {-1, 0}, {-1, 1}};
@@ -50,29 +64,164 @@ static inline bool isPowerOfTwo(int n)
 }
 
 
-void generateTerrain(std::unique_ptr<Terrain> &terrain, int width, int height, std::string terrainType)
+static bool isValidTerrainType(const std::string &terrainType)
 {
+    return terrainType == "loadHeightmap" || terrainType == "faultFormation" || terrainType == "midpointDisplacement" ||
+           terrainType == "perlinNoise";
+}
+
+static bool parsePositiveInt(const char *text, const char *name, int &value, std::string &error)
+{
+    errno = 0;
+    char *end = nullptr;
+    const long parsed = std::strtol(text, &end, 10);
+
+    if (errno != 0 || end == text || *end != '\0' || parsed <= 0 || parsed > INT_MAX)
+    {
+        std::ostringstream oss;
+        oss << "Argument invalide pour " << name << " : '" << text << "' (entier strictement positif attendu)";
+        error = oss.str();
+        return false;
+    }
+
+    value = static_cast<int>(parsed);
+    return true;
+}
+
+static int getOmpMaxThreads()
+{
+#ifdef _OPENMP
+    return omp_get_max_threads();
+#else
+    return 1;
+#endif
+}
+
+static const char *erosionModeName()
+{
+#if EROSION_MODE == 1
+    return "MPI 2D";
+#elif EROSION_MODE == 2
+    return "MPI 2D BLOCKED";
+#elif EROSION_MODE == 3
+    return "MPI 2D BLOCKED PARALLEL";
+#elif EROSION_MODE == 4
+    return "MPI 2D CHECKBOARD";
+#elif EROSION_MODE == 5
+    return "MPI 2D CHECKBOARD BLOCKED";
+#elif EROSION_MODE == 6
+    return "MPI 2D CHECKBOARD BLOCKED PARALLEL";
+#elif EROSION_MODE == 7
+    return "MPI 2D CHECKBOARD INPLACE";
+#elif EROSION_MODE == 8
+    return "MPI 2D CHECKBOARD INPLACE BLOCKED";
+#elif EROSION_MODE == 9
+    return "MPI 2D CHECKBOARD INPLACE BLOCKED PARALLEL";
+#else
+    return "MPI 2D";
+#endif
+}
+
+static std::string buildPngFilename(const char *stage, const std::string &terrainType, int width, int height, int steps,
+                                    int mpiRanks, int pRows, int pCols, int ompThreads)
+{
+    std::ostringstream oss;
+    oss << "MPI2D_" << stage << "_" << terrainType << "_" << width << "x" << height << "_steps" << steps << "_ranks"
+        << mpiRanks << "_p" << pRows << "x" << pCols << "_omp" << ompThreads;
+
+    const char *jobId = std::getenv("SLURM_JOB_ID");
+    if (jobId != nullptr && jobId[0] != '\0')
+    {
+        oss << "_job" << jobId;
+    }
+
+    oss << ".png";
+    return oss.str();
+}
+
+static bool csvFileHasContent(const std::string &path)
+{
+    std::ifstream in(path, std::ios::binary);
+    return in.good() && in.peek() != std::char_traits<char>::eof();
+}
+
+static bool appendBenchmarkCsv(const std::string &path, const std::string &terrainType, int width, int height, int steps,
+                               int mpiRanks, int pRows, int pCols, int ompThreads, double elapsed, double relativeError,
+                               double mlups, std::string &error)
+{
+    const bool needsHeader = !csvFileHasContent(path);
+    std::ofstream out(path, std::ios::app);
+    if (!out)
+    {
+        error = "Impossible d'ouvrir le fichier CSV : " + path;
+        return false;
+    }
+
+    if (needsHeader)
+    {
+        out << "terrain,W,H,steps,mpi_ranks,p_rows,p_cols,omp_threads,elapsed_s,relative_error,mlups\n";
+    }
+
+    out << terrainType << "," << width << "," << height << "," << steps << "," << mpiRanks << "," << pRows << ","
+        << pCols << "," << ompThreads << "," << std::fixed << std::setprecision(6) << elapsed << ","
+        << std::scientific << std::setprecision(12) << relativeError << "," << std::fixed << std::setprecision(6)
+        << mlups << "\n";
+
+    return true;
+}
+
+static bool generateTerrain(std::unique_ptr<Terrain> &terrain, int width, int height, const std::string &terrainType,
+                            std::string &error)
+{
+    if (terrainType == "loadHeightmap")
+    {
+        auto loaded = std::make_unique<Terrain>();
+        loaded->loadTerrain("../src/heightmap/heightmap.png", 1.0f, 100.0f);
+        if (loaded->getTerrainWidth() != width || loaded->getTerrainHeight() != height)
+        {
+            std::ostringstream oss;
+            oss << "La heightmap chargee mesure " << loaded->getTerrainWidth() << "x" << loaded->getTerrainHeight()
+                << ", mais la commande demande " << width << "x" << height;
+            error = oss.str();
+            return false;
+        }
+        terrain = std::move(loaded);
+        return true;
+    }
+
     if (terrainType == "faultFormation")
     {
         auto generator = std::make_unique<FaultFormationTerrain>();
         generator->CreateFaultFormation(width, height, 1000, 0, 255, 1);
         terrain = std::move(generator);
+        return true;
     }
     else if (terrainType == "midpointDisplacement")
     {
+        if (width != height || !isPowerOfTwo(width - 1))
+        {
+            std::ostringstream oss;
+            oss << "midpointDisplacement exige W == H et W = 2^n + 1 (recu " << width << "x" << height << ")";
+            error = oss.str();
+            return false;
+        }
+
         auto generator = std::make_unique<MidpointDisplacement>();
         generator->CreateMidpointDisplacement(width, 0, 255, 1, 0.5);
         terrain = std::move(generator);
+        return true;
     }
-    else
-    {
-        if (terrainType != "perlinNoise")
-            printf("Default terrain : PerlinNoise \n");
 
+    if (terrainType == "perlinNoise")
+    {
         auto generator = std::make_unique<PerlinNoiseTerrain>();
         generator->CreatePerlinNoise(width, height, 0, 255, 1, 0.005);
         terrain = std::move(generator);
+        return true;
     }
+
+    error = "Terrain invalide : " + terrainType;
+    return false;
 }
 
 
@@ -115,6 +264,39 @@ static float testConservation(const float *initialData, const float *finalData, 
     float relativeError = fabs((sumFinal - sumInitial) / sumInitial);
 
     return relativeError;
+}
+
+struct HeightmapValidation
+{
+    bool hasNanOrInf = false;
+    bool hasNegative = false;
+    float minHeight = 0.0f;
+};
+
+static HeightmapValidation validateHeightmap(const float *data, int size)
+{
+    HeightmapValidation result;
+    if (size <= 0)
+    {
+        return result;
+    }
+
+    result.minHeight = data[0];
+    for (int i = 0; i < size; ++i)
+    {
+        const float value = data[i];
+        if (!std::isfinite(value))
+        {
+            result.hasNanOrInf = true;
+        }
+        if (value < 0.0f)
+        {
+            result.hasNegative = true;
+        }
+        result.minHeight = std::min(result.minHeight, value);
+    }
+
+    return result;
 }
 
 // -----------------------------------------------------------
@@ -266,7 +448,7 @@ static void stepMpi2DBlockedParallel(const float *__restrict__ data, float *__re
     omp_lock_t fluxLock;
     omp_init_lock(&fluxLock);
 
-    #pragma omp parallel for collapse(2) schedule(static)
+    #pragma omp parallel for schedule(static)
     for (int ii = 1; ii <= H; ii += BLOCK_SIZE_I)
     {
         int i_max = std::min(ii + BLOCK_SIZE_I - 1, H);
@@ -485,7 +667,7 @@ static void stepMpi2DCheckboardBlockedParallel(const float *__restrict__ data, f
     const int BLOCK_SIZE_J = 64;
 
     for (int color=0;color<2;++color){
-        #pragma omp parallel for collapse(2) schedule(static)
+        #pragma omp parallel for schedule(static)
         for (int ii = 1; ii <= H; ii += BLOCK_SIZE_I)
         {
             int i_max = std::min(ii + BLOCK_SIZE_I - 1, H);
@@ -1077,36 +1259,110 @@ static void gather2D(float *globalData, float *localData, int GH, int GW, int ba
 
 // -----------------------------------------------------------
 //  launchMPI2D
-//  mpirun -np <N> ./prog mpi2d <type> <W> <H> <steps> <P_rows> <P_cols>
+//  mpirun -np <N> ./prog MPI <type> <W> <H> <steps> <P_rows> <P_cols> [--no-image] [--csv <file>]
 // -----------------------------------------------------------
 int launchMPI2D(int argc, char *argv[])
 {
-    if (argc < 8)
-    {
-        if (argc > 1)
-            fprintf(stderr, "Usage: %s mpi2d <terrainType> <W> <H> <steps> <P_rows> <P_cols>\n", argv[0]);
-        return 1;
-    }
-
     MPI_Init(&argc, &argv);
 
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    std::string terrainType = argv[2];
-    int GW = atoi(argv[3]);
-    int GH = atoi(argv[4]);
-    int steps = atoi(argv[5]);
-    int P_rows = atoi(argv[6]);
-    int P_cols = atoi(argv[7]);
-
-    if (P_rows * P_cols != size)
+    const auto failAfterInit = [&](const std::string &message)
     {
         if (rank == 0)
-            fprintf(stderr, "Erreur : P_rows(%d) * P_cols(%d) != nb_procs(%d)\n", P_rows, P_cols, size);
+        {
+            fprintf(stderr, "Erreur : %s\n", message.c_str());
+            fprintf(stderr, "Usage: %s MPI <terrainType> <W> <H> <steps> <P_rows> <P_cols> [--no-image] [--csv <file>]\n",
+                    argv[0]);
+            fprintf(stderr, "<terrainType> : loadHeightmap | faultFormation | midpointDisplacement | perlinNoise\n");
+        }
         MPI_Finalize();
         return 1;
+    };
+
+    if (argc < 8)
+    {
+        return failAfterInit("commande MPI incomplete");
+    }
+
+    std::string terrainType = argv[2];
+    int GW = 0;
+    int GH = 0;
+    int steps = 0;
+    int P_rows = 0;
+    int P_cols = 0;
+    std::string parseError;
+
+    if (!isValidTerrainType(terrainType))
+    {
+        return failAfterInit("terrain invalide : " + terrainType);
+    }
+
+    if (!parsePositiveInt(argv[3], "W", GW, parseError) || !parsePositiveInt(argv[4], "H", GH, parseError) ||
+        !parsePositiveInt(argv[5], "steps", steps, parseError) ||
+        !parsePositiveInt(argv[6], "P_rows", P_rows, parseError) ||
+        !parsePositiveInt(argv[7], "P_cols", P_cols, parseError))
+    {
+        return failAfterInit(parseError);
+    }
+
+    bool writeImages = true;
+    std::string csvFile;
+
+    for (int arg = 8; arg < argc; ++arg)
+    {
+        const std::string option = argv[arg];
+        if (option == "--no-image")
+        {
+            writeImages = false;
+        }
+        else if (option == "--csv")
+        {
+            if (arg + 1 >= argc)
+            {
+                return failAfterInit("l'option --csv exige un chemin de fichier");
+            }
+            csvFile = argv[++arg];
+        }
+        else
+        {
+            return failAfterInit("option inconnue : " + option);
+        }
+    }
+
+    if (static_cast<long long>(P_rows) * static_cast<long long>(P_cols) != size)
+    {
+        std::ostringstream oss;
+        oss << "P_rows(" << P_rows << ") * P_cols(" << P_cols << ") != nb_procs(" << size << ")";
+        return failAfterInit(oss.str());
+    }
+
+    if (GW % P_cols != 0)
+    {
+        std::ostringstream oss;
+        oss << "W(" << GW << ") doit etre divisible par P_cols(" << P_cols << ") pour les benchmarks";
+        return failAfterInit(oss.str());
+    }
+
+    if (GH % P_rows != 0)
+    {
+        std::ostringstream oss;
+        oss << "H(" << GH << ") doit etre divisible par P_rows(" << P_rows << ") pour les benchmarks";
+        return failAfterInit(oss.str());
+    }
+
+    const int ompThreads = getOmpMaxThreads();
+    if (rank == 0)
+    {
+        char hostname[256] = {0};
+        if (gethostname(hostname, sizeof(hostname) - 1) != 0)
+        {
+            std::snprintf(hostname, sizeof(hostname), "unknown");
+        }
+        printf("rank=%d host=%s omp_max=%d mpi_ranks=%d\n", rank, hostname, ompThreads, size);
+        printf("Erosion mode : %s (EROSION_MODE=%d)\n", erosionModeName(), EROSION_MODE);
     }
 
     int myRow = rank / P_cols;
@@ -1134,21 +1390,70 @@ int launchMPI2D(int argc, char *argv[])
 
     float *localData = (float *)calloc(localSize, sizeof(float));
     float *localFlux = (float *)calloc(localSize, sizeof(float));
+    const int localAllocOk = (localData != nullptr && localFlux != nullptr) ? 1 : 0;
+    int allLocalAllocOk = 0;
+    MPI_Allreduce(&localAllocOk, &allLocalAllocOk, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+    if (!allLocalAllocOk)
+    {
+        if (rank == 0)
+        {
+            fprintf(stderr, "Erreur : allocation des sous-grilles locales impossible\n");
+        }
+        free(localData);
+        free(localFlux);
+        MPI_Finalize();
+        return 1;
+    }
 
     float *globalData = nullptr;
     float *globalInitial = nullptr;
+    int generationOk = 1;
 
     if (rank == 0)
     {
         std::unique_ptr<Terrain> terrain;
-        generateTerrain(terrain, GW, GH, terrainType);
-        globalData = (float *)malloc(GH * GW * sizeof(float));
-        memcpy(globalData, terrain->getData()->data(), GH * GW * sizeof(float));
+        std::string generationError;
+        if (!generateTerrain(terrain, GW, GH, terrainType, generationError))
+        {
+            fprintf(stderr, "Erreur : %s\n", generationError.c_str());
+            generationOk = 0;
+        }
 
-        globalInitial = (float *)malloc(GH * GW * sizeof(float));
-        memcpy(globalInitial, globalData, GH * GW * sizeof(float));
+        if (generationOk)
+        {
+            globalData = (float *)malloc(GH * GW * sizeof(float));
+            if (globalData == nullptr)
+            {
+                fprintf(stderr, "Erreur : allocation globalData impossible\n");
+                MPI_Abort(MPI_COMM_WORLD, 1);
+            }
+            memcpy(globalData, terrain->getData()->data(), GH * GW * sizeof(float));
 
-        //savePngHeightmap("MPI2D_before.png", globalData, GW, GH);
+            globalInitial = (float *)malloc(GH * GW * sizeof(float));
+            if (globalInitial == nullptr)
+            {
+                fprintf(stderr, "Erreur : allocation globalInitial impossible\n");
+                free(globalData);
+                MPI_Abort(MPI_COMM_WORLD, 1);
+            }
+            memcpy(globalInitial, globalData, GH * GW * sizeof(float));
+
+            if (writeImages)
+            {
+                const std::string beforeName =
+                    buildPngFilename("before", terrainType, GW, GH, steps, size, P_rows, P_cols, ompThreads);
+                savePngHeightmap(beforeName.c_str(), globalData, GW, GH);
+            }
+        }
+    }
+
+    MPI_Bcast(&generationOk, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    if (!generationOk)
+    {
+        free(localData);
+        free(localFlux);
+        MPI_Finalize();
+        return 1;
     }
 
     double t0 = MPI_Wtime();
@@ -1182,8 +1487,6 @@ int launchMPI2D(int argc, char *argv[])
         #else
             stepMpi2D(localData, localFlux, myBlockH, myBlockW);
         #endif
-        // 2. Calcul du flux (sans modifier data)
-        stepMpi2DCheckboardBlocked(localData, localFlux, myBlockH, myBlockW);
 
         // 3. Échange des flux qui ont débordé dans les ghost cells (arêtes + coins)
         exchangeFluxBorders2D(localFlux, myBlockH, myBlockW, topNeigh, botNeigh, leftNeigh, rightNeigh, topLeftNeigh,
@@ -1200,42 +1503,53 @@ int launchMPI2D(int argc, char *argv[])
     double total_cell_updates = (double)steps * GH * GW;
     double mlups_total = total_cell_updates / elapsed / 1e6;
 
-    const uint8_t FLOPS_PER_CELL = 52; // 28 avec 4 voisins
-    double total_ops = total_cell_updates * FLOPS_PER_CELL;
-    double gflops = total_ops / elapsed / 1e9;
-
+    int exitCode = 0;
 
     if (rank == 0)
     {
-        //savePngHeightmap("MPI2D_after.png", globalData, GW, GH);
+        const double relativeError = testConservation(globalInitial, globalData, GH * GW);
+        const HeightmapValidation validation = validateHeightmap(globalData, GH * GW);
 
-        #if EROSION_MODE == 1
-            printf("-------------- RESULT (MPI 2D %dx%d) --------------\n", P_rows, P_cols);
-        #elif EROSION_MODE == 2
-            printf("-------------- RESULT (MPI 2D BLOCKED %dx%d) --------------\n", P_rows, P_cols);
-        #elif EROSION_MODE == 3
-            printf("-------------- RESULT (MPI 2D BLOCKED PARALLEL%dx%d) --------------\n", P_rows, P_cols);
-        #elif EROSION_MODE == 4
-            printf("-------------- RESULT (MPI 2D CHECKBOARD %dx%d) --------------\n", P_rows, P_cols);
-        #elif EROSION_MODE == 5
-            printf("-------------- RESULT (MPI 2D CHECKBOARD BLOCKED %dx%d) --------------\n", P_rows, P_cols);
-        #elif EROSION_MODE == 6
-            printf("-------------- RESULT (MPI 2D CHECKBOARD BLOCKED PARALLEL%dx%d) --------------\n", P_rows, P_cols);
-        #elif EROSION_MODE == 7
-            printf("-------------- RESULT (MPI 2D CHECKBOARD INPLACE %dx%d) --------------\n", P_rows, P_cols);
-        #elif EROSION_MODE == 8
-            printf("-------------- RESULT (MPI 2D CHECKBOARD INPLACE BLOCKED %dx%d) --------------\n", P_rows, P_cols);
-        #elif EROSION_MODE == 9
-            printf("-------------- RESULT (MPI 2D CHECKBOARD INPLACE BLOCKED PARALLEL %dx%d) --------------\n", P_rows, P_cols);
-        #else
-            printf("-------------- RESULT (MPI 2D %dx%d) --------------\n", P_rows, P_cols);
-        #endif
+        if (writeImages)
+        {
+            const std::string afterName =
+                buildPngFilename("after", terrainType, GW, GH, steps, size, P_rows, P_cols, ompThreads);
+            savePngHeightmap(afterName.c_str(), globalData, GW, GH);
+        }
 
-        printf("Relative error : %f\n", testConservation(globalInitial, globalData, GH * GW));
+        printf("-------------- RESULT (%s %dx%d) --------------\n", erosionModeName(), P_rows, P_cols);
+
+        printf("Relative error : %f\n", relativeError);
         printf("Elapsed : %.6f s\n", elapsed);
         printf("MLUPS: %.2f\n", mlups_total);
+        printf("CSV_RESULT,%s,%d,%d,%d,%d,%d,%d,%d,%.6f,%.12e,%.6f\n", terrainType.c_str(), GW, GH, steps, size,
+               P_rows, P_cols, ompThreads, elapsed, relativeError, mlups_total);
         // printf("GFLOPS: %.2f\n", gflops);
 
+        if (relativeError > 1e-5)
+        {
+            fprintf(stderr, "Warning : relative error %.12e > 1e-5\n", relativeError);
+        }
+        if (validation.hasNegative)
+        {
+            fprintf(stderr, "Warning : hauteur negative detectee (min=%f)\n", validation.minHeight);
+        }
+        if (validation.hasNanOrInf)
+        {
+            fprintf(stderr, "Erreur : NaN ou Inf detecte dans la grille finale\n");
+            exitCode = 2;
+        }
+
+        if (!csvFile.empty())
+        {
+            std::string csvError;
+            if (!appendBenchmarkCsv(csvFile, terrainType, GW, GH, steps, size, P_rows, P_cols, ompThreads, elapsed,
+                                    relativeError, mlups_total, csvError))
+            {
+                fprintf(stderr, "Erreur : %s\n", csvError.c_str());
+                exitCode = 1;
+            }
+        }
 
         free(globalData);
         free(globalInitial);
@@ -1244,6 +1558,7 @@ int launchMPI2D(int argc, char *argv[])
     free(localData);
     free(localFlux);
 
+    MPI_Bcast(&exitCode, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Finalize();
-    return 0;
+    return exitCode;
 }

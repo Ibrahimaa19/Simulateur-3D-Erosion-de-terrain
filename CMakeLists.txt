@@ -9,6 +9,7 @@ option(EROSION_ENABLE_RENDERING "Build the OpenGL/GLFW/ImGui renderer" ON)
 option(EROSION_ENABLE_MPI "Build MPI execution mode" ON)
 option(EROSION_ENABLE_TESTS "Build dependency-free core tests" ON)
 option(EROSION_NATIVE_ARCH "Enable -march=native for local benchmarking" OFF)
+set(EROSION_MODE "5" CACHE STRING "MPI erosion kernel mode selected in include/Mpi.hpp")
 
 find_package(OpenMP REQUIRED)
 
@@ -54,9 +55,34 @@ target_compile_definitions(${PROJECT_NAME}
     PRIVATE
         EROSION_ENABLE_RENDERING=$<BOOL:${EROSION_ENABLE_RENDERING}>
         EROSION_ENABLE_MPI=$<BOOL:${EROSION_ENABLE_MPI}>
+        EROSION_MODE=${EROSION_MODE}
 )
 
 if(EROSION_ENABLE_MPI)
+    find_program(EROSION_MPI_CXX_WRAPPER NAMES mpicxx mpic++ mpiCC)
+    if(EROSION_MPI_CXX_WRAPPER)
+        set(MPI_CXX_COMPILER "${EROSION_MPI_CXX_WRAPPER}" CACHE FILEPATH "MPI C++ compiler")
+
+        execute_process(
+            COMMAND "${EROSION_MPI_CXX_WRAPPER}" --showme:compile
+            OUTPUT_VARIABLE EROSION_MPI_COMPILE_FLAGS
+            ERROR_QUIET
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        string(REGEX MATCHALL "-I[^ \n\t]+" EROSION_MPI_INCLUDE_FLAGS "${EROSION_MPI_COMPILE_FLAGS}")
+        set(EROSION_MPI_INCLUDE_DIRS "")
+        foreach(EROSION_MPI_INCLUDE_FLAG IN LISTS EROSION_MPI_INCLUDE_FLAGS)
+            string(REGEX REPLACE "^-I" "" EROSION_MPI_INCLUDE_DIR "${EROSION_MPI_INCLUDE_FLAG}")
+            if(IS_DIRECTORY "${EROSION_MPI_INCLUDE_DIR}")
+                list(APPEND EROSION_MPI_INCLUDE_DIRS "${EROSION_MPI_INCLUDE_DIR}")
+            endif()
+        endforeach()
+        if(EROSION_MPI_INCLUDE_DIRS)
+            list(REMOVE_DUPLICATES EROSION_MPI_INCLUDE_DIRS)
+            set(MPI_CXX_COMPILER_INCLUDE_DIRS "${EROSION_MPI_INCLUDE_DIRS}" CACHE STRING "MPI C++ include dirs" FORCE)
+        endif()
+    endif()
+
     find_package(MPI REQUIRED COMPONENTS CXX)
 
     target_link_libraries(${PROJECT_NAME}
