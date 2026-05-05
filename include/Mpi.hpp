@@ -35,7 +35,7 @@
 #define TAG_FLUX_CORNER 202
 
 #ifndef EROSION_MODE
-#define EROSION_MODE 5
+#define EROSION_MODE 11
 #endif
 
 
@@ -117,8 +117,36 @@ static const char *erosionModeName()
     return "MPI 2D CHECKBOARD INPLACE BLOCKED";
 #elif EROSION_MODE == 9
     return "MPI 2D CHECKBOARD INPLACE BLOCKED PARALLEL";
+#elif EROSION_MODE == 10
+    return "MPI 2D COLORING PARALLEL SAFE";
+#elif EROSION_MODE == 11
+    return "MPI 2D ATOMIC PARALLEL SAFE";
 #else
     return "MPI 2D";
+#endif
+}
+
+static bool erosionModeUsesOpenMP()
+{
+#if EROSION_MODE == 3 || EROSION_MODE == 6 || EROSION_MODE == 9 || EROSION_MODE == 10 || EROSION_MODE == 11
+    return true;
+#else
+    return false;
+#endif
+}
+
+static int getOmpTeamSize()
+{
+#ifdef _OPENMP
+    int teamSize = 1;
+    #pragma omp parallel
+    {
+        #pragma omp single
+        teamSize = omp_get_num_threads();
+    }
+    return teamSize;
+#else
+    return 1;
 #endif
 }
 
@@ -720,6 +748,125 @@ static void stepMpi2DCheckboardBlockedParallel(const float *__restrict__ data, f
 
 }
 
+static int firstIndexWithModulo(int begin, int modulo, int residue)
+{
+    const int currentResidue = begin % modulo;
+    const int delta = (residue - currentResidue + modulo) % modulo;
+    return begin + delta;
+}
+
+static void stepMpi2DColoringParallelSafe(const float *__restrict__ data, float *__restrict__ flux, int H, int W)
+{
+    const float transferRate = 0.5f;
+    const float PI = 3.14159265f;
+    const float talusAngle = std::tan(30.f * PI / 180.f);
+    const int stride = W + 2;
+
+    memset(flux, 0, sizeof(float) * (H + 2) * stride);
+
+    const int di[4] = {1, -1, 0, 0};
+    const int dj[4] = {0, 0, -1, 1};
+    const int colorModulo = 4;
+
+#pragma omp parallel
+    {
+        for (int rowResidue = 0; rowResidue < colorModulo; ++rowResidue)
+        {
+            const int iStart = firstIndexWithModulo(1, colorModulo, rowResidue);
+            for (int colResidue = 0; colResidue < colorModulo; ++colResidue)
+            {
+                const int jStart = firstIndexWithModulo(1, colorModulo, colResidue);
+
+#pragma omp for collapse(2) schedule(static)
+                for (int i = iStart; i <= H; i += colorModulo)
+                {
+                    for (int j = jStart; j <= W; j += colorModulo)
+                    {
+                        const float cur = data[i * stride + j];
+                        float diff[4], totalDiff = 0.f, validCount = 0.f;
+
+                        for (int k = 0; k < 4; ++k)
+                        {
+                            diff[k] = cur - data[(i + di[k]) * stride + (j + dj[k])];
+                            if (diff[k] > talusAngle)
+                            {
+                                totalDiff += diff[k];
+                                validCount += 1.f;
+                            }
+                        }
+
+                        if (totalDiff > 0.f && validCount > 0.f)
+                        {
+                            float mat = transferRate * (totalDiff / validCount);
+                            mat = std::min(mat, cur * transferRate);
+
+                            flux[i * stride + j] -= mat;
+
+                            for (int k = 0; k < 4; ++k)
+                            {
+                                if (diff[k] > talusAngle)
+                                    flux[(i + di[k]) * stride + (j + dj[k])] += mat * (diff[k] / totalDiff);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+static void stepMpi2DAtomicParallelSafe(const float *__restrict__ data, float *__restrict__ flux, int H, int W)
+{
+    const float transferRate = 0.5f;
+    const float PI = 3.14159265f;
+    const float talusAngle = std::tan(30.f * PI / 180.f);
+    const int stride = W + 2;
+
+    memset(flux, 0, sizeof(float) * (H + 2) * stride);
+
+    const int di[4] = {1, -1, 0, 0};
+    const int dj[4] = {0, 0, -1, 1};
+
+#pragma omp parallel for collapse(2) schedule(static)
+    for (int i = 1; i <= H; ++i)
+    {
+        for (int j = 1; j <= W; ++j)
+        {
+            const float cur = data[i * stride + j];
+            float diff[4], totalDiff = 0.f, validCount = 0.f;
+
+            for (int k = 0; k < 4; ++k)
+            {
+                diff[k] = cur - data[(i + di[k]) * stride + (j + dj[k])];
+                if (diff[k] > talusAngle)
+                {
+                    totalDiff += diff[k];
+                    validCount += 1.f;
+                }
+            }
+
+            if (totalDiff > 0.f && validCount > 0.f)
+            {
+                float mat = transferRate * (totalDiff / validCount);
+                mat = std::min(mat, cur * transferRate);
+
+#pragma omp atomic update
+                flux[i * stride + j] -= mat;
+
+                for (int k = 0; k < 4; ++k)
+                {
+                    if (diff[k] > talusAngle)
+                    {
+                        const float amount = mat * (diff[k] / totalDiff);
+#pragma omp atomic update
+                        flux[(i + di[k]) * stride + (j + dj[k])] += amount;
+                    }
+                }
+            }
+        }
+    }
+}
+
 static void stepMpi2DCheckboardInplace(const float *__restrict__ data, float *__restrict__ flux, int H, int W)
 {
     const float transferRate = 0.5f;
@@ -918,6 +1065,15 @@ static void stepMpi2DCheckboardInplaceBlockedParallel(const float *__restrict__ 
 static void applyFlux2D(float *__restrict__ data, const float *__restrict__ flux, int H, int W)
 {
     const int stride = W + 2;
+    for (int i = 1; i <= H; ++i)
+        for (int j = 1; j <= W; ++j)
+            data[i * stride + j] += flux[i * stride + j];
+}
+
+static void applyFlux2DParallel(float *__restrict__ data, const float *__restrict__ flux, int H, int W)
+{
+    const int stride = W + 2;
+#pragma omp parallel for collapse(2) schedule(static)
     for (int i = 1; i <= H; ++i)
         for (int j = 1; j <= W; ++j)
             data[i * stride + j] += flux[i * stride + j];
@@ -1363,6 +1519,8 @@ int launchMPI2D(int argc, char *argv[])
         }
         printf("rank=%d host=%s omp_max=%d mpi_ranks=%d\n", rank, hostname, ompThreads, size);
         printf("Erosion mode : %s (EROSION_MODE=%d)\n", erosionModeName(), EROSION_MODE);
+        printf("OpenMP enabled : %s\n", erosionModeUsesOpenMP() ? "yes" : "no");
+        printf("rank=%d omp_team=%d\n", rank, getOmpTeamSize());
     }
 
     int myRow = rank / P_cols;
@@ -1484,6 +1642,10 @@ int launchMPI2D(int argc, char *argv[])
             stepMpi2DCheckboardInplaceBlocked(localData, localFlux, myBlockH, myBlockW);
         #elif EROSION_MODE == 9
             stepMpi2DCheckboardInplaceBlockedParallel(localData, localFlux, myBlockH, myBlockW);
+        #elif EROSION_MODE == 10
+            stepMpi2DColoringParallelSafe(localData, localFlux, myBlockH, myBlockW);
+        #elif EROSION_MODE == 11
+            stepMpi2DAtomicParallelSafe(localData, localFlux, myBlockH, myBlockW);
         #else
             stepMpi2D(localData, localFlux, myBlockH, myBlockW);
         #endif
@@ -1493,7 +1655,11 @@ int launchMPI2D(int argc, char *argv[])
                               topRightNeigh, botLeftNeigh, botRightNeigh);
 
         // 4. Application du flux
-        applyFlux2D(localData, localFlux, myBlockH, myBlockW);
+        #if EROSION_MODE == 10 || EROSION_MODE == 11
+            applyFlux2DParallel(localData, localFlux, myBlockH, myBlockW);
+        #else
+            applyFlux2D(localData, localFlux, myBlockH, myBlockW);
+        #endif
     }
 
     gather2D(globalData, localData, GH, GW, baseBlockH, baseBlockW, P_rows, P_cols, myBlockH, myBlockW, rank);

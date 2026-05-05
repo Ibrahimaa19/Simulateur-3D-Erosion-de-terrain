@@ -9,7 +9,7 @@ option(EROSION_ENABLE_RENDERING "Build the OpenGL/GLFW/ImGui renderer" ON)
 option(EROSION_ENABLE_MPI "Build MPI execution mode" ON)
 option(EROSION_ENABLE_TESTS "Build dependency-free core tests" ON)
 option(EROSION_NATIVE_ARCH "Enable -march=native for local benchmarking" OFF)
-set(EROSION_MODE "5" CACHE STRING "MPI erosion kernel mode selected in include/Mpi.hpp")
+set(EROSION_MODE "11" CACHE STRING "MPI erosion kernel mode selected in include/Mpi.hpp")
 
 find_package(OpenMP REQUIRED)
 

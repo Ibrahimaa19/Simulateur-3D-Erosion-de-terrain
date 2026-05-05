@@ -13,12 +13,13 @@ RANKS="${RANKS:-16}"
 OMP="${OMP:-8}"
 P_ROWS="${P_ROWS:-4}"
 P_COLS="${P_COLS:-4}"
+EROSION_MODE="${EROSION_MODE:-11}"
 
 for size in 512 1024 2048 4096 8192; do
   sbatch \
     --nodes=1 \
     --ntasks="$RANKS" \
     --cpus-per-task="$OMP" \
-    --export=ALL,TERRAIN="$TERRAIN",W="$size",H="$size",STEPS="$STEPS",P_ROWS="$P_ROWS",P_COLS="$P_COLS" \
+    --export=ALL,TERRAIN="$TERRAIN",W="$size",H="$size",STEPS="$STEPS",P_ROWS="$P_ROWS",P_COLS="$P_COLS",EROSION_MODE="$EROSION_MODE" \
     "$SCRIPT_DIR/run_one_config.slurm"
 done
